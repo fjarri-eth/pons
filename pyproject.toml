@@ -11,6 +11,12 @@ dependencies = [
     "eth-account>=0.5",
     "eth-utils>=1.10",
     "eth-abi>=2",
+    "py-solc-x>=1",
+    "pysha3>=1",
+    # Stupid eth-tester only has pre-releases, so we can't set a range.
+    # Another option is to pin it, but it's a library, so let's hope tests will catch whatever.
+    # TODO: make our own mock around Pyevm.
+    "eth-tester[pyevm]",
 ]
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -21,7 +27,9 @@ homepage = "https://github.com/fjarri/pons"
 [project.optional-dependencies]
 dev = [
     "pytest>=6",
+    "pytest-trio",
 ]
+
 [tool]
 [tool.pdm]
 [tool.pdm.dev-dependencies]
