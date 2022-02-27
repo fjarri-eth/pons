@@ -18,7 +18,7 @@ class CompiledContract(Contract):
             contract_source = f.read()
 
         compiled = solcx.compile_source(
-            contract_source, output_values=["abi", "bin"], solc_version="0.8.9", evm_version='london')
+            contract_source, output_values=["abi", "bin"], evm_version='london')
         compiled = compiled['<stdin>:Test']
 
         return cls(compiled['abi'], compiled['bin'])

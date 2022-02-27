@@ -28,6 +28,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install -e .[dev]
+    # py-solc-x can do it too, but let's use standard system tools
+    - name: Install solc
+      run: |
+        sudo add-apt-repository ppa:ethereum/ethereum
+        sudo apt-get update
+        sudo apt-get install solc
     - name: Test with pytest
       run: |
         pytest
