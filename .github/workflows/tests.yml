@@ -36,4 +36,10 @@ jobs:
         sudo apt-get install solc
     - name: Test with pytest
       run: |
-        pytest
+        py.test --cov=pons --cov-report=xml
+    - name: Upload coverage
+      if: matrix.python-version == '3.8'
+      run: |
+        curl -Os https://uploader.codecov.io/latest/linux/codecov
+        chmod +x codecov
+        ./codecov

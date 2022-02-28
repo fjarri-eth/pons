@@ -28,6 +28,7 @@ homepage = "https://github.com/fjarri/pons"
 dev = [
     "pytest>=6",
     "pytest-trio",
+    "pytest-cov",
 ]
 
 [tool]
