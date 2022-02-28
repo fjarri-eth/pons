@@ -30,6 +30,10 @@ dev = [
     "pytest-trio",
     "pytest-cov",
 ]
+docs = [
+    "sphinx>=4",
+    "furo",
+]
 
 [tool]
 [tool.pdm]
