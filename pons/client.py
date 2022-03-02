@@ -17,8 +17,8 @@ class Client:
 
     def __init__(self, provider: Provider):
         self._provider = provider
-        self._net_version = None
-        self._chain_id = None
+        self._net_version: Optional[str] = None
+        self._chain_id: Optional[int] = None
 
     def with_signer(self, signer: Signer):
         return SigningClient(self._provider, signer)

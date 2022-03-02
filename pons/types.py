@@ -7,10 +7,10 @@ from eth_utils import to_checksum_address, to_canonical_address, to_wei
 class Wei:
 
     @classmethod
-    def from_unit(cls, quantity, unit):
+    def from_unit(cls, quantity: int, unit: str) -> 'Wei':
         return cls(to_wei(quantity, unit))
 
-    def __init__(self, wei):
+    def __init__(self, wei: int):
         self.wei = wei
 
     def __int__(self):
