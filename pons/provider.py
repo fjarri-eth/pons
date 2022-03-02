@@ -17,9 +17,10 @@ class Provider(ABC):
 
 class EthereumTesterProvider(Provider):
 
-    def __init__(self, root_balance: Wei = 100):
-        state_overrides = {'balance': int(Wei.from_unit(root_balance, 'ether'))}
-        custom_genesis_state = PyEVMBackend.generate_genesis_state(num_accounts=1)
+    def __init__(self, root_balance_eth: int = 100):
+        custom_genesis_state = PyEVMBackend.generate_genesis_state(
+            num_accounts=1,
+            overrides=dict(balance=int(Wei.from_unit(root_balance_eth, 'ether'))))
         backend = PyEVMBackend(genesis_state=custom_genesis_state)
         self._ethereum_tester = EthereumTester(backend)
         self.root_account = Account.from_key(backend.account_keys[0])
