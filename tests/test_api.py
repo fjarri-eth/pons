@@ -10,19 +10,21 @@ async def test_payment(test_provider):
     client = Client(provider=test_provider)
 
     root_account = test_provider.root_account
-    root_client = client.with_signer(root_account)
+    root_client = client.with_signer(AccountSigner(root_account))
 
     acc1 = Account.create()
     acc1_client = client.with_signer(acc1)
 
-    # Fund the deployer account
+    root_address = Address.from_hex(root_account.address)
+    acc1_address = Address.from_hex(acc1.address)
 
-    root_balance = await client.get_balance(root_account.address)
+    # Fund the deployer account
+    root_balance = await client.get_balance(root_address)
     to_transfer = Wei.from_unit(10, 'ether') # or `10 * ether`?
-    await root_client.transfer(acc1.address, to_transfer)
+    await root_client.transfer(acc1_address, to_transfer)
     # TODO: check that block has changed
-    root_balance_after = await client.get_balance(root_account.address)
-    acc1_balance_after = await client.get_balance(acc1.address)
+    root_balance_after = await client.get_balance(root_address)
+    acc1_balance_after = await client.get_balance(acc1_address)
     assert acc1_balance_after == to_transfer
     assert root_balance - root_balance_after > to_transfer
 
@@ -32,19 +34,22 @@ async def test_contract(test_provider, compiled_contract):
     client = Client(provider=test_provider)
 
     root_account = test_provider.root_account
-    root_client = client.with_signer(root_account)
+    root_client = client.with_signer(AccountSigner(root_account))
 
     acc1 = Account.create()
-    acc1_client = client.with_signer(acc1)
+    acc1_client = client.with_signer(AccountSigner(acc1))
+
+    root_address = Address.from_hex(root_account.address)
+    acc1_address = Address.from_hex(acc1.address)
 
     # Fund the deployer account
 
-    root_balance = await client.get_balance(root_account.address)
+    root_balance = await client.get_balance(root_address)
     to_transfer = Wei.from_unit(10, 'ether') # or `10 * ether`?
-    await root_client.transfer(acc1.address, to_transfer)
+    await root_client.transfer(acc1_address, to_transfer)
     # TODO: check that block has changed
-    root_balance_after = await client.get_balance(root_account.address)
-    acc1_balance_after = await client.get_balance(acc1.address)
+    root_balance_after = await client.get_balance(root_address)
+    acc1_balance_after = await client.get_balance(acc1_address)
     assert acc1_balance_after == to_transfer
     assert root_balance - root_balance_after > to_transfer
 

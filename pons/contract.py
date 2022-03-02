@@ -21,7 +21,7 @@ class CompiledContract(Contract):
             contract_source, output_values=["abi", "bin"], evm_version='london')
         compiled = compiled['<stdin>:Test']
 
-        return cls(compiled['abi'], compiled['bin'])
+        return cls(compiled['abi'], bytes.fromhex(compiled['bin']))
 
     def __init__(self, abi, bytecode):
         super().__init__(abi)

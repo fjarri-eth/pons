@@ -1,5 +1,6 @@
 from enum import Enum, auto
 import re
+from typing import Any
 
 from eth_abi import encode_single, decode_single
 from sha3 import keccak_256
@@ -147,7 +148,7 @@ class MethodCall:
         self._args = args
         self._is_constructor = is_constructor
 
-    def encode(self):
+    def encode(self) -> bytes:
         signature = self._method.canonical_input_signature()
         encoded_args = encode_single(signature, self._args)
 
@@ -156,9 +157,9 @@ class MethodCall:
         else:
             return encoded_args
 
-    def decode_output(self, output: 'str'):
+    def decode_output(self, output: bytes) -> Any:
         signature = self._method.canonical_output_signature()
-        results = decode_single(signature, bytes.fromhex(output[2:]))
+        results = decode_single(signature, output)
         # TODO: or do it when deriving canonical_output_signature?
         if len(self._method.outputs) == 1:
             results = results[0]
