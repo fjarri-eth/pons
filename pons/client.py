@@ -52,7 +52,8 @@ class Client:
 
         return TxReceipt(
             succeeded=(decode_quantity(result['status']) == 1),
-            contract_address=decode_address(contract_address) if contract_address else None
+            contract_address=decode_address(contract_address) if contract_address else None,
+            gas_used=decode_quantity(result['gasUsed']),
             )
 
     async def get_transaction_count(self, address: Address, block: Union[int, Block] = Block.LATEST) -> int:
@@ -88,6 +89,54 @@ class Client:
         result = await self._provider.rpc_call('eth_sendRawTransaction', encode_data(tx_bytes))
         return decode_tx_hash(result)
 
+    async def estimate_gas(self, contract_address: Address, call: MethodCall) -> Wei:
+        encoded_args = call.encode()
+        result = await self._provider.rpc_call(
+            'eth_estimateGas',
+            {
+                'to': encode_address(contract_address),
+                'data': encode_data(encoded_args)
+            },
+            encode_block(Block.LATEST))
+        return decode_quantity(result)
+
+    async def estimate_deploy(self, contract: CompiledContract, *args) -> int:
+        encoded_args = contract.abi.constructor(*args).encode()
+        tx = {
+            'data': encode_data(contract.bytecode + encoded_args)
+        }
+        result = await self._provider.rpc_call(
+            'eth_estimateGas',
+            tx,
+            encode_block(Block.LATEST))
+        return decode_quantity(result)
+
+    async def estimate_transfer(self, source_address: Address, destination_address: Address, amount: Wei) -> int:
+        # TODO: source_address and amount are optional,
+        # but if they are specified, we will fail here instead of later.
+        tx = {
+            'from': encode_address(source_address),
+            'to': encode_address(destination_address),
+            'value': encode_wei(amount),
+        }
+        result = await self._provider.rpc_call(
+            'eth_estimateGas',
+            tx,
+            encode_block(Block.LATEST))
+        return decode_quantity(result)
+
+    async def estimate_transact(self, contract_address: Address, call: MethodCall) -> int:
+        encoded_args = call.encode()
+        tx = {
+            'to': encode_address(contract_address),
+            'data': encode_data(encoded_args),
+        }
+        result = await self._provider.rpc_call(
+            'eth_estimateGas',
+            tx,
+            encode_block(Block.LATEST))
+        return decode_quantity(result)
+
 
 class SigningClient(Client):
 
@@ -96,14 +145,15 @@ class SigningClient(Client):
         self._signer = signer
 
     async def transfer(self, destination_address: Address, amount: Wei):
-        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         chain_id = await self.get_chain_id()
+        gas = await self.estimate_transfer(self._signer.address(), destination_address, amount)
+        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
             'to': encode_address(destination_address),
             'value': encode_wei(amount),
-            'gas': encode_quantity(30000),
+            'gas': encode_quantity(gas),
             'maxFeePerGas': encode_wei(Wei.from_unit(250, 'gwei')),
             'maxPriorityFeePerGas': encode_wei(Wei.from_unit(2, 'gwei')),
             'nonce': encode_quantity(nonce),
@@ -114,13 +164,14 @@ class SigningClient(Client):
 
     async def deploy(self, contract: CompiledContract, *args) -> DeployedContract:
         encoded_args = contract.abi.constructor(*args).encode()
-        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         chain_id = await self.get_chain_id()
+        gas = await self.estimate_deploy(contract, *args) # TODO: don't encode args twice
+        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
             'value': encode_quantity(0),
-            'gas': encode_quantity(1000000),
+            'gas': encode_quantity(gas),
             'maxFeePerGas': encode_wei(Wei.from_unit(250, 'gwei')),
             'maxPriorityFeePerGas': encode_wei(Wei.from_unit(2, 'gwei')),
             'nonce': encode_quantity(nonce),
@@ -137,14 +188,15 @@ class SigningClient(Client):
 
     async def transact(self, contract_address: Address, call: MethodCall):
         encoded_args = call.encode()
-        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         chain_id = await self.get_chain_id()
+        gas = await self.estimate_transact(contract_address, call)
+        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
             'to': encode_address(contract_address),
             'value': encode_quantity(0),
-            'gas': encode_quantity(30000),
+            'gas': encode_quantity(gas),
             'maxFeePerGas': encode_wei(Wei.from_unit(250, 'gwei')),
             'maxPriorityFeePerGas': encode_wei(Wei.from_unit(2, 'gwei')),
             'nonce': encode_quantity(nonce),

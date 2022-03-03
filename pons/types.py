@@ -47,6 +47,12 @@ class Address:
     def as_checksum(self) -> str:
         return to_checksum_address(self._address_bytes)
 
+    def __str__(self):
+        return self.as_checksum()
+
+    def __repr__(self):
+        return f"Address.from_hex({self})"
+
 
 class Block(Enum):
     LATEST = 'latest'
@@ -67,6 +73,7 @@ class TxHash:
 class TxReceipt(NamedTuple):
     succeeded: bool
     contract_address: Optional[Address]
+    gas_used: int
 
 
 def encode_quantity(val: int) -> str:

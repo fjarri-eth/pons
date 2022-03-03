@@ -5,7 +5,7 @@ from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 import httpx
 
-from .types import Wei, Address, encode_quantity, encode_address
+from .types import Wei, Address, encode_quantity, encode_address, decode_quantity
 
 
 class Provider(ABC):
@@ -35,6 +35,7 @@ class EthereumTesterProvider(Provider):
             eth_getTransactionCount=self.eth_get_transaction_count,
             eth_call=self.eth_call,
             eth_sendRawTransaction=self.eth_send_raw_transaction,
+            eth_estimateGas=self.eth_estimate_gas,
             )
         return await dispatch[method](*args)
 
@@ -61,8 +62,16 @@ class EthereumTesterProvider(Provider):
     async def eth_get_transaction_receipt(self, tx_hash_hex):
         result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
         result['contractAddress'] = result.pop('contract_address')
-        result['status'] = encode_quantity(result['status'])
+        result['status'] = encode_quantity(result.pop('status'))
+        result['gasUsed'] = encode_quantity(result.pop('gas_used'))
         return result
+
+    async def eth_estimate_gas(self, tx: dict, block: str) -> str:
+        if 'from' not in tx:
+            tx['from'] = encode_address(self._default_address)
+        if 'value' in tx:
+            tx['value'] = decode_quantity(tx['value'])
+        return encode_quantity(self._ethereum_tester.estimate_gas(tx, block))
 
 
 class HTTPProvider:
