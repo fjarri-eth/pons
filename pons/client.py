@@ -137,6 +137,10 @@ class Client:
             encode_block(Block.LATEST))
         return decode_quantity(result)
 
+    async def gas_price(self):
+        result = await self._provider.rpc_call('eth_gasPrice')
+        return decode_wei(result)
+
 
 class SigningClient(Client):
 
@@ -147,6 +151,9 @@ class SigningClient(Client):
     async def transfer(self, destination_address: Address, amount: Wei):
         chain_id = await self.get_chain_id()
         gas = await self.estimate_transfer(self._signer.address(), destination_address, amount)
+        # TODO: implement gas strategies
+        max_gas_price = await self.gas_price()
+        max_tip = Wei.from_unit(1, 'gwei')
         nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
@@ -154,8 +161,8 @@ class SigningClient(Client):
             'to': encode_address(destination_address),
             'value': encode_wei(amount),
             'gas': encode_quantity(gas),
-            'maxFeePerGas': encode_wei(Wei.from_unit(250, 'gwei')),
-            'maxPriorityFeePerGas': encode_wei(Wei.from_unit(2, 'gwei')),
+            'maxFeePerGas': encode_wei(max_gas_price),
+            'maxPriorityFeePerGas': encode_wei(max_tip),
             'nonce': encode_quantity(nonce),
         }
         signed_tx = self._signer.sign_transaction(tx)
@@ -166,14 +173,17 @@ class SigningClient(Client):
         encoded_args = contract.abi.constructor(*args).encode()
         chain_id = await self.get_chain_id()
         gas = await self.estimate_deploy(contract, *args) # TODO: don't encode args twice
+        # TODO: implement gas strategies
+        max_gas_price = await self.gas_price()
+        max_tip = Wei.from_unit(1, 'gwei')
         nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
             'value': encode_quantity(0),
             'gas': encode_quantity(gas),
-            'maxFeePerGas': encode_wei(Wei.from_unit(250, 'gwei')),
-            'maxPriorityFeePerGas': encode_wei(Wei.from_unit(2, 'gwei')),
+            'maxFeePerGas': encode_wei(max_gas_price),
+            'maxPriorityFeePerGas': encode_wei(max_tip),
             'nonce': encode_quantity(nonce),
             'data': encode_data(contract.bytecode + encoded_args)
         }
@@ -190,6 +200,9 @@ class SigningClient(Client):
         encoded_args = call.encode()
         chain_id = await self.get_chain_id()
         gas = await self.estimate_transact(contract_address, call)
+        # TODO: implement gas strategies
+        max_gas_price = await self.gas_price()
+        max_tip = Wei.from_unit(1, 'gwei')
         nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
@@ -197,8 +210,8 @@ class SigningClient(Client):
             'to': encode_address(contract_address),
             'value': encode_quantity(0),
             'gas': encode_quantity(gas),
-            'maxFeePerGas': encode_wei(Wei.from_unit(250, 'gwei')),
-            'maxPriorityFeePerGas': encode_wei(Wei.from_unit(2, 'gwei')),
+            'maxFeePerGas': encode_wei(max_gas_price),
+            'maxPriorityFeePerGas': encode_wei(max_tip),
             'nonce': encode_quantity(nonce),
             'data': encode_data(encoded_args)
         }

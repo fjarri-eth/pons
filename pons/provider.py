@@ -36,6 +36,7 @@ class EthereumTesterProvider(Provider):
             eth_call=self.eth_call,
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
+            eth_gasPrice=self.eth_gas_price,
             )
         return await dispatch[method](*args)
 
@@ -72,6 +73,14 @@ class EthereumTesterProvider(Provider):
         if 'value' in tx:
             tx['value'] = decode_quantity(tx['value'])
         return encode_quantity(self._ethereum_tester.estimate_gas(tx, block))
+
+    async def eth_gas_price(self):
+        # The specific algorithm is not enforced in the standard,
+        # but this is the logic Infura uses. Seems to work for them.
+        block_info = self._ethereum_tester.get_block_by_number('latest', False)
+
+        # Base fee plus 1 GWei
+        return encode_quantity(block_info['base_fee_per_gas'] + 10**9)
 
 
 class HTTPProvider:
