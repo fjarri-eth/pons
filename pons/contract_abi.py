@@ -2,8 +2,8 @@ from enum import Enum, auto
 import re
 from typing import Any
 
+from eth_utils import keccak
 from eth_abi import encode_single, decode_single
-from sha3 import keccak_256
 
 from .primitive_types import type_from_abi_string
 
@@ -123,7 +123,7 @@ class Method:
 
     def id(self):
         signature = self.canonical_input_signature()
-        return keccak_256(self.name.encode() + signature.encode()).digest()[:4]
+        return keccak(self.name.encode() + signature.encode())[:4]
 
     def __call__(self, *args):
         # TODO: allow args/kwds and bind them to correct parameters using inspect.signature()
