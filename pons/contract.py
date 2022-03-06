@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import solcx
 
 from .contract_abi import ABI
@@ -14,14 +16,18 @@ class CompiledContract(Contract):
     # TODO: make optional, most people will just use deployed contracts
     @classmethod
     def from_file(cls, path):
-        with open(path) as f:
-            contract_source = f.read()
+        path = Path(path).resolve()
 
-        compiled = solcx.compile_source(
-            contract_source, output_values=["abi", "bin"], evm_version='london')
-        compiled = compiled['<stdin>:Test']
+        compiled = solcx.compile_files(
+            [path], output_values=["abi", "bin"], evm_version='london')
 
-        return cls(compiled['abi'], bytes.fromhex(compiled['bin']))
+        # For now this method is only used for testing purposes,
+        # so we are assuming there was only one contract in the compiled file.
+        assert len(compiled) == 1
+
+        _contract_name, compiled_contract = compiled.popitem()
+
+        return cls(compiled_contract['abi'], bytes.fromhex(compiled_contract['bin']))
 
     def __init__(self, abi, bytecode):
         super().__init__(abi)
