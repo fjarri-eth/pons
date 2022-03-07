@@ -53,6 +53,12 @@ class Address:
     def __repr__(self):
         return f"Address.from_hex({self})"
 
+    def __hash__(self):
+        return hash(self._address_bytes)
+
+    def __eq__(self, other):
+        return isinstance(other, Address) and self._address_bytes == other._address_bytes
+
 
 class Block(Enum):
     LATEST = 'latest'
