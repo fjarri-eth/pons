@@ -166,7 +166,7 @@ class MethodCall:
         return results
 
 
-class ABI:
+class ContractABI:
 
     def __init__(self, abi):
         self.constructor = None
