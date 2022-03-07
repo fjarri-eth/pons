@@ -188,7 +188,8 @@ class ContractABI:
                     raise ValueError()
                 self.fallback = Method(entry)
             elif entry['type'] == 'event':
-                raise NotImplementedError
+                # TODO: support this
+                pass
             else:
                 raise ValueError()
 
