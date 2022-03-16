@@ -125,11 +125,12 @@ class Client:
             encode_block(Block.LATEST))
         return decode_quantity(result)
 
-    async def estimate_transact(self, contract_address: Address, call: MethodCall) -> int:
+    async def estimate_transact(self, contract_address: Address, call: MethodCall, value=Wei(0)) -> int:
         encoded_args = call.encode()
         tx = {
             'to': encode_address(contract_address),
             'data': encode_data(encoded_args),
+            'value': encode_wei(value),
         }
         result = await self._provider.rpc_call(
             'eth_estimateGas',
@@ -180,7 +181,7 @@ class SigningClient(Client):
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
-            'value': encode_quantity(0),
+            'value': encode_wei(0),
             'gas': encode_quantity(gas),
             'maxFeePerGas': encode_wei(max_gas_price),
             'maxPriorityFeePerGas': encode_wei(max_tip),
@@ -196,10 +197,10 @@ class SigningClient(Client):
 
         return DeployedContract(contract.abi, receipt.contract_address)
 
-    async def transact(self, contract_address: Address, call: MethodCall):
+    async def transact(self, contract_address: Address, call: MethodCall, value=Wei(0)):
         encoded_args = call.encode()
         chain_id = await self.get_chain_id()
-        gas = await self.estimate_transact(contract_address, call)
+        gas = await self.estimate_transact(contract_address, call, value=value)
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Wei.from_unit(1, 'gwei')
@@ -208,7 +209,7 @@ class SigningClient(Client):
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
             'to': encode_address(contract_address),
-            'value': encode_quantity(0),
+            'value': encode_wei(value),
             'gas': encode_quantity(gas),
             'maxFeePerGas': encode_wei(max_gas_price),
             'maxPriorityFeePerGas': encode_wei(max_tip),
