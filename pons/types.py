@@ -23,9 +23,16 @@ class Wei:
         assert type(other) == type(self)
         return Wei(self.wei - other.wei)
 
+    def __mul__(self, other: int):
+        return Wei(self.wei * other)
+
     def __gt__(self, other):
         assert type(other) == type(self)
         return self.wei > other.wei
+
+    def __ge__(self, other):
+        assert type(other) == type(self)
+        return self.wei >= other.wei
 
     def __str__(self):
         return f"{self.wei / 10**18} ETH"
