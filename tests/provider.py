@@ -8,7 +8,7 @@ from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 
 from pons import Provider
-from pons.types import Wei, Address, encode_quantity, encode_address, encode_wei, decode_quantity
+from pons.types import Amount, Address, encode_quantity, encode_address, encode_amount, decode_quantity
 
 
 class EthereumTesterProvider(Provider):
@@ -16,7 +16,7 @@ class EthereumTesterProvider(Provider):
     def __init__(self, root_balance_eth: int = 100):
         custom_genesis_state = PyEVMBackend.generate_genesis_state(
             num_accounts=1,
-            overrides=dict(balance=int(Wei.from_unit(root_balance_eth, 'ether'))))
+            overrides=dict(balance=Amount.ether(root_balance_eth).as_wei()))
         backend = PyEVMBackend(genesis_state=custom_genesis_state)
         self._ethereum_tester = EthereumTester(backend)
         self.root_account = Account.from_key(backend.account_keys[0])
@@ -84,6 +84,6 @@ class EthereumTesterProvider(Provider):
         result['timestamp'] = encode_quantity(result['timestamp'])
         for tx_info in result['transactions']:
             tx_info['gas'] = encode_quantity(tx_info['gas'])
-            tx_info['gasPrice'] = encode_wei(tx_info.pop('gas_price'))
+            tx_info['gasPrice'] = encode_amount(tx_info.pop('gas_price'))
 
         return result

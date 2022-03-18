@@ -20,7 +20,7 @@ async def test_payment(test_provider):
 
     # Fund the deployer account
     root_balance = await client.get_balance(root_address)
-    to_transfer = Wei.from_unit(10, 'ether') # or `10 * ether`?
+    to_transfer = Amount.ether(10)
     await root_client.transfer(acc1_address, to_transfer)
     # TODO: check that block has changed
     root_balance_after = await client.get_balance(root_address)
@@ -45,7 +45,7 @@ async def test_contract(test_provider, compiled_contract):
     # Fund the deployer account
 
     root_balance = await client.get_balance(root_address)
-    to_transfer = Wei.from_unit(10, 'ether') # or `10 * ether`?
+    to_transfer = Amount.ether(10)
     await root_client.transfer(acc1_address, to_transfer)
     # TODO: check that block has changed
     root_balance_after = await client.get_balance(root_address)

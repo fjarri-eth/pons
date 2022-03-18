@@ -1,41 +1,58 @@
 from enum import Enum
-from typing import NamedTuple, Union, Optional
+from typing import NamedTuple, Union, Optional, Tuple
 
-from eth_utils import to_checksum_address, to_canonical_address, to_wei
+from eth_utils import to_checksum_address, to_canonical_address
 
 
-class Wei:
+class Amount:
 
     @classmethod
-    def from_unit(cls, quantity: int, unit: str) -> 'Wei':
-        return cls(to_wei(quantity, unit))
+    def wei(cls, value: int):
+        return cls(value)
+
+    @classmethod
+    def gwei(cls, value: int):
+        return cls(10**9 * value)
+
+    @classmethod
+    def ether(cls, value: int):
+        return cls(10**18 * value)
 
     def __init__(self, wei: int):
-        self.wei = wei
+        assert isinstance(wei, int)
+        self._wei = wei
 
-    def __int__(self):
-        return self.wei
+    def as_wei(self):
+        return self._wei
+
+    def as_gwei(self):
+        return self._wei / 10**9
+
+    def as_ether(self):
+        return self._wei / 10**18
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.wei == other.wei
+        assert type(other) == type(self)
+        return self._wei == other._wei
 
     def __sub__(self, other):
         assert type(other) == type(self)
-        return Wei(self.wei - other.wei)
+        return self.wei(self._wei - other._wei)
 
     def __mul__(self, other: int):
-        return Wei(self.wei * other)
+        assert isinstance(other, int)
+        return self.wei(self._wei * other)
 
     def __gt__(self, other):
         assert type(other) == type(self)
-        return self.wei > other.wei
+        return self._wei > other._wei
 
     def __ge__(self, other):
         assert type(other) == type(self)
-        return self.wei >= other.wei
+        return self._wei >= other._wei
 
-    def __str__(self):
-        return f"{self.wei / 10**18} ETH"
+    def __repr__(self):
+        return f"Amount({self._wei})"
 
 
 class Address:
@@ -64,7 +81,8 @@ class Address:
         return hash(self._address_bytes)
 
     def __eq__(self, other):
-        return isinstance(other, Address) and self._address_bytes == other._address_bytes
+        assert isinstance(other, Address)
+        return self._address_bytes == other._address_bytes
 
 
 class Block(Enum):
@@ -101,8 +119,8 @@ def encode_address(val: Address) -> str:
     return val.as_checksum()
 
 
-def encode_wei(val: Wei) -> str:
-    return encode_quantity(int(val))
+def encode_amount(val: Amount) -> str:
+    return encode_quantity(val.as_wei())
 
 
 def encode_block(val: Union[int, Block]) -> str:
@@ -130,8 +148,8 @@ def decode_address(val: str) -> Address:
     return Address(decode_data(val))
 
 
-def decode_wei(val: str) -> Wei:
-    return Wei(decode_quantity(val))
+def decode_amount(val: str) -> Amount:
+    return Amount(decode_quantity(val))
 
 
 def decode_tx_hash(val: str) -> TxHash:
