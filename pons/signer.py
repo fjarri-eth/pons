@@ -6,17 +6,29 @@ from .types import Address
 
 
 class Signer(ABC):
+    """
+    The base class for transaction signers.
+    """
 
     @abstractmethod
     def address(self) -> Address:
+        """
+        Returns the address corresponding to the signer's private key.
+        """
         pass
 
     @abstractmethod
     def sign_transaction(self, tx: dict) -> bytes:
+        """
+        Signs the given JSON transaction and returns the bytes of the signature.
+        """
         pass
 
 
-class AccountSigner:
+class AccountSigner(Signer):
+    """
+    A signer wrapper for `eth_account.Account`.
+    """
 
     def __init__(self, account: Account):
         self._account = account

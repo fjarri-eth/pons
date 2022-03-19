@@ -5,13 +5,22 @@ import httpx
 
 
 class Provider(ABC):
+    """
+    The base class for JSON RPC providers.
+    """
 
     @abstractmethod
     async def rpc_call(self, method: str, *args) -> Any:
+        """
+        Calls the given RPC method with the already json-ified arguments.
+        """
         ...
 
 
-class HTTPProvider:
+class HTTPProvider(Provider):
+    """
+    A provider for RPC via HTTP(S).
+    """
 
     def __init__(self, url):
         self._url = url

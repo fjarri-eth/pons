@@ -5,30 +5,55 @@ from eth_utils import to_checksum_address, to_canonical_address
 
 
 class Amount:
+    """
+    Represents a sum in the chain's native currency.
+
+    Can be subclassed to represent specific currencies of different networks (ETH, MATIC etc).
+    Arithmetic and comparison methods perform strict type checking,
+    so different currency objects cannot be compared or added to each other.
+    """
 
     @classmethod
-    def wei(cls, value: int):
+    def wei(cls, value: int) -> 'Amount':
+        """
+        Creates a sum from the amount in wei (``10^(-18)`` of the main unit).
+        """
         return cls(value)
 
     @classmethod
-    def gwei(cls, value: int):
-        return cls(10**9 * value)
+    def gwei(cls, value: Union[int, float]) -> 'Amount':
+        """
+        Creates a sum from the amount in gwei (``10^(-9)`` of the main unit).
+        """
+        return cls(int(10**9 * value))
 
     @classmethod
-    def ether(cls, value: int):
-        return cls(10**18 * value)
+    def ether(cls, value: Union[int, float]) -> 'Amount':
+        """
+        Creates a sum from the amount in the main currency unit.
+        """
+        return cls(int(10**18 * value))
 
     def __init__(self, wei: int):
         assert isinstance(wei, int)
         self._wei = wei
 
-    def as_wei(self):
+    def as_wei(self) -> int:
+        """
+        Returns the amount in wei.
+        """
         return self._wei
 
-    def as_gwei(self):
+    def as_gwei(self) -> float:
+        """
+        Returns the amount in gwei.
+        """
         return self._wei / 10**9
 
-    def as_ether(self):
+    def as_ether(self) -> float:
+        """
+        Returns the amount in the main currency unit.
+        """
         return self._wei / 10**18
 
     def __eq__(self, other):
@@ -56,9 +81,16 @@ class Amount:
 
 
 class Address:
+    """
+    Represents an Ethereum address.
+    """
 
     @classmethod
     def from_hex(cls, address_str: str) -> 'Address':
+        """
+        Creates the address from a hex representation
+        (with or without the ``0x`` prefix, checksummed or not).
+        """
         return cls(to_canonical_address(address_str))
 
     def __init__(self, address_bytes: bytes):
@@ -69,6 +101,9 @@ class Address:
         return self._address_bytes
 
     def as_checksum(self) -> str:
+        """
+        Retunrs the checksummed hex representation of the address.
+        """
         return to_checksum_address(self._address_bytes)
 
     def __str__(self):
@@ -86,12 +121,24 @@ class Address:
 
 
 class Block(Enum):
+    """
+    Block aliases supported by Ethereum RPC.
+    """
+
     LATEST = 'latest'
+    """The latest confirmed block"""
+
     EARLIEST = 'earliest'
+    """The earliest block"""
+
     PENDING = 'pending'
+    """Currently pending block"""
 
 
 class TxHash:
+    """
+    A wrapper for the transaction hash.
+    """
 
     def __init__(self, tx_hash: bytes):
         assert len(tx_hash) == 32
@@ -102,9 +149,21 @@ class TxHash:
 
 
 class TxReceipt(NamedTuple):
+    """
+    Transaction receipt.
+    """
+
     succeeded: bool
+    """Whether the transaction was successful."""
+
     contract_address: Optional[Address]
+    """
+    If it was a successful deployment transaction,
+    contains the address of the deployed contract.
+    """
+
     gas_used: int
+    """The amount of gas used by the transaction."""
 
 
 def encode_quantity(val: int) -> str:

@@ -86,6 +86,9 @@ class Struct:
 
 
 class Method:
+    """
+    A contract method.
+    """
 
     def __init__(self, abi_entry):
 
@@ -125,7 +128,10 @@ class Method:
         signature = self.canonical_input_signature()
         return keccak(self.name.encode() + signature.encode())[:4]
 
-    def __call__(self, *args):
+    def __call__(self, *args) -> 'MethodCall':
+        """
+        Creates a method call object with encapsulated arguments.
+        """
         # TODO: allow args/kwds and bind them to correct parameters using inspect.signature()
         # Possibly validate the internal structure here too?
         return MethodCall(self, args, is_constructor=self.is_constructor)
@@ -142,6 +148,9 @@ class Method:
 
 
 class MethodCall:
+    """
+    A contract method with attached arguments.
+    """
 
     def __init__(self, method, args, is_constructor=False):
         self._method = method
@@ -167,8 +176,13 @@ class MethodCall:
 
 
 class ContractABI:
+    """
+    A wrapper for contrat ABI.
 
-    def __init__(self, abi):
+    Contract methods accessible as attributes of this object, with the type :py:class:`Method`.
+    """
+
+    def __init__(self, abi: dict):
         self.constructor = None
         self.fallback = None
 
