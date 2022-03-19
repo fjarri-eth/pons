@@ -22,7 +22,7 @@ class EthereumTesterProvider(Provider):
         self.root_account = Account.from_key(backend.account_keys[0])
         self._default_address = Address.from_hex(self.root_account.address)
 
-    async def rpc_call(self, method, *args):
+    async def rpc(self, method, *args):
         dispatch = dict(
             net_version=self.net_version,
             eth_chainId=self.eth_chain_id,

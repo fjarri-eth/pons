@@ -36,7 +36,7 @@ class Client:
         Calls the  ``net_version`` RPC method.
         """
         if self._net_version is None:
-            result = await self._provider.rpc_call('net_version')
+            result = await self._provider.rpc('net_version')
             assert isinstance(result, str)
             self._net_version = result
         return self._net_version
@@ -46,7 +46,7 @@ class Client:
         Calls the ``eth_chainId`` RPC method.
         """
         if self._chain_id is None:
-            result = await self._provider.rpc_call('eth_chainId')
+            result = await self._provider.rpc('eth_chainId')
             self._chain_id = decode_quantity(result)
         return self._chain_id
 
@@ -54,7 +54,7 @@ class Client:
         """
         Calls the ``eth_getBalance`` RPC method.
         """
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_getBalance', encode_address(address), encode_block(block))
         return decode_amount(result)
 
@@ -62,7 +62,7 @@ class Client:
         """
         Calls the ``eth_getTransactionReceipt`` RPC method.
         """
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_getTransactionReceipt', encode_tx_hash(tx_hash))
 
         if not result:
@@ -80,7 +80,7 @@ class Client:
         """
         Calls the ``eth_getTransactionCount`` RPC method.
         """
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_getTransactionCount', encode_address(address), encode_block(block))
         return decode_quantity(result)
 
@@ -104,7 +104,7 @@ class Client:
         """
 
         encoded_args = call.encode()
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_call',
             {
                 'to': encode_address(contract_address),
@@ -119,7 +119,7 @@ class Client:
         """
         Sends a signed and serialized transaction.
         """
-        result = await self._provider.rpc_call('eth_sendRawTransaction', encode_data(tx_bytes))
+        result = await self._provider.rpc('eth_sendRawTransaction', encode_data(tx_bytes))
         return decode_tx_hash(result)
 
     async def estimate_deploy(self, contract: CompiledContract, *args) -> int:
@@ -130,7 +130,7 @@ class Client:
         tx = {
             'data': encode_data(contract.bytecode + encoded_args)
         }
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_estimateGas',
             tx,
             encode_block(Block.LATEST))
@@ -148,7 +148,7 @@ class Client:
             'to': encode_address(destination_address),
             'value': encode_amount(amount),
         }
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_estimateGas',
             tx,
             encode_block(Block.LATEST))
@@ -164,7 +164,7 @@ class Client:
             'data': encode_data(encoded_args),
             'value': encode_amount(amount),
         }
-        result = await self._provider.rpc_call(
+        result = await self._provider.rpc(
             'eth_estimateGas',
             tx,
             encode_block(Block.LATEST))
@@ -174,7 +174,7 @@ class Client:
         """
         Calls the ``eth_gasPrice`` RPC method.
         """
-        result = await self._provider.rpc_call('eth_gasPrice')
+        result = await self._provider.rpc('eth_gasPrice')
         return decode_amount(result)
 
 

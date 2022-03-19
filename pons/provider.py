@@ -10,7 +10,7 @@ class Provider(ABC):
     """
 
     @abstractmethod
-    async def rpc_call(self, method: str, *args) -> Any:
+    async def rpc(self, method: str, *args) -> Any:
         """
         Calls the given RPC method with the already json-ified arguments.
         """
@@ -25,7 +25,7 @@ class HTTPProvider(Provider):
     def __init__(self, url):
         self._url = url
 
-    async def rpc_call(self, method, *args):
+    async def rpc(self, method, *args):
         json = {
             "jsonrpc": "2.0",
             "method": method,
