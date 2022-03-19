@@ -81,7 +81,7 @@ class Address:
         return hash(self._address_bytes)
 
     def __eq__(self, other):
-        assert isinstance(other, Address)
+        assert type(other) == type(self)
         return self._address_bytes == other._address_bytes
 
 
