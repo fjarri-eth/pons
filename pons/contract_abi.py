@@ -1,6 +1,6 @@
 from enum import Enum, auto
 import re
-from typing import Any
+from typing import Any, Tuple
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
@@ -152,14 +152,22 @@ class MethodCall:
     A contract method with attached arguments.
     """
 
+    method_name: str
+    """The name of the method."""
+
+    args: Tuple
+    """The unprocessed arguments to the method call."""
+
+
     def __init__(self, method, args, is_constructor=False):
         self._method = method
-        self._args = args
+        self.args = args
         self._is_constructor = is_constructor
+        self.method_name = method.name
 
     def encode(self) -> bytes:
         signature = self._method.canonical_input_signature()
-        encoded_args = encode_single(signature, self._args)
+        encoded_args = encode_single(signature, self.args)
 
         if not self._is_constructor:
             return self._method.id() + encoded_args
