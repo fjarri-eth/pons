@@ -35,7 +35,10 @@ class Amount:
         return cls(int(10**18 * value))
 
     def __init__(self, wei: int):
-        assert isinstance(wei, int)
+        if not isinstance(wei, int):
+            raise TypeError(f"The amount must be an integer, got {repr(wei)}")
+        if wei < 0:
+            raise ValueError(f"The amount must be non-negative, got {wei}")
         self._wei = wei
 
     def as_wei(self) -> int:
@@ -94,7 +97,10 @@ class Address:
         return cls(to_canonical_address(address_str))
 
     def __init__(self, address_bytes: bytes):
-        assert len(address_bytes) == 20
+        if not isinstance(address_bytes, bytes):
+            raise TypeError(f"Address must be a bytestring, got {repr(address_bytes)}")
+        if len(address_bytes) != 20:
+            raise ValueError(f"Address must be 20 bytes long, got {address_bytes}")
         self._address_bytes = address_bytes
 
     def __bytes__(self):
