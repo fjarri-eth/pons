@@ -1,6 +1,6 @@
 [project]
 name = "pons"
-version = "0.1.0"
+version = "0.2.0"
 description = "Async RPC client for Ethereum"
 authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
@@ -14,7 +14,7 @@ dependencies = [
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
 ]
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license-expression = "MIT"
 
 [project.urls]
 homepage = "https://github.com/fjarri/pons"
