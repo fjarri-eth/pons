@@ -10,6 +10,7 @@ class Signer(ABC):
     The base class for transaction signers.
     """
 
+    @property
     @abstractmethod
     def address(self) -> Address:
         """
@@ -33,6 +34,7 @@ class AccountSigner(Signer):
     def __init__(self, account: Account):
         self._account = account
 
+    @property
     def address(self) -> Address:
         return Address.from_hex(self._account.address)
 

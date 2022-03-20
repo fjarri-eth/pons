@@ -193,11 +193,11 @@ class SigningClient(Client):
         Waits for the transaction to be confirmed.
         """
         chain_id = await self.get_chain_id()
-        gas = await self.estimate_transfer(self._signer.address(), destination_address, amount)
+        gas = await self.estimate_transfer(self._signer.address, destination_address, amount)
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
-        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
+        nonce = await self.get_transaction_count(self._signer.address, Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
@@ -223,7 +223,7 @@ class SigningClient(Client):
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
-        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
+        nonce = await self.get_transaction_count(self._signer.address, Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
@@ -254,7 +254,7 @@ class SigningClient(Client):
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
-        nonce = await self.get_transaction_count(self._signer.address(), Block.LATEST)
+        nonce = await self.get_transaction_count(self._signer.address, Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
