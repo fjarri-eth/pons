@@ -10,15 +10,14 @@ Clients
 .. autoclass:: Client
    :members:
 
-.. autoclass:: SigningClient
+.. autoclass:: pons.client.ClientSession
    :members:
 
 
 Providers
 ~~~~~~~~~
 
-.. autoclass:: Provider
-   :members:
+.. autoclass:: pons.provider.Provider
 
 .. autoclass:: HTTPProvider
    :show-inheritance:

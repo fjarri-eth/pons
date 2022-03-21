@@ -28,7 +28,7 @@ class Signer(ABC):
 
 class AccountSigner(Signer):
     """
-    A signer wrapper for `eth_account.Account`.
+    A signer wrapper for ``eth_account.Account``.
     """
 
     def __init__(self, account: Account):

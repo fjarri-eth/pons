@@ -1,5 +1,6 @@
+from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, AsyncGenerator
 
 import trio
 
@@ -15,7 +16,7 @@ from .types import (
 
 class Client:
     """
-    A read-only Ethereum RPC client.
+    An Ethereum RPC client.
     """
 
     def __init__(self, provider: Provider):
@@ -23,20 +24,33 @@ class Client:
         self._net_version: Optional[str] = None
         self._chain_id: Optional[int] = None
 
-    def with_signer(self, signer: Signer):
+    @asynccontextmanager
+    async def session(self) -> 'ClientSession':
         """
-        Creates a client that can sign transactions
-        (and therefore make modifications to the blockchain)
-        using the provided signer.
+        Opens a session to the client allowing the backend to optimize sequential requests.
         """
-        return SigningClient(self._provider, signer)
+        async with self._provider.session() as provider_session:
+            client_session = ClientSession(provider_session)
+            yield client_session
+            # TODO: incorporate cached values from the session back into the client
+
+
+class ClientSession:
+    """
+    An open session to the provider.
+    """
+
+    def __init__(self, provider_session):
+        self._provider_session = provider_session
+        self._net_version: Optional[str] = None
+        self._chain_id: Optional[int] = None
 
     async def net_version(self) -> str:
         """
         Calls the  ``net_version`` RPC method.
         """
         if self._net_version is None:
-            result = await self._provider.rpc('net_version')
+            result = await self._provider_session.rpc('net_version')
             assert isinstance(result, str)
             self._net_version = result
         return self._net_version
@@ -46,7 +60,7 @@ class Client:
         Calls the ``eth_chainId`` RPC method.
         """
         if self._chain_id is None:
-            result = await self._provider.rpc('eth_chainId')
+            result = await self._provider_session.rpc('eth_chainId')
             self._chain_id = decode_quantity(result)
         return self._chain_id
 
@@ -54,7 +68,7 @@ class Client:
         """
         Calls the ``eth_getBalance`` RPC method.
         """
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_getBalance', encode_address(address), encode_block(block))
         return decode_amount(result)
 
@@ -62,7 +76,7 @@ class Client:
         """
         Calls the ``eth_getTransactionReceipt`` RPC method.
         """
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_getTransactionReceipt', encode_tx_hash(tx_hash))
 
         if not result:
@@ -80,7 +94,7 @@ class Client:
         """
         Calls the ``eth_getTransactionCount`` RPC method.
         """
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_getTransactionCount', encode_address(address), encode_block(block))
         return decode_quantity(result)
 
@@ -104,7 +118,7 @@ class Client:
         """
 
         encoded_args = call.encode()
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_call',
             {
                 'to': encode_address(contract_address),
@@ -119,7 +133,7 @@ class Client:
         """
         Sends a signed and serialized transaction.
         """
-        result = await self._provider.rpc('eth_sendRawTransaction', encode_data(tx_bytes))
+        result = await self._provider_session.rpc('eth_sendRawTransaction', encode_data(tx_bytes))
         return decode_tx_hash(result)
 
     async def estimate_deploy(self, contract: CompiledContract, *args) -> int:
@@ -130,7 +144,7 @@ class Client:
         tx = {
             'data': encode_data(contract.bytecode + encoded_args)
         }
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_estimateGas',
             tx,
             encode_block(Block.LATEST))
@@ -148,7 +162,7 @@ class Client:
             'to': encode_address(destination_address),
             'value': encode_amount(amount),
         }
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_estimateGas',
             tx,
             encode_block(Block.LATEST))
@@ -164,7 +178,7 @@ class Client:
             'data': encode_data(encoded_args),
             'value': encode_amount(amount),
         }
-        result = await self._provider.rpc(
+        result = await self._provider_session.rpc(
             'eth_estimateGas',
             tx,
             encode_block(Block.LATEST))
@@ -174,30 +188,20 @@ class Client:
         """
         Calls the ``eth_gasPrice`` RPC method.
         """
-        result = await self._provider.rpc('eth_gasPrice')
+        result = await self._provider_session.rpc('eth_gasPrice')
         return decode_amount(result)
 
-
-class SigningClient(Client):
-    """
-    A client with an attached signer that can make transactions.
-    """
-
-    def __init__(self, provider: Provider, signer: Signer):
-        super().__init__(provider)
-        self._signer = signer
-
-    async def transfer(self, destination_address: Address, amount: Amount):
+    async def transfer(self, signer: Signer, destination_address: Address, amount: Amount):
         """
         Transfers funds from the address of the attached signer to the destination address.
         Waits for the transaction to be confirmed.
         """
         chain_id = await self.get_chain_id()
-        gas = await self.estimate_transfer(self._signer.address, destination_address, amount)
+        gas = await self.estimate_transfer(signer.address, destination_address, amount)
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
-        nonce = await self.get_transaction_count(self._signer.address, Block.LATEST)
+        nonce = await self.get_transaction_count(signer.address, Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
@@ -208,11 +212,11 @@ class SigningClient(Client):
             'maxPriorityFeePerGas': encode_amount(max_tip),
             'nonce': encode_quantity(nonce),
         }
-        signed_tx = self._signer.sign_transaction(tx)
+        signed_tx = signer.sign_transaction(tx)
         tx_hash = await self.send_raw_transaction(signed_tx)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
 
-    async def deploy(self, contract: CompiledContract, *args) -> DeployedContract:
+    async def deploy(self, signer: Signer, contract: CompiledContract, *args) -> DeployedContract:
         """
         Deploys the contract passing ``args`` to the constructor.
         Waits for the transaction to be confirmed.
@@ -223,7 +227,7 @@ class SigningClient(Client):
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
-        nonce = await self.get_transaction_count(self._signer.address, Block.LATEST)
+        nonce = await self.get_transaction_count(signer.address, Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
@@ -234,7 +238,7 @@ class SigningClient(Client):
             'nonce': encode_quantity(nonce),
             'data': encode_data(contract.bytecode + encoded_args)
         }
-        signed_tx = self._signer.sign_transaction(tx)
+        signed_tx = signer.sign_transaction(tx)
         tx_hash = await self.send_raw_transaction(signed_tx)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
 
@@ -243,7 +247,7 @@ class SigningClient(Client):
 
         return DeployedContract(contract.abi, receipt.contract_address)
 
-    async def transact(self, contract_address: Address, call: MethodCall, amount: Amount = Amount(0)):
+    async def transact(self, signer: Signer, contract_address: Address, call: MethodCall, amount: Amount = Amount(0)):
         """
         Transacts with the contract using a prepared method call.
         Waits for the transaction to be confirmed.
@@ -254,7 +258,7 @@ class SigningClient(Client):
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
-        nonce = await self.get_transaction_count(self._signer.address, Block.LATEST)
+        nonce = await self.get_transaction_count(signer.address, Block.LATEST)
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
@@ -266,7 +270,7 @@ class SigningClient(Client):
             'nonce': encode_quantity(nonce),
             'data': encode_data(encoded_args)
         }
-        signed_tx = self._signer.sign_transaction(tx)
+        signed_tx = signer.sign_transaction(tx)
         tx_hash = await self.send_raw_transaction(signed_tx)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
 
