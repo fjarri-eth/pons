@@ -1,12 +1,12 @@
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Union, Any, Optional, AsyncGenerator
+from typing import Union, Any, Optional, AsyncIterator
 
 import trio
 
 from .contract import DeployedContract, CompiledContract
 from .contract_abi import MethodCall
-from .provider import Provider
+from .provider import Provider, ProviderSession
 from .signer import Signer
 from .types import (
     Address, Amount, Block, TxHash, TxReceipt,
@@ -25,7 +25,7 @@ class Client:
         self._chain_id: Optional[int] = None
 
     @asynccontextmanager
-    async def session(self) -> 'ClientSession':
+    async def session(self) -> AsyncIterator['ClientSession']:
         """
         Opens a session to the client allowing the backend to optimize sequential requests.
         """
@@ -40,7 +40,7 @@ class ClientSession:
     An open session to the provider.
     """
 
-    def __init__(self, provider_session):
+    def __init__(self, provider_session: ProviderSession):
         self._provider_session = provider_session
         self._net_version: Optional[str] = None
         self._chain_id: Optional[int] = None

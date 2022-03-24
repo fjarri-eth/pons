@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, AsyncIterator
 
 import httpx
 
@@ -10,14 +10,14 @@ class Provider(ABC):
     The base class for JSON RPC providers.
     """
 
-    @asynccontextmanager
     @abstractmethod
-    async def session(self) -> 'ProviderSession':
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator['ProviderSession']:
         """
         Opens a session to the provider
         (allowing the backend to perform multiple operations faster).
         """
-        ...
+        yield # type: ignore
 
 
 class ProviderSession(ABC):
@@ -26,7 +26,7 @@ class ProviderSession(ABC):
     """
 
     @abstractmethod
-    async def rpc(self) -> Any:
+    async def rpc(self, method: str, *args) -> Any:
         """
         Calls the given RPC method with the already json-ified arguments.
         """
@@ -42,7 +42,7 @@ class HTTPProvider(Provider):
         self._url = url
 
     @asynccontextmanager
-    async def session(self) -> 'HTTPSession':
+    async def session(self) -> AsyncIterator['HTTPSession']:
         async with httpx.AsyncClient() as client:
             yield HTTPSession(self._url, client)
 
@@ -53,7 +53,7 @@ class HTTPSession(ProviderSession):
         self._url = url
         self._client = http_client
 
-    async def rpc(self, method, *args):
+    async def rpc(self, method: str, *args):
         json = {
             "jsonrpc": "2.0",
             "method": method,

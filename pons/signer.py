@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from eth_account import Account
+from eth_account.account import LocalAccount
 
 from .types import Address
 
@@ -28,10 +28,10 @@ class Signer(ABC):
 
 class AccountSigner(Signer):
     """
-    A signer wrapper for ``eth_account.Account``.
+    A signer wrapper for ``eth_account.LocalAccount``.
     """
 
-    def __init__(self, account: Account):
+    def __init__(self, account: LocalAccount):
         self._account = account
 
     @property
