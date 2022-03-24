@@ -10,7 +10,7 @@ Clients
 .. autoclass:: Client
    :members:
 
-.. autoclass:: pons.client.ClientSession
+.. autoclass:: pons.client.ClientSession()
    :members:
 
 
@@ -45,11 +45,11 @@ Contracts
 .. autoclass:: ContractABI
    :members:
 
-.. autoclass:: Method
+.. autoclass:: Method()
    :members:
    :special-members: __call__
 
-.. autoclass:: MethodCall
+.. autoclass:: MethodCall()
    :members:
 
 
@@ -62,11 +62,11 @@ Types
 .. autoclass:: Address
    :members:
 
-.. autoclass:: Block
+.. autoclass:: Block()
    :members:
 
-.. autoclass:: TxHash
+.. autoclass:: TxHash()
    :members:
 
-.. autoclass:: TxReceipt
+.. autoclass:: TxReceipt()
    :members:
