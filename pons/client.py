@@ -245,6 +245,10 @@ class ClientSession:
         if not receipt.succeeded:
             raise Exception(receipt)
 
+        if receipt.contract_address is None:
+            raise RuntimeError(
+                "The transaction succeeded, but contractAddress is not present in the receipt")
+
         return DeployedContract(contract.abi, receipt.contract_address)
 
     async def transact(self, signer: Signer, contract_address: Address, call: MethodCall, amount: Amount = Amount(0)):
