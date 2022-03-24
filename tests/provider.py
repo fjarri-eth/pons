@@ -2,12 +2,13 @@
 PyEVM-based provider for tests.
 """
 
+from contextlib import asynccontextmanager
 from typing import Union, List
 
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 
-from pons import Provider
+from pons.provider import Provider, ProviderSession
 from pons.types import Amount, Address, encode_quantity, encode_address, encode_amount, decode_quantity
 
 
@@ -87,3 +88,16 @@ class EthereumTesterProvider(Provider):
             tx_info['gasPrice'] = encode_amount(tx_info.pop('gas_price'))
 
         return result
+
+    @asynccontextmanager
+    async def session(self):
+        yield EthereumTesterProviderSession(self)
+
+
+class EthereumTesterProviderSession(ProviderSession):
+
+    def __init__(self, provider):
+        self._provider = provider
+
+    async def rpc(self, method, *args):
+        return await self._provider.rpc(method, *args)

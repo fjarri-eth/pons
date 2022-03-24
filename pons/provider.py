@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 import httpx
 
@@ -7,6 +8,21 @@ import httpx
 class Provider(ABC):
     """
     The base class for JSON RPC providers.
+    """
+
+    @abstractmethod
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator['ProviderSession']:
+        """
+        Opens a session to the provider
+        (allowing the backend to perform multiple operations faster).
+        """
+        yield # type: ignore
+
+
+class ProviderSession(ABC):
+    """
+    The base class for provider sessions.
     """
 
     @abstractmethod
@@ -22,18 +38,29 @@ class HTTPProvider(Provider):
     A provider for RPC via HTTP(S).
     """
 
-    def __init__(self, url):
+    def __init__(self, url: str):
         self._url = url
 
-    async def rpc(self, method, *args):
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator['HTTPSession']:
+        async with httpx.AsyncClient() as client:
+            yield HTTPSession(self._url, client)
+
+
+class HTTPSession(ProviderSession):
+
+    def __init__(self, url: str, http_client: httpx.AsyncClient):
+        self._url = url
+        self._client = http_client
+
+    async def rpc(self, method: str, *args):
         json = {
             "jsonrpc": "2.0",
             "method": method,
             "params": list(args),
             "id": 0
             }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(self._url, json=json)
+        response = await self._client.post(self._url, json=json)
         response_json = response.json()
         if 'error' in response_json:
             code = response_json['error']['code']

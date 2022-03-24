@@ -34,6 +34,11 @@ dev = [
 docs = [
     "sphinx>=4",
     "furo",
+    "sphinxcontrib-trio",
+]
+lint = [
+    "mypy>=0.941",
+    "trio-typing[mypy]>=0.7.0",
 ]
 
 [tool]

@@ -10,15 +10,14 @@ Clients
 .. autoclass:: Client
    :members:
 
-.. autoclass:: SigningClient
+.. autoclass:: pons.client.ClientSession()
    :members:
 
 
 Providers
 ~~~~~~~~~
 
-.. autoclass:: Provider
-   :members:
+.. autoclass:: pons.provider.Provider
 
 .. autoclass:: HTTPProvider
    :show-inheritance:
@@ -46,11 +45,11 @@ Contracts
 .. autoclass:: ContractABI
    :members:
 
-.. autoclass:: Method
+.. autoclass:: Method()
    :members:
    :special-members: __call__
 
-.. autoclass:: MethodCall
+.. autoclass:: MethodCall()
    :members:
 
 
@@ -63,11 +62,11 @@ Types
 .. autoclass:: Address
    :members:
 
-.. autoclass:: Block
+.. autoclass:: Block()
    :members:
 
-.. autoclass:: TxHash
+.. autoclass:: TxHash()
    :members:
 
-.. autoclass:: TxReceipt
+.. autoclass:: TxReceipt()
    :members:

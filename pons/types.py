@@ -100,7 +100,7 @@ class Address:
         if not isinstance(address_bytes, bytes):
             raise TypeError(f"Address must be a bytestring, got {repr(address_bytes)}")
         if len(address_bytes) != 20:
-            raise ValueError(f"Address must be 20 bytes long, got {address_bytes}")
+            raise ValueError(f"Address must be 20 bytes long, got {repr(address_bytes)}")
         self._address_bytes = address_bytes
 
     def __bytes__(self):
