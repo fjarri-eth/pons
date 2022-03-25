@@ -42,9 +42,10 @@ async def test_contract(test_provider, compiled_contract):
     root_address = Address.from_hex(root_account.address)
     acc1_address = Address.from_hex(acc1.address)
 
-    # Fund the deployer account
-
     async with client.session() as session:
+
+        # Fund the deployer account
+
         root_balance = await session.get_balance(root_address)
         to_transfer = Amount.ether(10)
         await session.transfer(root_signer, acc1_address, to_transfer)
@@ -56,12 +57,10 @@ async def test_contract(test_provider, compiled_contract):
 
         # Deploy the contract
 
-        # TODO: can we estimate gas?
         deployed_contract = await session.deploy(acc1_signer, compiled_contract, 12345, 56789)
 
         # Transact with the contract
 
-        acc2 = Account.create()
         call = deployed_contract.abi.setState(111)
         await session.transact(acc1_signer, deployed_contract.address, call)
 
