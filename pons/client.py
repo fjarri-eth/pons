@@ -5,7 +5,7 @@ from typing import Union, Any, Optional, AsyncIterator
 import trio
 
 from .contract import DeployedContract, CompiledContract
-from .contract_abi import MethodCall
+from .contract_abi import MethodCall, StateMutability
 from .provider import Provider, ProviderSession
 from .signer import Signer
 from .types import (
@@ -117,6 +117,8 @@ class ClientSession:
         Sends a prepared contact method call to the provided address.
         Returns the decoded output.
         """
+        if call.method.state_mutability not in (StateMutability.VIEW, StateMutability.PURE):
+            raise ValueError("This is a mutating method, use `.transact()` instead")
 
         encoded_args = call.encode()
         result = await self._provider_session.rpc(
@@ -257,6 +259,12 @@ class ClientSession:
         Transacts with the contract using a prepared method call.
         Waits for the transaction to be confirmed.
         """
+        if call.method.state_mutability not in (StateMutability.NONPAYABLE, StateMutability.PAYABLE):
+            raise ValueError("No need to transact with a non-mutating method, use `.call()` instead")
+
+        if call.method.state_mutability != StateMutability.PAYABLE and amount != Amount(0):
+            raise ValueError("This method does not accept an associated payment")
+
         encoded_args = call.encode()
         chain_id = await self.get_chain_id()
         gas = await self.estimate_transact(contract_address, call, amount=amount)

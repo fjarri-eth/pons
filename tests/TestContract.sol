@@ -15,6 +15,11 @@ contract Test {
         v2 = 2;
     }
 
+    fallback(bytes calldata) external returns (bytes memory) {
+        v1 = 1;
+        v2 = 2;
+    }
+
     function setState(uint256 _v1) public {
         v1 = _v1;
     }

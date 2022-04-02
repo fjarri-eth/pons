@@ -6,11 +6,11 @@ from typing import Optional
 class Type(ABC):
 
     @abstractmethod
-    def canonical_signature(self):
+    def canonical_form(self):
         pass
 
     def __str__(self):
-        return self.canonical_signature()
+        return self.canonical_form()
 
 
 class UInt(Type):
@@ -20,7 +20,7 @@ class UInt(Type):
             raise Exception(f"Incorrect uint bit size: {bits}")
         self._bits = bits
 
-    def canonical_signature(self):
+    def canonical_form(self):
         return f"uint{self._bits}"
 
 
@@ -31,7 +31,7 @@ class Int(Type):
             raise Exception(f"Incorrect int bit size: {bits}")
         self._bits = bits
 
-    def canonical_signature(self):
+    def canonical_form(self):
         return f"int{self._bits}"
 
 
@@ -42,22 +42,22 @@ class Bytes(Type):
             raise Exception(f"Incorrect bytes size: {size}")
         self._size = size
 
-    def canonical_signature(self):
+    def canonical_form(self):
         return f"bytes{self._size if self._size else ''}"
 
 
 class Address(Type):
-    def canonical_signature(self):
+    def canonical_form(self):
         return "address"
 
 
 class String(Type):
-    def canonical_signature(self):
+    def canonical_form(self):
         return "string"
 
 
 class Bool(Type):
-    def canonical_signature(self):
+    def canonical_form(self):
         return "bool"
 
 
