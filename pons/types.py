@@ -60,23 +60,28 @@ class Amount:
         return self._wei / 10**18
 
     def __eq__(self, other):
-        assert type(other) == type(self)
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
         return self._wei == other._wei
 
     def __sub__(self, other):
-        assert type(other) == type(self)
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
         return self.wei(self._wei - other._wei)
 
     def __mul__(self, other: int):
-        assert isinstance(other, int)
+        if not isinstance(other, int):
+            raise TypeError(f"Expected an integer, got {type(other)}")
         return self.wei(self._wei * other)
 
     def __gt__(self, other):
-        assert type(other) == type(self)
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
         return self._wei > other._wei
 
     def __ge__(self, other):
-        assert type(other) == type(self)
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
         return self._wei >= other._wei
 
     def __repr__(self):
@@ -122,7 +127,8 @@ class Address:
         return hash(self._address_bytes)
 
     def __eq__(self, other):
-        assert type(other) == type(self)
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
         return self._address_bytes == other._address_bytes
 
 
@@ -147,7 +153,10 @@ class TxHash:
     """
 
     def __init__(self, tx_hash: bytes):
-        assert len(tx_hash) == 32
+        if not isinstance(tx_hash, bytes):
+            raise TypeError(f"Transaction hash must be a bytestring, got {repr(tx_hash)}")
+        if len(tx_hash) != 32:
+            raise ValueError(f"Transaction hash must be 32 bytes long, got {repr(tx_hash)}")
         self._tx_hash = tx_hash
 
     def __bytes__(self):
@@ -200,12 +209,14 @@ def encode_tx_hash(val: TxHash) -> str:
 
 
 def decode_quantity(val: str) -> int:
-    assert isinstance(val, str) and val.startswith('0x')
+    if not val.startswith('0x'):
+        raise ValueError("Encoded quantity must start with `0x`")
     return int(val, 16)
 
 
 def decode_data(val: str) -> bytes:
-    assert isinstance(val, str) and val.startswith('0x')
+    if not val.startswith('0x'):
+        raise ValueError("Encoded data must start with `0x`")
     return bytes.fromhex(val[2:])
 
 

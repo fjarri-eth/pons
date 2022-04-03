@@ -51,7 +51,8 @@ class ClientSession:
         """
         if self._net_version is None:
             result = await self._provider_session.rpc('net_version')
-            assert isinstance(result, str)
+            if not isinstance(result, str):
+                raise RuntimeError("Expected a string from the RPC of net_version()")
             self._net_version = result
         return self._net_version
 
