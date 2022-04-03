@@ -33,7 +33,7 @@ class Parameter:
 
 def dispatch_type(abi_entry):
     type_str = abi_entry['type']
-    match = re.match(r"(\w+)(\[(\d+)?\])?", type_str)
+    match = re.match(r"^(.*?)(\[(\d+)?\])?$", type_str)
     if not match:
         raise Exception(f"Incorrect type format: {type_str}")
 
