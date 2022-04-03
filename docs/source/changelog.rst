@@ -15,8 +15,11 @@ Fixed
 ^^^^^
 
 - Multiple fixes for typing of methods. (PR_1_)
+- Fixed the handling of array-of-array ABI types. (PR_2_)
+
 
 .. _PR_1: https://github.com/fjarri/pons/pull/1
+.. _PR_2: https://github.com/fjarri/pons/pull/2
 
 
 0.2.0 (19-03-2022)
