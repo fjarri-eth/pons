@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from enum import Enum, auto
 import re
-from typing import Any, Tuple, Iterable, List, Dict
+from typing import Any, Tuple, Iterable, List, Dict, Optional
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
@@ -161,31 +162,44 @@ class Method(Callable):
         return cls(name=name, inputs=inputs, outputs=outputs, state_mutability=state_mutability)
 
     @classmethod
-    def pure(cls, name, inputs, outputs):
-        return cls(name, inputs, outputs, state_mutability=StateMutability.PURE)
+    def pure(cls, name, inputs, outputs, unique_name=None):
+        return cls(name, inputs, outputs, state_mutability=StateMutability.PURE, unique_name=unique_name)
 
     @classmethod
-    def view(cls, name, inputs, outputs):
-        return cls(name, inputs, outputs, state_mutability=StateMutability.VIEW)
+    def view(cls, name, inputs, outputs, unique_name=None):
+        return cls(name, inputs, outputs, state_mutability=StateMutability.VIEW, unique_name=unique_name)
 
     @classmethod
-    def nonpayable(cls, name, inputs):
-        return cls(name, inputs, {}, state_mutability=StateMutability.NONPAYABLE)
+    def nonpayable(cls, name, inputs, unique_name=None):
+        return cls(name, inputs, {}, state_mutability=StateMutability.NONPAYABLE, unique_name=unique_name)
 
     @classmethod
-    def payable(cls, name, inputs):
-        return cls(name, inputs, {}, state_mutability=StateMutability.PAYABLE)
+    def payable(cls, name, inputs, unique_name=None):
+        return cls(name, inputs, {}, state_mutability=StateMutability.PAYABLE, unique_name=unique_name)
 
     def __init__(
-            self, name: str, inputs: Dict[str, Type],
-            outputs: Dict[str, Type], state_mutability: StateMutability):
+            self,
+            name: str,
+            inputs: Dict[str, Type],
+            outputs: List[Type],
+            state_mutability: StateMutability,
+            unique_name: Optional[str] = None):
         self.name = name
+        self.unique_name = unique_name or name
         self.state_mutability = state_mutability
         self._inputs = inputs
 
         if isinstance(outputs, Type):
             outputs = dict(_=outputs)
         self._outputs = outputs
+
+    def disambiguate(self):
+        return type(self)(
+            name=self.name,
+            inputs=self._inputs,
+            outputs=self._outputs,
+            state_mutability=self.state_mutability,
+            unique_name=self.name + '_' + self.selector().hex())
 
     @property
     def inputs(self):
@@ -280,39 +294,60 @@ class ContractABI:
         constructor = None
         fallback = None
         receive = None
-        methods = []
+        methods = {}
+        selectors = defaultdict(set)
 
         for entry in json_abi:
+
             if entry['type'] == 'constructor':
                 if constructor:
                     raise ValueError("JSON ABI contains more than one constructor declarations")
                 constructor = Constructor.from_json(entry)
+
             elif entry['type'] == 'function':
                 method = Method.from_json(entry)
-                if method.name in methods:
-                    raise ValueError(f"JSON ABI contains more than one declarations of `{method.name}`")
-                methods.append(method)
+                selector = method.selector()
+                if method.name in selectors:
+                    if selector in selectors[method.name]:
+                        raise ValueError(
+                            f"JSON ABI contains more than one declarations of `{method.name}` "
+                            f"with the same selector ({method})")
+
+                    if len(selectors[method.name]) == 1:
+                        # If it's the second encountered method, remove the "simple" entry
+                        another_method = methods.pop(method.name)
+                        another_method = another_method.disambiguate()
+                        methods[another_method.unique_name] = another_method
+
+                    method = method.disambiguate()
+
+                selectors[method.name].add(selector)
+                methods[method.unique_name] = method
+
             elif entry['type'] == 'fallback':
                 if fallback:
                     raise ValueError("JSON ABI contains more than one fallback declarations")
                 fallback = Fallback.from_json(entry)
+
             elif entry['type'] == 'receive':
                 if receive:
                     raise ValueError("JSON ABI contains more than one receive method declarations")
                 receive = Receive.from_json(entry)
+
             elif entry['type'] == 'event':
                 # TODO: support this
                 pass
+
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
-        return cls(constructor=constructor, fallback=fallback, receive=receive, methods=methods)
+        return cls(constructor=constructor, fallback=fallback, receive=receive, methods=methods.values())
 
     def __init__(self, constructor=None, fallback=False, receive=False, methods=None):
         self.fallback = fallback
         self.receive = receive
         self.constructor = constructor
-        self.method = Methods({method.name: method for method in methods})
+        self.method = Methods({method.unique_name: method for method in methods})
 
     def __str__(self):
         all_methods = (

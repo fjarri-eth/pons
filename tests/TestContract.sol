@@ -27,4 +27,8 @@ contract Test {
     function getState(uint256 _x) public view returns (uint256) {
         return v1 + _x;
     }
+
+    function getState(uint256 _x, uint256 _y) public view returns (uint256) {
+        return v1 + _x + _y;
+    }
 }

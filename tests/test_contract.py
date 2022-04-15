@@ -31,12 +31,13 @@ async def test_abi_declaration(test_provider, compiled_contract):
         constructor=Constructor.nonpayable(inputs=dict(_v1=uint256, _v2=uint256)),
         methods=[
             Method.nonpayable(name='setState', inputs=dict(_v1=uint256)),
-            Method.view(name='getState', inputs=dict(_x=uint256), outputs=uint256)
+            Method.view(name='getState', unique_name='getState_v1', inputs=dict(_x=uint256), outputs=uint256),
+            Method.view(name='getState', unique_name='getState_v2', inputs=dict(_x=uint256, y=uint256), outputs=uint256)
             ]
         )
 
     contract_address = deployed_contract.address
-    deployed_contract_from_abi = DeployedContract(abi, contract_address)
+    deployed_contract = DeployedContract(abi, contract_address)
 
     async with client.session() as session:
 
@@ -47,7 +48,10 @@ async def test_abi_declaration(test_provider, compiled_contract):
 
         # Call the contract
 
-        call = deployed_contract.abi.method.getState(123)
+        call = deployed_contract.abi.method.getState_v1(123)
         result = await session.call(contract_address, call)
+        assert result == 111 + 123
 
-    assert result == 111 + 123
+        call = deployed_contract.abi.method.getState_v2(123, 456)
+        result = await session.call(contract_address, call)
+        assert result == 111 + 123 + 456
