@@ -1,17 +1,14 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum, auto
+import inspect
 import re
 from typing import Any, Tuple, Iterable, List, Dict, Optional
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 
-from . import primitive_types
-from .primitive_types import type_from_abi_string, Type
-
-
-uint256 = primitive_types.UInt(256)
+from .contract_types import Type, dispatch_type
 
 
 class StateMutability(Enum):
@@ -33,60 +30,6 @@ class StateMutability(Enum):
             raise ValueError(f"Unknown state mutability type: `{val}`")
 
         return state_mutability_values[val]
-
-
-def dispatch_type(abi_entry):
-    type_str = abi_entry['type']
-    match = re.match(r"^(.*?)(\[(\d+)?\])?$", type_str)
-    if not match:
-        raise Exception(f"Incorrect type format: {type_str}")
-
-    element_type_name = match.group(1)
-    is_array = match.group(2)
-    array_size = match.group(3)
-    if array_size:
-        array_size = int(array_size)
-
-    if is_array:
-        element_entry = dict(abi_entry)
-        element_entry['type'] = element_type_name
-        element_type = dispatch_type(element_entry)
-        return Array(element_type, array_size)
-    elif element_type_name == 'tuple':
-        fields = {}
-        for component in abi_entry['components']:
-            fields[component['name']] = dispatch_type(component)
-        return Struct(fields)
-    else:
-        return type_from_abi_string(element_type_name)
-
-    self.is_array = is_array is not None
-    self.array_size = array_size
-
-
-class Array(Type):
-
-    def __init__(self, element_type, size):
-        self.element_type = element_type
-        self.size = size
-
-    def canonical_form(self):
-        return self.element_type.canonical_form() + "[" + (str(self.size) if self.size else "") + "]"
-
-    def __str__(self):
-        return str(self.element_type) + "[" + (str(self.size) if self.size else "") + "]"
-
-
-class Struct(Type):
-
-    def __init__(self, fields):
-        self.fields = fields
-
-    def canonical_form(self):
-        return "(" + ",".join(field.canonical_form() for field in self.fields.values()) + ")"
-
-    def __str__(self):
-        return "(" + ", ".join(str(tp) + " " + str(name) for name, tp in self.fields.items()) + ")"
 
 
 class Callable(ABC):
@@ -111,8 +54,8 @@ class Callable(ABC):
     def canonical_output_signature(self):
         return "(" + ",".join(param.canonical_form() for param in self.outputs.values()) + ")"
 
-    def __call__(self, *args):
-        return MethodCall(self, args)
+    def __call__(self, *args, **kwargs):
+        return MethodCall(self, *args, **kwargs)
 
 
 class Constructor(Callable):
@@ -255,9 +198,20 @@ class MethodCall:
     """The unprocessed arguments to the method call."""
 
 
-    def __init__(self, method, args):
+    def __init__(self, method, *args, **kwargs):
+
+        signature = inspect.Signature(parameters=[
+            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            for name, tp in method.inputs.items()
+            ])
+        bargs = signature.bind(*args, **kwargs)
+        normalized_args = [
+            tp.normalize(barg)
+            for barg, tp in zip(bargs.arguments.values(), method.inputs.values())
+            ]
+
         self.method = method
-        self.args = args
+        self.args = normalized_args
 
     def encode(self) -> bytes:
         signature = self.method.canonical_input_signature()
@@ -266,9 +220,17 @@ class MethodCall:
 
     def decode_output(self, output: bytes) -> Any:
         signature = self.method.canonical_output_signature()
-        results = decode_single(signature, output)
+        normalized_results = decode_single(signature, output)
+
+        assert len(normalized_results) == len(self.method.outputs)
+
+        results = [
+            tp.denormalize(result)
+            for result, tp in zip(normalized_results, self.method.outputs.values())
+            ]
+
         # TODO: or always return a list?
-        if len(self.method.outputs) == 1:
+        if len(results) == 1:
             results = results[0]
         return results
 

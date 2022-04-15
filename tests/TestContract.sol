@@ -31,4 +31,20 @@ contract Test {
     function getState(uint256 _x, uint256 _y) public view returns (uint256) {
         return v1 + _x + _y;
     }
+
+    struct Inner {
+        uint256 inner1;
+        uint256 inner2;
+    }
+
+    struct Outer {
+        Inner inner;
+        uint256 outer1;
+    }
+
+    function testStructs(Inner memory inner_in, Outer memory outer_in)
+            public pure returns (Inner memory inner_out, Outer memory outer_out) {
+        inner_out = inner_in;
+        outer_out = outer_in;
+    }
 }
