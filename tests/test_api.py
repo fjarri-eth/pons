@@ -57,16 +57,16 @@ async def test_contract(test_provider, compiled_contract):
 
         # Deploy the contract
 
-        deployed_contract = await session.deploy(acc1_signer, compiled_contract, 12345, 56789)
+        call = compiled_contract.constructor(12345, 56789)
+        deployed_contract = await session.deploy(acc1_signer, call)
 
         # Transact with the contract
-
-        call = deployed_contract.abi.method.setState(111)
-        await session.transact(acc1_signer, deployed_contract.address, call)
+        call = deployed_contract.write.setState(111)
+        await session.transact(acc1_signer, call)
 
         # Call the contract
 
-        call = deployed_contract.abi.method.getState(123)
-        result = await session.call(deployed_contract.address, call)
+        call = deployed_contract.read.getState(123)
+        result = await session.call(call)
 
     assert result == 111 + 123

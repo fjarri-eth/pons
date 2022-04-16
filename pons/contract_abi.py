@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum, auto
+from functools import cached_property
 import inspect
 import re
 from typing import Any, Tuple, Iterable, List, Dict, Optional
@@ -8,7 +9,7 @@ from typing import Any, Tuple, Iterable, List, Dict, Optional
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 
-from .contract_types import Type, dispatch_type
+from .contract_types import Type, dispatch_types
 
 
 class StateMutability(Enum):
@@ -32,6 +33,19 @@ class StateMutability(Enum):
         return state_mutability_values[val]
 
 
+def canonical_signature(types):
+    return "(" + ",".join(tp.canonical_form() for tp in types) + ")"
+
+
+def bind_args(param_names, *args, **kwargs):
+    signature = inspect.Signature(parameters=[
+        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        for name in param_names
+        ])
+    bargs = signature.bind(*args, **kwargs)
+    return bargs.args
+
+
 class Callable(ABC):
 
     @property
@@ -39,23 +53,28 @@ class Callable(ABC):
     def inputs(self):
         ...
 
+    @cached_property
+    def input_signature(self):
+        return canonical_signature(self.inputs.values())
+
+    def _encode_args(self, *args, **kwargs):
+        param_names = self.inputs.keys()
+        param_types = self.inputs.values()
+        bound_args = bind_args(param_names, *args, **kwargs)
+        normalized_args = [tp.normalize(arg) for arg, tp in zip(bound_args, param_types)]
+        return encode_single(self.input_signature, normalized_args)
+
+
+class Method(Callable):
+
     @property
     @abstractmethod
-    def outputs(self):
+    def name(self):
         ...
 
-    @abstractmethod
+    @cached_property
     def selector(self):
-        ...
-
-    def canonical_input_signature(self):
-        return "(" + ",".join(param.canonical_form() for param in self.inputs.values()) + ")"
-
-    def canonical_output_signature(self):
-        return "(" + ",".join(param.canonical_form() for param in self.outputs.values()) + ")"
-
-    def __call__(self, *args, **kwargs):
-        return MethodCall(self, *args, **kwargs)
+        return keccak(self.name.encode() + self.input_signature.encode())[:4]
 
 
 class Constructor(Callable):
@@ -64,97 +83,111 @@ class Constructor(Callable):
     def from_json(cls, method_entry: dict):
         assert method_entry['type'] == 'constructor'
         assert 'name' not in method_entry
-        assert 'outputs' not in method_entry
+        assert 'outputs' not in method_entry or not method_entry['outputs']
         state_mutability = StateMutability.from_string(method_entry['stateMutability'])
         assert state_mutability in (StateMutability.NONPAYABLE, StateMutability.PAYABLE)
-        inputs = {entry['name']: dispatch_type(entry) for entry in method_entry['inputs']}
-        return cls(inputs, state_mutability)
+        inputs = dispatch_types(method_entry['inputs'])
+        payable = state_mutability == StateMutability.PAYABLE
+        return cls(inputs, payable=payable)
 
-    @classmethod
-    def nonpayable(cls, *args, **kwds):
-        return cls(*args, **kwds, state_mutability=StateMutability.NONPAYABLE)
-
-    @classmethod
-    def payable(cls, *args, **kwds):
-        return cls(*args, **kwds, state_mutability=StateMutability.PAYABLE)
-
-    def __init__(self, inputs, state_mutability):
+    def __init__(self, inputs, payable=False):
         self._inputs = inputs
-        self.state_mutability = state_mutability
+        self.payable = payable
 
     @property
     def inputs(self):
         return self._inputs
 
-    @property
-    def outputs(self):
-        return []
-
-    def selector(self):
-        return b""
+    def __call__(self, *args, **kwargs):
+        input_bytes = self._encode_args(*args, *kwargs)
+        return ConstructorCall(input_bytes)
 
 
-class Method(Callable):
+class ReadMethod(Method):
 
     @classmethod
     def from_json(cls, method_entry: dict):
         name = method_entry['name']
+        inputs = dispatch_types(method_entry['inputs'])
+        outputs = dispatch_types(method_entry['outputs'])
         state_mutability = StateMutability.from_string(method_entry['stateMutability'])
-        inputs = {entry['name']: dispatch_type(entry) for entry in method_entry['inputs']}
-        outputs = {entry['name']: dispatch_type(entry) for entry in method_entry['inputs']}
-        return cls(name=name, inputs=inputs, outputs=outputs, state_mutability=state_mutability)
-
-    @classmethod
-    def pure(cls, name, inputs, outputs, unique_name=None):
-        return cls(name, inputs, outputs, state_mutability=StateMutability.PURE, unique_name=unique_name)
-
-    @classmethod
-    def view(cls, name, inputs, outputs, unique_name=None):
-        return cls(name, inputs, outputs, state_mutability=StateMutability.VIEW, unique_name=unique_name)
-
-    @classmethod
-    def nonpayable(cls, name, inputs, unique_name=None):
-        return cls(name, inputs, {}, state_mutability=StateMutability.NONPAYABLE, unique_name=unique_name)
-
-    @classmethod
-    def payable(cls, name, inputs, unique_name=None):
-        return cls(name, inputs, {}, state_mutability=StateMutability.PAYABLE, unique_name=unique_name)
+        assert state_mutability in (StateMutability.PURE, StateMutability.VIEW)
+        return cls(name=name, inputs=inputs, outputs=outputs)
 
     def __init__(
             self,
             name: str,
             inputs: Dict[str, Type],
-            outputs: List[Type],
-            state_mutability: StateMutability,
-            unique_name: Optional[str] = None):
-        self.name = name
-        self.unique_name = unique_name or name
-        self.state_mutability = state_mutability
+            outputs: Dict[str, Type]):
+        self._name = name
         self._inputs = inputs
 
         if isinstance(outputs, Type):
-            outputs = dict(_=outputs)
+            outputs = {"": outputs}
         self._outputs = outputs
 
-    def disambiguate(self):
-        return type(self)(
-            name=self.name,
-            inputs=self._inputs,
-            outputs=self._outputs,
-            state_mutability=self.state_mutability,
-            unique_name=self.name + '_' + self.selector().hex())
+    @property
+    def name(self):
+        return self._name
 
     @property
     def inputs(self):
         return self._inputs
 
-    @property
-    def outputs(self):
-        return self._outputs
+    @cached_property
+    def output_signature(self):
+        return canonical_signature(self._outputs.values())
 
-    def selector(self):
-        signature = self.canonical_input_signature()
-        return keccak(self.name.encode() + signature.encode())[:4]
+    def __call__(self, *args, **kwargs):
+        input_bytes = self._encode_args(*args, *kwargs)
+        data_bytes = self.selector + input_bytes
+        return ReadCall(data_bytes)
+
+    def decode_output(self, output_bytes: bytes) -> Any:
+        param_types = self._outputs.values()
+        normalized_results = decode_single(self.output_signature, output_bytes)
+        results = [tp.denormalize(result) for result, tp in zip(normalized_results, param_types)]
+
+        # TODO: or always return a list?
+        # TODO: bind output elements to names?
+        if len(results) == 1:
+            results = results[0]
+        return results
+
+
+class WriteMethod(Method):
+
+    @classmethod
+    def from_json(cls, method_entry: dict):
+        name = method_entry['name']
+        inputs = dispatch_types(method_entry['inputs'])
+        assert 'outputs' not in method_entry or not method_entry['outputs']
+        state_mutability = StateMutability.from_string(method_entry['stateMutability'])
+        assert state_mutability in (StateMutability.NONPAYABLE, StateMutability.PAYABLE)
+        payable = state_mutability == StateMutability.PAYABLE
+        return cls(name=name, inputs=inputs, payable=payable)
+
+    def __init__(
+            self,
+            name: str,
+            inputs: Dict[str, Type],
+            payable: bool = False):
+        self._name = name
+        self._inputs = inputs
+        self.payable = payable
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def inputs(self):
+        return self._inputs
+
+    def __call__(self, *args, **kwargs):
+        input_bytes = self._encode_args(*args, *kwargs)
+        data_bytes = self.selector + input_bytes
+        return WriteCall(data_bytes)
 
 
 class Fallback:
@@ -189,50 +222,22 @@ class Receive:
         self.state_mutability = state_mutability
 
 
-class MethodCall:
-    """
-    A contract method with attached arguments.
-    """
+class ConstructorCall:
 
-    args: Tuple
-    """The unprocessed arguments to the method call."""
+    def __init__(self, input_bytes):
+        self.input_bytes = input_bytes
 
 
-    def __init__(self, method, *args, **kwargs):
+class ReadCall:
 
-        signature = inspect.Signature(parameters=[
-            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-            for name, tp in method.inputs.items()
-            ])
-        bargs = signature.bind(*args, **kwargs)
-        normalized_args = [
-            tp.normalize(barg)
-            for barg, tp in zip(bargs.arguments.values(), method.inputs.values())
-            ]
+    def __init__(self, data_bytes):
+        self.data_bytes = data_bytes
 
-        self.method = method
-        self.args = normalized_args
 
-    def encode(self) -> bytes:
-        signature = self.method.canonical_input_signature()
-        encoded_args = encode_single(signature, self.args)
-        return self.method.selector() + encoded_args
+class WriteCall:
 
-    def decode_output(self, output: bytes) -> Any:
-        signature = self.method.canonical_output_signature()
-        normalized_results = decode_single(signature, output)
-
-        assert len(normalized_results) == len(self.method.outputs)
-
-        results = [
-            tp.denormalize(result)
-            for result, tp in zip(normalized_results, self.method.outputs.values())
-            ]
-
-        # TODO: or always return a list?
-        if len(results) == 1:
-            results = results[0]
-        return results
+    def __init__(self, data_bytes):
+        self.data_bytes = data_bytes
 
 
 class Methods:
@@ -242,6 +247,9 @@ class Methods:
 
     def __getattr__(self, method_name) -> Method:
         return self._methods_dict[method_name]
+
+    def __iter__(self):
+        return iter(self._methods_dict.values())
 
 
 class ContractABI:
@@ -257,7 +265,6 @@ class ContractABI:
         fallback = None
         receive = None
         methods = {}
-        selectors = defaultdict(set)
 
         for entry in json_abi:
 
@@ -267,24 +274,18 @@ class ContractABI:
                 constructor = Constructor.from_json(entry)
 
             elif entry['type'] == 'function':
-                method = Method.from_json(entry)
-                selector = method.selector()
-                if method.name in selectors:
-                    if selector in selectors[method.name]:
-                        raise ValueError(
-                            f"JSON ABI contains more than one declarations of `{method.name}` "
-                            f"with the same selector ({method})")
+                state_mutability = StateMutability.from_string(entry['stateMutability'])
+                if state_mutability in (StateMutability.PURE, StateMutability.VIEW):
+                    method = ReadMethod.from_json(entry)
+                else:
+                    method = WriteMethod.from_json(entry)
 
-                    if len(selectors[method.name]) == 1:
-                        # If it's the second encountered method, remove the "simple" entry
-                        another_method = methods.pop(method.name)
-                        another_method = another_method.disambiguate()
-                        methods[another_method.unique_name] = another_method
+                if method.name in methods:
+                    # TODO: add support for overloaded methods
+                    raise ValueError(
+                        f"JSON ABI contains more than one declarations of `{method.name}`")
 
-                    method = method.disambiguate()
-
-                selectors[method.name].add(selector)
-                methods[method.unique_name] = method
+                methods[method.name] = method
 
             elif entry['type'] == 'fallback':
                 if fallback:
@@ -303,13 +304,19 @@ class ContractABI:
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
-        return cls(constructor=constructor, fallback=fallback, receive=receive, methods=methods.values())
+        read = [method for method in methods.values() if isinstance(method, ReadMethod)]
+        write = [method for method in methods.values() if isinstance(method, WriteMethod)]
 
-    def __init__(self, constructor=None, fallback=False, receive=False, methods=None):
+        return cls(
+            constructor=constructor, fallback=fallback, receive=receive,
+            read=read, write=write)
+
+    def __init__(self, constructor=None, fallback=False, receive=False, read=None, write=None):
         self.fallback = fallback
         self.receive = receive
         self.constructor = constructor
-        self.method = Methods({method.unique_name: method for method in methods})
+        self.read = Methods({method.name: method for method in (read or [])})
+        self.write = Methods({method.name: method for method in (write or [])})
 
     def __str__(self):
         all_methods = (

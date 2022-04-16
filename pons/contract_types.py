@@ -234,4 +234,8 @@ def dispatch_type(abi_entry):
         return type_from_abi_string(element_type_name)
 
 
+def dispatch_types(abi_entry):
+    return {entry['name']: dispatch_type(entry) for entry in abi_entry}
+
+
 uint256 = UInt(256)

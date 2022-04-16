@@ -4,8 +4,7 @@ from typing import Union, Any, Optional, AsyncIterator
 
 import trio
 
-from .contract import DeployedContract, CompiledContract
-from .contract_abi import MethodCall, StateMutability
+from .contract import DeployedContract, CompiledContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
 from .provider import Provider, ProviderSession
 from .signer import Signer
 from .types import (
@@ -109,23 +108,16 @@ class ClientSession:
                 return receipt
             await trio.sleep(poll_latency)
 
-    async def call(self,
-                   contract_address: Address,
-                   call: MethodCall,
-                   block: Union[int, Block] = Block.LATEST) -> Any:
+    async def call(self, call: BoundReadCall, block: Union[int, Block] = Block.LATEST) -> Any:
         """
         Sends a prepared contact method call to the provided address.
         Returns the decoded output.
         """
-        if call.method.state_mutability not in (StateMutability.VIEW, StateMutability.PURE):
-            raise ValueError("This is a mutating method, use `.transact()` instead")
-
-        encoded_args = call.encode()
         result = await self._provider_session.rpc(
             'eth_call',
             {
-                'to': encode_address(contract_address),
-                'data': encode_data(encoded_args)
+                'to': encode_address(call.contract_address),
+                'data': encode_data(call.data_bytes)
             },
             encode_block(block))
 
@@ -139,13 +131,13 @@ class ClientSession:
         result = await self._provider_session.rpc('eth_sendRawTransaction', encode_data(tx_bytes))
         return decode_tx_hash(result)
 
-    async def estimate_deploy(self, contract: CompiledContract, *args) -> int:
+    async def estimate_deploy(self, call: BoundConstructorCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
         """
-        encoded_args = contract.abi.constructor(*args).encode()
         tx = {
-            'data': encode_data(contract.bytecode + encoded_args)
+            'data': encode_data(call.data_bytes),
+            'value': encode_amount(amount),
         }
         result = await self._provider_session.rpc(
             'eth_estimateGas',
@@ -171,14 +163,13 @@ class ClientSession:
             encode_block(Block.LATEST))
         return decode_quantity(result)
 
-    async def estimate_transact(self, contract_address: Address, call: MethodCall, amount: Amount = Amount(0)) -> int:
+    async def estimate_transact(self, call: BoundWriteCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
         """
-        encoded_args = call.encode()
         tx = {
-            'to': encode_address(contract_address),
-            'data': encode_data(encoded_args),
+            'to': encode_address(call.contract_address),
+            'data': encode_data(call.data_bytes),
             'value': encode_amount(amount),
         }
         result = await self._provider_session.rpc(
@@ -219,14 +210,16 @@ class ClientSession:
         tx_hash = await self.send_raw_transaction(signed_tx)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
 
-    async def deploy(self, signer: Signer, contract: CompiledContract, *args) -> DeployedContract:
+    async def deploy(self, signer: Signer, call: BoundConstructorCall, amount: Amount = Amount(0)) -> DeployedContract:
         """
         Deploys the contract passing ``args`` to the constructor.
         Waits for the transaction to be confirmed.
         """
-        encoded_args = contract.abi.constructor(*args).encode()
+        if call.payable and amount != Amount(0):
+            raise ValueError("This constructor does not accept an associated payment")
+
         chain_id = await self.get_chain_id()
-        gas = await self.estimate_deploy(contract, *args) # TODO: don't encode args twice
+        gas = await self.estimate_deploy(call, amount=amount)
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
@@ -234,12 +227,12 @@ class ClientSession:
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
-            'value': encode_amount(Amount(0)),
+            'value': encode_amount(amount),
             'gas': encode_quantity(gas),
             'maxFeePerGas': encode_amount(max_gas_price),
             'maxPriorityFeePerGas': encode_amount(max_tip),
             'nonce': encode_quantity(nonce),
-            'data': encode_data(contract.bytecode + encoded_args)
+            'data': encode_data(call.data_bytes)
         }
         signed_tx = signer.sign_transaction(tx)
         tx_hash = await self.send_raw_transaction(signed_tx)
@@ -252,22 +245,18 @@ class ClientSession:
             raise RuntimeError(
                 "The transaction succeeded, but contractAddress is not present in the receipt")
 
-        return DeployedContract(contract.abi, receipt.contract_address)
+        return DeployedContract(call.contract_abi, receipt.contract_address)
 
-    async def transact(self, signer: Signer, contract_address: Address, call: MethodCall, amount: Amount = Amount(0)):
+    async def transact(self, signer: Signer, call: BoundWriteCall, amount: Amount = Amount(0)):
         """
         Transacts with the contract using a prepared method call.
         Waits for the transaction to be confirmed.
         """
-        if call.method.state_mutability not in (StateMutability.NONPAYABLE, StateMutability.PAYABLE):
-            raise ValueError("No need to transact with a non-mutating method, use `.call()` instead")
-
-        if call.method.state_mutability != StateMutability.PAYABLE and amount != Amount(0):
+        if call.payable and amount != Amount(0):
             raise ValueError("This method does not accept an associated payment")
 
-        encoded_args = call.encode()
         chain_id = await self.get_chain_id()
-        gas = await self.estimate_transact(contract_address, call, amount=amount)
+        gas = await self.estimate_transact(call, amount=amount)
         # TODO: implement gas strategies
         max_gas_price = await self.gas_price()
         max_tip = Amount.gwei(1)
@@ -275,13 +264,13 @@ class ClientSession:
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
-            'to': encode_address(contract_address),
+            'to': encode_address(call.contract_address),
             'value': encode_amount(amount),
             'gas': encode_quantity(gas),
             'maxFeePerGas': encode_amount(max_gas_price),
             'maxPriorityFeePerGas': encode_amount(max_tip),
             'nonce': encode_quantity(nonce),
-            'data': encode_data(encoded_args)
+            'data': encode_data(call.data_bytes)
         }
         signed_tx = signer.sign_transaction(tx)
         tx_hash = await self.send_raw_transaction(signed_tx)
