@@ -36,6 +36,9 @@ class StateMutability(Enum):
 
 
 class Signature:
+    """
+    Generalized signature of either inputs or outputs.
+    """
 
     def __init__(self, parameters: Union[Mapping[str, Type], Sequence[Type]]):
         self._parameters = parameters
@@ -53,7 +56,7 @@ class Signature:
 
         self._types = types
 
-    def bind(self, *args, **kwargs) -> Tuple[Any, ...]:
+    def _bind(self, *args, **kwargs) -> Tuple[Any, ...]:
         if self._signature:
             bargs = self._signature.bind(*args, **kwargs)
             return bargs.args
@@ -64,17 +67,33 @@ class Signature:
 
     @cached_property
     def canonical_form(self) -> str:
+        """
+        Returns the signature serialized in the canonical form as a string.
+        """
         return "(" + ",".join(tp.canonical_form() for tp in self._types) + ")"
 
     def encode(self, *args, **kwargs) -> bytes:
-        bound_args = self.bind(*args, **kwargs)
+        """
+        Encodes assorted positional/keyword arguments into the bytestring
+        according to the ABI format.
+        """
+        bound_args = self._bind(*args, **kwargs)
         normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args, self._types)]
         return encode_single(self.canonical_form, normalized_values)
 
     def encode_single(self, value) -> bytes:
+        """
+        Encodes a single value into the bytestring according to the ABI format.
+
+        If the signature has named parameters, the value is treated
+        as a dictionary of keyword arguments.
+        If the signature has anonymous parameters, and the value is an iterable,
+        it is treated as alist of positional arguments;
+        if it is not iterable, it is treated as a single positional argument.
+        """
         if isinstance(value, dict) and self._named_params:
             return self.encode(**value)
-        elif isinstance(value, (list, tuple)) and not self._named_params:
+        elif isinstance(value, Iterable) and not self._named_params:
             return self.encode(*value)
         elif not self._named_params:
             return self.encode(value)
@@ -84,24 +103,39 @@ class Signature:
                 f"for a signature with" + ("named" if self._named_params else "anonymous") + " parameters")
 
     def decode(self, value_bytes: bytes) -> List[Any]:
+        """
+        Decodes the packed bytestring into a list of values.
+        """
         normalized_values = decode_single(self.canonical_form, value_bytes)
         return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
 
 
 class Method(ABC):
+    """
+    An abstract type for a method (mutating or non-mutating).
+    """
 
     @property
     @abstractmethod
     def name(self) -> str:
+        """
+        Method name.
+        """
         ...
 
     @property
     @abstractmethod
     def inputs(self) -> Signature:
+        """
+        Method's input signature.
+        """
         ...
 
     @cached_property
     def selector(self) -> bytes:
+        """
+        Method's selector.
+        """
         return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
 
     def _encode_call(self, *args, **kwargs) -> bytes:
@@ -110,9 +144,18 @@ class Method(ABC):
 
 
 class Constructor:
+    """
+    Contract constructor.
+    """
+
+    payable: bool
+    """Whether this method is marked as payable"""
 
     @classmethod
     def from_json(cls, method_entry: dict) -> 'Constructor':
+        """
+        Creates this object from a JSON ABI method entry.
+        """
         assert method_entry['type'] == 'constructor'
         assert 'name' not in method_entry
         assert 'outputs' not in method_entry or not method_entry['outputs']
@@ -127,14 +170,23 @@ class Constructor:
         self.payable = payable
 
     def __call__(self, *args, **kwargs) -> 'ConstructorCall':
+        """
+        Returns an encoded call with given arguments.
+        """
         input_bytes = self.inputs.encode(*args, *kwargs)
         return ConstructorCall(input_bytes)
 
 
 class ReadMethod(Method):
+    """
+    A non-mutating contract method.
+    """
 
     @classmethod
     def from_json(cls, method_entry: dict) -> 'ReadMethod':
+        """
+        Creates this object from a JSON ABI method entry.
+        """
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         outputs = dispatch_types(method_entry['outputs'])
@@ -167,9 +219,15 @@ class ReadMethod(Method):
         return self._inputs
 
     def __call__(self, *args, **kwargs) -> 'ReadCall':
+        """
+        Returns an encoded call with given arguments.
+        """
         return ReadCall(self._encode_call(*args, **kwargs))
 
     def decode_output(self, output_bytes: bytes) -> Any:
+        """
+        Decodes the output from ABI-packed bytes.
+        """
         results = self.outputs.decode(output_bytes)
         if self._single_output:
             results = results[0]
@@ -177,9 +235,18 @@ class ReadMethod(Method):
 
 
 class WriteMethod(Method):
+    """
+    A mutating contract method.
+    """
+
+    payable: bool
+    """Whether this method is marked as payable"""
 
     @classmethod
     def from_json(cls, method_entry: dict) -> 'WriteMethod':
+        """
+        Creates this object from a JSON ABI method entry.
+        """
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         assert 'outputs' not in method_entry or not method_entry['outputs']
@@ -202,13 +269,25 @@ class WriteMethod(Method):
         return self._inputs
 
     def __call__(self, *args, **kwargs) -> 'WriteCall':
+        """
+        Returns an encoded call with given arguments.
+        """
         return WriteCall(self._encode_call(*args, **kwargs))
 
 
 class Fallback:
+    """
+    A fallback method.
+    """
+
+    payable: bool
+    """Whether this method is marked as payable"""
 
     @classmethod
     def from_json(cls, entry) -> 'Fallback':
+        """
+        Creates this object from a JSON ABI method entry.
+        """
         assert entry['type'] == 'fallback'
         assert 'name' not in entry
         assert 'inputs' not in entry
@@ -223,9 +302,18 @@ class Fallback:
 
 
 class Receive:
+    """
+    A receive method.
+    """
+
+    payable: bool
+    """Whether this method is marked as payable"""
 
     @classmethod
     def from_json(cls, entry) -> 'Receive':
+        """
+        Creates this object from a JSON ABI method entry.
+        """
         assert entry['type'] == 'receive'
         assert 'name' not in entry
         assert 'inputs' not in entry
@@ -240,18 +328,36 @@ class Receive:
 
 
 class ConstructorCall:
+    """
+    A call to the contract's constructor.
+    """
+
+    input_bytes: bytes
+    """Encoded call arguments."""
 
     def __init__(self, input_bytes: bytes):
         self.input_bytes = input_bytes
 
 
 class ReadCall:
+    """
+    A call to a contract's non-mutating method.
+    """
+
+    data_bytes: bytes
+    """Encoded call arguments with the selector."""
 
     def __init__(self, data_bytes: bytes):
         self.data_bytes = data_bytes
 
 
 class WriteCall:
+    """
+    A call to a contract's mutating method.
+    """
+
+    data_bytes: bytes
+    """Encoded call arguments with the selector."""
 
     def __init__(self, data_bytes: bytes):
         self.data_bytes = data_bytes
@@ -261,14 +367,24 @@ MethodType = TypeVar('MethodType')
 
 
 class Methods(Generic[MethodType]):
+    """
+    A holder for named methods which can be accessed as attributes,
+    or iterated over.
+    """
 
     def __init__(self, methods_dict: Mapping[str, MethodType]):
         self._methods_dict = methods_dict
 
     def __getattr__(self, method_name: str) -> MethodType:
+        """
+        Returns the method by name.
+        """
         return self._methods_dict[method_name]
 
     def __iter__(self) -> Iterator[MethodType]:
+        """
+        Returns the iterator over all methods.
+        """
         return iter(self._methods_dict.values())
 
 
@@ -278,6 +394,21 @@ class ContractABI:
 
     Contract methods accessible as attributes of this object, with the type :py:class:`Method`.
     """
+
+    constructor: Optional[Constructor]
+    """Contract's constructor."""
+
+    fallback: Optional[Fallback]
+    """Contract's fallback method."""
+
+    receive: Optional[Receive]
+    """Contract's receive method."""
+
+    read: Methods[ReadMethod]
+    """Contract's non-mutating methods."""
+
+    write: Methods[WriteMethod]
+    """Contract's mutating methods."""
 
     @classmethod
     def from_json(cls, json_abi: list) -> 'ContractABI':

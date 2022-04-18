@@ -6,6 +6,7 @@ from ._entities import Address
 
 
 class Type(ABC):
+    """The base type for Solidity types."""
 
     @abstractmethod
     def canonical_form(self) -> str:
