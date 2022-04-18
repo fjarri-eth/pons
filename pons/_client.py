@@ -4,10 +4,10 @@ from typing import Union, Any, Optional, AsyncIterator
 
 import trio
 
-from .contract import DeployedContract, CompiledContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
-from .provider import Provider, ProviderSession
-from .signer import Signer
-from .types import (
+from ._contract import DeployedContract, CompiledContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
+from ._provider import Provider, ProviderSession
+from ._signer import Signer
+from ._entities import (
     Address, Amount, Block, TxHash, TxReceipt,
     encode_quantity, encode_data, encode_address, encode_amount, encode_tx_hash, encode_block,
     decode_quantity, decode_data, decode_address, decode_amount, decode_tx_hash)

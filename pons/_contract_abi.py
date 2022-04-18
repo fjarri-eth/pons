@@ -9,7 +9,7 @@ from typing import Any, Tuple, Iterable, List, Dict, Optional
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 
-from .contract_types import Type, dispatch_types
+from ._solidity_types import Type, dispatch_types
 
 
 class StateMutability(Enum):
@@ -92,6 +92,7 @@ class Method(ABC):
         ...
 
     @property
+    @abstractmethod
     def inputs(self):
         ...
 

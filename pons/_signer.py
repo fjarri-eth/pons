@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from eth_account.account import LocalAccount
 
-from .types import Address
+from ._entities import Address
 
 
 class Signer(ABC):

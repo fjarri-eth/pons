@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from .contract_abi import ContractABI, ConstructorCall, ReadCall, WriteCall, Methods
-from .types import Address
+from ._contract_abi import ContractABI, ConstructorCall, ReadCall, WriteCall, Methods
+from ._entities import Address
 
 
 class BoundConstructor:

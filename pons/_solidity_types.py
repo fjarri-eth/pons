@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import re
 from typing import Optional
 
-from .types import Address
+from ._entities import Address
 
 
 class Type(ABC):

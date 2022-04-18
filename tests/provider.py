@@ -8,8 +8,8 @@ from typing import Union, List
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 
-from pons.provider import Provider, ProviderSession
-from pons.types import Amount, Address, encode_quantity, encode_address, encode_amount, decode_quantity
+from pons._provider import Provider, ProviderSession
+from pons._entities import Amount, Address, encode_quantity, encode_address, encode_amount, decode_quantity
 
 
 class EthereumTesterProvider(Provider):

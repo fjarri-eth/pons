@@ -1,4 +1,4 @@
-from .contract_types import UInt, Int, Bytes, AddressType, String, Bool
+from ._solidity_types import UInt, Int, Bytes, AddressType, String, Bool
 
 
 def uint(bits):
