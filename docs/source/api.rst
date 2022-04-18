@@ -147,9 +147,8 @@ Solidity types
 
 .. autoclass:: pons._solidity_types.Type
 
-Type aliases are exported from the ``abi`` submodule:
+Type aliases are exported from the ``abi`` submodule.
+Arrays can be obtained from ``Type`` objects by indexing them (either with an integer for a fixed-size array, or with ``...`` for a variable-sized array).
 
 .. automodule:: pons.abi
    :members:
-
-

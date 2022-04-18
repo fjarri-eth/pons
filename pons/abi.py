@@ -1,4 +1,4 @@
-from ._solidity_types import UInt, Int, Bytes, AddressType, String, Bool
+from ._solidity_types import UInt, Int, Bytes, AddressType, String, Bool, Type, Struct
 
 
 _py_int = int
@@ -17,6 +17,11 @@ def int(bits: _py_int) -> Int:
 def bytes(size: _py_int) -> Bytes:
     """Returns the ``bytes<size>`` type."""
     return Bytes(size)
+
+
+def struct(**kwargs: Type) -> Struct:
+    """Returns the structure type with given fields."""
+    return Struct(kwargs)
 
 
 address = AddressType()

@@ -28,8 +28,8 @@ async def test_abi_declaration(test_provider, compiled_contract):
         deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(12345, 56789))
 
     # Now all we have is this
-    inner_struct = Struct(dict(inner1=abi.uint(256), inner2=abi.uint(256)))
-    outer_struct = Struct(dict(inner=inner_struct, outer1=abi.uint(256)))
+    inner_struct = abi.struct(inner1=abi.uint(256), inner2=abi.uint(256))
+    outer_struct = abi.struct(inner=inner_struct, outer1=abi.uint(256))
     declared_abi = ContractABI(
         constructor=Constructor(inputs=dict(_v1=abi.uint(256), _v2=abi.uint(256))),
         write=[
