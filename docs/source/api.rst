@@ -10,14 +10,14 @@ Clients
 .. autoclass:: Client
    :members:
 
-.. autoclass:: pons.client.ClientSession()
+.. autoclass:: pons._client.ClientSession()
    :members:
 
 
 Providers
 ~~~~~~~~~
 
-.. autoclass:: pons.provider.Provider
+.. autoclass:: pons._provider.Provider
 
 .. autoclass:: HTTPProvider
    :show-inheritance:
@@ -33,8 +33,63 @@ Signers
    :show-inheritance:
 
 
-Contracts
-~~~~~~~~~
+Contract ABI
+~~~~~~~~~~~~
+
+.. autoclass:: ContractABI
+   :members:
+
+.. autoclass:: Constructor
+   :members:
+   :special-members: __call__
+
+.. autoclass:: ReadMethod
+   :show-inheritance:
+   :members:
+   :special-members: __call__
+
+.. autoclass:: WriteMethod
+   :show-inheritance:
+   :members:
+   :special-members: __call__
+
+.. autoclass:: Fallback
+   :members:
+
+.. autoclass:: Receive
+   :members:
+
+
+Secondary classes
+^^^^^^^^^^^^^^^^^
+
+.. autoclass:: pons._contract_abi.ConstructorCall
+   :members:
+
+.. autoclass:: pons._contract_abi.ReadCall
+   :members:
+
+.. autoclass:: pons._contract_abi.WriteCall
+   :members:
+
+
+Utility classes
+^^^^^^^^^^^^^^^
+
+.. autoclass:: pons._contract_abi.Methods()
+   :show-inheritance:
+   :members:
+   :special-members: __getattr__, __iter__
+
+.. autoclass:: pons._contract_abi.Signature
+   :members:
+
+.. autoclass:: pons._contract_abi.Method
+   :members:
+
+
+Compiled and deployed contracts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: CompiledContract
    :members:
@@ -42,19 +97,34 @@ Contracts
 .. autoclass:: DeployedContract
    :members:
 
-.. autoclass:: ContractABI
-   :members:
 
-.. autoclass:: Method()
+Secondary classes
+^^^^^^^^^^^^^^^^^
+
+.. autoclass:: pons._contract.BoundConstructor
    :members:
    :special-members: __call__
 
-.. autoclass:: MethodCall()
+.. autoclass:: pons._contract.BoundConstructorCall
+   :members:
+
+.. autoclass:: pons._contract.BoundReadMethod
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundReadCall
+   :members:
+
+.. autoclass:: pons._contract.BoundWriteMethod
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundWriteCall
    :members:
 
 
-Types
-~~~~~
+Entities
+~~~~~~~~
 
 .. autoclass:: Amount
    :members:
@@ -70,3 +140,16 @@ Types
 
 .. autoclass:: TxReceipt()
    :members:
+
+
+Solidity types
+~~~~~~~~~~~~~~
+
+.. autoclass:: pons._solidity_types.Type
+
+Type aliases are exported from the ``abi`` submodule:
+
+.. automodule:: pons.abi
+   :members:
+
+

@@ -16,6 +16,7 @@ def compile_contract(path) -> CompiledContract:
     assert len(compiled) == 1
 
     _contract_name, compiled_contract = compiled.popitem()
-    abi = ContractABI(compiled_contract['abi'])
 
-    return CompiledContract(abi=abi, bytecode=bytes.fromhex(compiled_contract['bin']))
+    return CompiledContract.from_compiler_output(
+        json_abi=compiled_contract['abi'],
+        bytecode=bytes.fromhex(compiled_contract['bin']))
