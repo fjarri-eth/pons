@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from pons import abi
 from pons import *
 
 from .compile import compile_contract
@@ -27,15 +28,15 @@ async def test_abi_declaration(test_provider, compiled_contract):
         deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(12345, 56789))
 
     # Now all we have is this
-    inner_struct = Struct(dict(inner1=uint256, inner2=uint256))
-    outer_struct = Struct(dict(inner=inner_struct, outer1=uint256))
-    abi = ContractABI(
-        constructor=Constructor(inputs=dict(_v1=uint256, _v2=uint256)),
+    inner_struct = Struct(dict(inner1=abi.uint(256), inner2=abi.uint(256)))
+    outer_struct = Struct(dict(inner=inner_struct, outer1=abi.uint(256)))
+    declared_abi = ContractABI(
+        constructor=Constructor(inputs=dict(_v1=abi.uint(256), _v2=abi.uint(256))),
         write=[
-            WriteMethod(name='setState', inputs=dict(_v1=uint256))
+            WriteMethod(name='setState', inputs=dict(_v1=abi.uint(256)))
         ],
         read=[
-            ReadMethod(name='getState', inputs=dict(_x=uint256), outputs=uint256),
+            ReadMethod(name='getState', inputs=dict(_x=abi.uint(256)), outputs=abi.uint(256)),
             ReadMethod(
                 name='testStructs',
                 inputs=dict(inner_in=inner_struct, outer_in=outer_struct),
@@ -45,7 +46,7 @@ async def test_abi_declaration(test_provider, compiled_contract):
         )
 
     contract_address = deployed_contract.address
-    deployed_contract = DeployedContract(abi, contract_address)
+    deployed_contract = DeployedContract(declared_abi, contract_address)
 
     async with client.session() as session:
 

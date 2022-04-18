@@ -69,4 +69,4 @@ async def test_contract(test_provider, compiled_contract):
         call = deployed_contract.read.getState(123)
         result = await session.call(call)
 
-    assert result == 111 + 123
+    assert result == [111 + 123]

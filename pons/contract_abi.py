@@ -33,51 +33,78 @@ class StateMutability(Enum):
         return state_mutability_values[val]
 
 
-def canonical_signature(types):
-    return "(" + ",".join(tp.canonical_form() for tp in types) + ")"
+class Signature:
 
+    def __init__(self, parameters):
+        self._parameters = parameters
 
-def bind_args(param_names, *args, **kwargs):
-    signature = inspect.Signature(parameters=[
-        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-        for name in param_names
-        ])
-    bargs = signature.bind(*args, **kwargs)
-    return bargs.args
+        if isinstance(parameters, dict):
+            self._named_params = True
+            self._signature = inspect.Signature(parameters=[
+                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                for name in parameters])
+            self._types = parameters.values()
+        else:
+            self._named_params = False
+            self._signature = None
+            self._types = parameters
 
-
-class Callable(ABC):
-
-    @property
-    @abstractmethod
-    def inputs(self):
-        ...
+    def bind(self, *args, **kwargs):
+        if self._signature:
+            bargs = self._signature.bind(*args, **kwargs)
+            return bargs.args
+        else:
+            assert not kwargs
+            assert len(args) == len(self._parameters)
+            return args
 
     @cached_property
-    def input_signature(self):
-        return canonical_signature(self.inputs.values())
+    def canonical_form(self):
+        return "(" + ",".join(tp.canonical_form() for tp in self._types) + ")"
 
-    def _encode_args(self, *args, **kwargs):
-        param_names = self.inputs.keys()
-        param_types = self.inputs.values()
-        bound_args = bind_args(param_names, *args, **kwargs)
-        normalized_args = [tp.normalize(arg) for arg, tp in zip(bound_args, param_types)]
-        return encode_single(self.input_signature, normalized_args)
+    def encode(self, *args, **kwargs):
+        bound_args = self.bind(*args, **kwargs)
+        normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args, self._types)]
+        return encode_single(self.canonical_form, normalized_values)
+
+    def encode_single(self, value):
+        if isinstance(value, dict) and self._named_params:
+            return self.encode(**value)
+        elif isinstance(value, (list, tuple)) and not self._named_params:
+            return self.encode(*value)
+        elif not self._named_params:
+            return self.encode(value)
+        else:
+            raise TypeError(
+                f"Wrong value type to encode ({type(value)}) "
+                f"for a signature with" + ("named" if self._named_parms else "anonymous") + " parameters")
+
+    def decode(self, value_bytes: bytes):
+        normalized_values = decode_single(self.canonical_form, value_bytes)
+        return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
 
 
-class Method(Callable):
+class Method(ABC):
 
     @property
     @abstractmethod
     def name(self):
         ...
 
+    @property
+    def inputs(self):
+        ...
+
     @cached_property
     def selector(self):
-        return keccak(self.name.encode() + self.input_signature.encode())[:4]
+        return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
+
+    def _encode_call(self, *args, **kwargs):
+        input_bytes = self.inputs.encode(*args, *kwargs)
+        return self.selector + input_bytes
 
 
-class Constructor(Callable):
+class Constructor:
 
     @classmethod
     def from_json(cls, method_entry: dict):
@@ -91,15 +118,11 @@ class Constructor(Callable):
         return cls(inputs, payable=payable)
 
     def __init__(self, inputs, payable=False):
-        self._inputs = inputs
+        self.inputs = Signature(inputs)
         self.payable = payable
 
-    @property
-    def inputs(self):
-        return self._inputs
-
     def __call__(self, *args, **kwargs):
-        input_bytes = self._encode_args(*args, *kwargs)
+        input_bytes = self.inputs.encode(*args, *kwargs)
         return ConstructorCall(input_bytes)
 
 
@@ -112,19 +135,23 @@ class ReadMethod(Method):
         outputs = dispatch_types(method_entry['outputs'])
         state_mutability = StateMutability.from_string(method_entry['stateMutability'])
         assert state_mutability in (StateMutability.PURE, StateMutability.VIEW)
+        # The JSON ABI will have outputs in a dictionary even if they're anonymous.
+        # We need to be stricter.
+        if all(output == "" for output in outputs):
+            outputs = outputs.values()
         return cls(name=name, inputs=inputs, outputs=outputs)
 
-    def __init__(
-            self,
-            name: str,
-            inputs: Dict[str, Type],
-            outputs: Dict[str, Type]):
+    def __init__(self, name: str, inputs: Dict[str, Type], outputs: Dict[str, Type]):
         self._name = name
-        self._inputs = inputs
+        self._inputs = Signature(inputs)
 
         if isinstance(outputs, Type):
-            outputs = {"": outputs}
-        self._outputs = outputs
+            outputs = [outputs]
+            self._single_output = True
+        else:
+            self._single_output = False
+
+        self.outputs = Signature(outputs)
 
     @property
     def name(self):
@@ -134,23 +161,12 @@ class ReadMethod(Method):
     def inputs(self):
         return self._inputs
 
-    @cached_property
-    def output_signature(self):
-        return canonical_signature(self._outputs.values())
-
     def __call__(self, *args, **kwargs):
-        input_bytes = self._encode_args(*args, *kwargs)
-        data_bytes = self.selector + input_bytes
-        return ReadCall(data_bytes)
+        return ReadCall(self._encode_call(*args, **kwargs))
 
     def decode_output(self, output_bytes: bytes) -> Any:
-        param_types = self._outputs.values()
-        normalized_results = decode_single(self.output_signature, output_bytes)
-        results = [tp.denormalize(result) for result, tp in zip(normalized_results, param_types)]
-
-        # TODO: or always return a list?
-        # TODO: bind output elements to names?
-        if len(results) == 1:
+        results = self.outputs.decode(output_bytes)
+        if self._single_output:
             results = results[0]
         return results
 
@@ -173,7 +189,7 @@ class WriteMethod(Method):
             inputs: Dict[str, Type],
             payable: bool = False):
         self._name = name
-        self._inputs = inputs
+        self._inputs = Signature(inputs)
         self.payable = payable
 
     @property
@@ -185,9 +201,7 @@ class WriteMethod(Method):
         return self._inputs
 
     def __call__(self, *args, **kwargs):
-        input_bytes = self._encode_args(*args, *kwargs)
-        data_bytes = self.selector + input_bytes
-        return WriteCall(data_bytes)
+        return WriteCall(self._encode_call(*args, **kwargs))
 
 
 class Fallback:

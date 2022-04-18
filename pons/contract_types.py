@@ -14,6 +14,12 @@ class Type(ABC):
     def __str__(self):
         return self.canonical_form()
 
+    def __getitem__(self, array_size):
+        if isinstance(array_size, int):
+            return Array(self, array_size)
+        elif array_size == ...:
+            return Array(self, None)
+
 
 class UInt(Type):
 
@@ -92,10 +98,10 @@ class AddressType(Type):
 
     def normalize(self, val):
         assert isinstance(val, Address)
-        return bytes(val)
+        return val.as_checksum()
 
     def denormalize(self, val):
-        return Address(val)
+        return Address.from_hex(val)
 
 
 class String(Type):
@@ -134,7 +140,7 @@ class Bool(Type):
 
 class Array(Type):
 
-    def __init__(self, element_type, size):
+    def __init__(self, element_type, size=None):
         self.element_type = element_type
         self.size = size
 
@@ -236,6 +242,3 @@ def dispatch_type(abi_entry):
 
 def dispatch_types(abi_entry):
     return {entry['name']: dispatch_type(entry) for entry in abi_entry}
-
-
-uint256 = UInt(256)
