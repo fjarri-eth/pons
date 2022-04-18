@@ -85,7 +85,7 @@ class Amount:
         return self._wei >= other._wei
 
     def __repr__(self):
-        return f"Amount({self._wei})"
+        return f"{self.__class__.__name__}({self._wei})"
 
 
 class Address:
@@ -121,7 +121,7 @@ class Address:
         return self.as_checksum()
 
     def __repr__(self):
-        return f"Address.from_hex({self})"
+        return f"{self.__class__.__name__}.from_hex({self})"
 
     def __hash__(self):
         return hash(self._address_bytes)

@@ -4,7 +4,9 @@ from enum import Enum, auto
 from functools import cached_property
 import inspect
 import re
-from typing import Any, Tuple, Iterable, List, Dict, Optional
+from typing import (
+    Any, Tuple, Iterable, List, Dict, Optional, Union, Mapping,
+    Iterable, TypeVar, Generic, Iterator, Sequence)
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
@@ -19,7 +21,7 @@ class StateMutability(Enum):
     PAYABLE = auto()
 
     @classmethod
-    def from_string(cls, val):
+    def from_string(cls, val) -> 'StateMutability':
         state_mutability_values = {
             'pure': StateMutability.PURE,
             'view': StateMutability.VIEW,
@@ -35,21 +37,23 @@ class StateMutability(Enum):
 
 class Signature:
 
-    def __init__(self, parameters):
+    def __init__(self, parameters: Union[Mapping[str, Type], Sequence[Type]]):
         self._parameters = parameters
+        self._signature: Optional[inspect.Signature] = None
+        self._named_params = False
 
-        if isinstance(parameters, dict):
+        if isinstance(parameters, Mapping):
             self._named_params = True
             self._signature = inspect.Signature(parameters=[
                 inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
                 for name in parameters])
-            self._types = parameters.values()
+            types = list(parameters.values())
         else:
-            self._named_params = False
-            self._signature = None
-            self._types = parameters
+            types = list(parameters)
 
-    def bind(self, *args, **kwargs):
+        self._types = types
+
+    def bind(self, *args, **kwargs) -> Tuple[Any, ...]:
         if self._signature:
             bargs = self._signature.bind(*args, **kwargs)
             return bargs.args
@@ -59,15 +63,15 @@ class Signature:
             return args
 
     @cached_property
-    def canonical_form(self):
+    def canonical_form(self) -> str:
         return "(" + ",".join(tp.canonical_form() for tp in self._types) + ")"
 
-    def encode(self, *args, **kwargs):
+    def encode(self, *args, **kwargs) -> bytes:
         bound_args = self.bind(*args, **kwargs)
         normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args, self._types)]
         return encode_single(self.canonical_form, normalized_values)
 
-    def encode_single(self, value):
+    def encode_single(self, value) -> bytes:
         if isinstance(value, dict) and self._named_params:
             return self.encode(**value)
         elif isinstance(value, (list, tuple)) and not self._named_params:
@@ -77,9 +81,9 @@ class Signature:
         else:
             raise TypeError(
                 f"Wrong value type to encode ({type(value)}) "
-                f"for a signature with" + ("named" if self._named_parms else "anonymous") + " parameters")
+                f"for a signature with" + ("named" if self._named_params else "anonymous") + " parameters")
 
-    def decode(self, value_bytes: bytes):
+    def decode(self, value_bytes: bytes) -> List[Any]:
         normalized_values = decode_single(self.canonical_form, value_bytes)
         return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
 
@@ -88,19 +92,19 @@ class Method(ABC):
 
     @property
     @abstractmethod
-    def name(self):
+    def name(self) -> str:
         ...
 
     @property
     @abstractmethod
-    def inputs(self):
+    def inputs(self) -> Signature:
         ...
 
     @cached_property
-    def selector(self):
+    def selector(self) -> bytes:
         return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
 
-    def _encode_call(self, *args, **kwargs):
+    def _encode_call(self, *args, **kwargs) -> bytes:
         input_bytes = self.inputs.encode(*args, *kwargs)
         return self.selector + input_bytes
 
@@ -108,7 +112,7 @@ class Method(ABC):
 class Constructor:
 
     @classmethod
-    def from_json(cls, method_entry: dict):
+    def from_json(cls, method_entry: dict) -> 'Constructor':
         assert method_entry['type'] == 'constructor'
         assert 'name' not in method_entry
         assert 'outputs' not in method_entry or not method_entry['outputs']
@@ -118,11 +122,11 @@ class Constructor:
         payable = state_mutability == StateMutability.PAYABLE
         return cls(inputs, payable=payable)
 
-    def __init__(self, inputs, payable=False):
+    def __init__(self, inputs: Mapping[str, Type], payable: bool = False):
         self.inputs = Signature(inputs)
         self.payable = payable
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> 'ConstructorCall':
         input_bytes = self.inputs.encode(*args, *kwargs)
         return ConstructorCall(input_bytes)
 
@@ -130,7 +134,7 @@ class Constructor:
 class ReadMethod(Method):
 
     @classmethod
-    def from_json(cls, method_entry: dict):
+    def from_json(cls, method_entry: dict) -> 'ReadMethod':
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         outputs = dispatch_types(method_entry['outputs'])
@@ -142,7 +146,7 @@ class ReadMethod(Method):
             outputs = outputs.values()
         return cls(name=name, inputs=inputs, outputs=outputs)
 
-    def __init__(self, name: str, inputs: Dict[str, Type], outputs: Dict[str, Type]):
+    def __init__(self, name: str, inputs: Mapping[str, Type], outputs: Union[Mapping[str, Type], Sequence[Type], Type]):
         self._name = name
         self._inputs = Signature(inputs)
 
@@ -155,14 +159,14 @@ class ReadMethod(Method):
         self.outputs = Signature(outputs)
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def inputs(self):
+    def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> 'ReadCall':
         return ReadCall(self._encode_call(*args, **kwargs))
 
     def decode_output(self, output_bytes: bytes) -> Any:
@@ -175,7 +179,7 @@ class ReadMethod(Method):
 class WriteMethod(Method):
 
     @classmethod
-    def from_json(cls, method_entry: dict):
+    def from_json(cls, method_entry: dict) -> 'WriteMethod':
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         assert 'outputs' not in method_entry or not method_entry['outputs']
@@ -184,86 +188,87 @@ class WriteMethod(Method):
         payable = state_mutability == StateMutability.PAYABLE
         return cls(name=name, inputs=inputs, payable=payable)
 
-    def __init__(
-            self,
-            name: str,
-            inputs: Dict[str, Type],
-            payable: bool = False):
+    def __init__(self, name: str, inputs: Mapping[str, Type], payable: bool = False):
         self._name = name
         self._inputs = Signature(inputs)
         self.payable = payable
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def inputs(self):
+    def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> 'WriteCall':
         return WriteCall(self._encode_call(*args, **kwargs))
 
 
 class Fallback:
 
     @classmethod
-    def from_json(cls, entry):
+    def from_json(cls, entry) -> 'Fallback':
         assert entry['type'] == 'fallback'
         assert 'name' not in entry
         assert 'inputs' not in entry
         assert 'outputs' not in entry
         state_mutability = StateMutability.from_string(entry['stateMutability'])
         assert state_mutability in (StateMutability.NONPAYABLE, StateMutability.PAYABLE)
-        return cls(state_mutability)
+        payable = state_mutability == StateMutability.PAYABLE
+        return cls(payable)
 
-    def __init__(self, state_mutability):
-        self.state_mutability = state_mutability
+    def __init__(self, payable: bool = False):
+        self.payable = payable
 
 
 class Receive:
 
     @classmethod
-    def from_json(cls, entry):
+    def from_json(cls, entry) -> 'Receive':
         assert entry['type'] == 'receive'
         assert 'name' not in entry
         assert 'inputs' not in entry
         assert 'outputs' not in entry
         state_mutability = StateMutability.from_string(entry['stateMutability'])
         assert state_mutability in (StateMutability.NONPAYABLE, StateMutability.PAYABLE)
-        return cls(state_mutability)
+        payable = state_mutability == StateMutability.PAYABLE
+        return cls(payable)
 
-    def __init__(self, state_mutability):
-        self.state_mutability = state_mutability
+    def __init__(self, payable: bool = False):
+        self.payable = payable
 
 
 class ConstructorCall:
 
-    def __init__(self, input_bytes):
+    def __init__(self, input_bytes: bytes):
         self.input_bytes = input_bytes
 
 
 class ReadCall:
 
-    def __init__(self, data_bytes):
+    def __init__(self, data_bytes: bytes):
         self.data_bytes = data_bytes
 
 
 class WriteCall:
 
-    def __init__(self, data_bytes):
+    def __init__(self, data_bytes: bytes):
         self.data_bytes = data_bytes
 
 
-class Methods:
+MethodType = TypeVar('MethodType')
 
-    def __init__(self, methods_dict):
+
+class Methods(Generic[MethodType]):
+
+    def __init__(self, methods_dict: Mapping[str, MethodType]):
         self._methods_dict = methods_dict
 
-    def __getattr__(self, method_name) -> Method:
+    def __getattr__(self, method_name: str) -> MethodType:
         return self._methods_dict[method_name]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[MethodType]:
         return iter(self._methods_dict.values())
 
 
@@ -275,11 +280,13 @@ class ContractABI:
     """
 
     @classmethod
-    def from_json(cls, json_abi: list):
+    def from_json(cls, json_abi: list) -> 'ContractABI':
         constructor = None
         fallback = None
         receive = None
-        methods = {}
+        read = []
+        write = []
+        methods = set()
 
         for entry in json_abi:
 
@@ -289,18 +296,18 @@ class ContractABI:
                 constructor = Constructor.from_json(entry)
 
             elif entry['type'] == 'function':
-                state_mutability = StateMutability.from_string(entry['stateMutability'])
-                if state_mutability in (StateMutability.PURE, StateMutability.VIEW):
-                    method = ReadMethod.from_json(entry)
-                else:
-                    method = WriteMethod.from_json(entry)
-
-                if method.name in methods:
+                if entry['name'] in methods:
                     # TODO: add support for overloaded methods
                     raise ValueError(
-                        f"JSON ABI contains more than one declarations of `{method.name}`")
+                        f"JSON ABI contains more than one declarations of `{entry['name']}`")
 
-                methods[method.name] = method
+                methods.add(entry['name'])
+
+                state_mutability = StateMutability.from_string(entry['stateMutability'])
+                if state_mutability in (StateMutability.PURE, StateMutability.VIEW):
+                    read.append(ReadMethod.from_json(entry))
+                else:
+                    write.append(WriteMethod.from_json(entry))
 
             elif entry['type'] == 'fallback':
                 if fallback:
@@ -319,14 +326,18 @@ class ContractABI:
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
-        read = [method for method in methods.values() if isinstance(method, ReadMethod)]
-        write = [method for method in methods.values() if isinstance(method, WriteMethod)]
-
         return cls(
             constructor=constructor, fallback=fallback, receive=receive,
             read=read, write=write)
 
-    def __init__(self, constructor=None, fallback=False, receive=False, read=None, write=None):
+    def __init__(
+            self,
+            constructor: Optional[Constructor] = None,
+            fallback: Optional[Fallback] = None,
+            receive: Optional[Receive] = None,
+            read: Optional[Iterable[ReadMethod]] = None,
+            write: Optional[Iterable[WriteMethod]] = None
+            ):
         self.fallback = fallback
         self.receive = receive
         self.constructor = constructor
@@ -336,8 +347,9 @@ class ContractABI:
     def __str__(self):
         all_methods = (
             ([self.constructor] if self.constructor else []) +
-            ([self.fallback] if self.fallback else [])
-            ([self.receive] if self.receive else [])
-            + self._functions)
+            ([self.fallback] if self.fallback else []) +
+            ([self.receive] if self.receive else []) +
+            list(self.read) +
+            list(self.write))
         method_list = ["    " + str(method) for method in all_methods]
         return "{\n" + "\n".join(method_list) + "\n}"

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import re
-from typing import Optional
+from typing import Optional, Any, Union
 
 from ._entities import Address
 
@@ -8,17 +8,29 @@ from ._entities import Address
 class Type(ABC):
 
     @abstractmethod
-    def canonical_form(self):
-        pass
+    def canonical_form(self) -> str:
+        ...
+
+    @abstractmethod
+    def normalize(self, val) -> Any:
+        ...
+
+    @abstractmethod
+    def denormalize(self, val) -> Any:
+        ...
 
     def __str__(self):
         return self.canonical_form()
 
-    def __getitem__(self, array_size):
+    def __getitem__(self, array_size: Union[int, Any]):
+        # In Py3.10 they added EllipsisType which would work better here.
+        # For now, relying on the documentation.
         if isinstance(array_size, int):
             return Array(self, array_size)
         elif array_size == ...:
             return Array(self, None)
+        else:
+            raise TypeError(f"Invalid array size specifier: {array_size}")
 
 
 class UInt(Type):

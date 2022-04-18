@@ -215,7 +215,7 @@ class ClientSession:
         Deploys the contract passing ``args`` to the constructor.
         Waits for the transaction to be confirmed.
         """
-        if call.payable and amount != Amount(0):
+        if not call.payable and amount.as_wei() != 0:
             raise ValueError("This constructor does not accept an associated payment")
 
         chain_id = await self.get_chain_id()
@@ -252,7 +252,7 @@ class ClientSession:
         Transacts with the contract using a prepared method call.
         Waits for the transaction to be confirmed.
         """
-        if call.payable and amount != Amount(0):
+        if not call.payable and amount.as_wei() != 0:
             raise ValueError("This method does not accept an associated payment")
 
         chain_id = await self.get_chain_id()
