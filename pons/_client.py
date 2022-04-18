@@ -9,8 +9,7 @@ from ._provider import Provider, ProviderSession
 from ._signer import Signer
 from ._entities import (
     Address, Amount, Block, TxHash, TxReceipt,
-    encode_quantity, encode_data, encode_address, encode_amount, encode_tx_hash, encode_block,
-    decode_quantity, decode_data, decode_address, decode_amount, decode_tx_hash)
+    encode_quantity, encode_data, encode_block, decode_quantity, decode_data)
 
 
 class Client:
@@ -69,15 +68,14 @@ class ClientSession:
         Calls the ``eth_getBalance`` RPC method.
         """
         result = await self._provider_session.rpc(
-            'eth_getBalance', encode_address(address), encode_block(block))
-        return decode_amount(result)
+            'eth_getBalance', address.encode(), encode_block(block))
+        return Amount.decode(result)
 
     async def get_transaction_receipt(self, tx_hash: TxHash) -> Optional[TxReceipt]:
         """
         Calls the ``eth_getTransactionReceipt`` RPC method.
         """
-        result = await self._provider_session.rpc(
-            'eth_getTransactionReceipt', encode_tx_hash(tx_hash))
+        result = await self._provider_session.rpc('eth_getTransactionReceipt', tx_hash.encode())
 
         if not result:
             return None
@@ -86,7 +84,7 @@ class ClientSession:
 
         return TxReceipt(
             succeeded=(decode_quantity(result['status']) == 1),
-            contract_address=decode_address(contract_address) if contract_address else None,
+            contract_address=Address.decode(contract_address) if contract_address else None,
             gas_used=decode_quantity(result['gasUsed']),
             )
 
@@ -95,7 +93,7 @@ class ClientSession:
         Calls the ``eth_getTransactionCount`` RPC method.
         """
         result = await self._provider_session.rpc(
-            'eth_getTransactionCount', encode_address(address), encode_block(block))
+            'eth_getTransactionCount', address.encode(), encode_block(block))
         return decode_quantity(result)
 
     async def wait_for_transaction_receipt(self, tx_hash: TxHash, poll_latency: float = 1.) -> TxReceipt:
@@ -116,7 +114,7 @@ class ClientSession:
         result = await self._provider_session.rpc(
             'eth_call',
             {
-                'to': encode_address(call.contract_address),
+                'to': call.contract_address.encode(),
                 'data': encode_data(call.data_bytes)
             },
             encode_block(block))
@@ -129,7 +127,7 @@ class ClientSession:
         Sends a signed and serialized transaction.
         """
         result = await self._provider_session.rpc('eth_sendRawTransaction', encode_data(tx_bytes))
-        return decode_tx_hash(result)
+        return TxHash.decode(result)
 
     async def estimate_deploy(self, call: BoundConstructorCall, amount: Amount = Amount(0)) -> int:
         """
@@ -137,7 +135,7 @@ class ClientSession:
         """
         tx = {
             'data': encode_data(call.data_bytes),
-            'value': encode_amount(amount),
+            'value': amount.encode(),
         }
         result = await self._provider_session.rpc(
             'eth_estimateGas',
@@ -153,9 +151,9 @@ class ClientSession:
         # TODO: source_address and amount are optional,
         # but if they are specified, we will fail here instead of later.
         tx = {
-            'from': encode_address(source_address),
-            'to': encode_address(destination_address),
-            'value': encode_amount(amount),
+            'from': source_address.encode(),
+            'to': destination_address.encode(),
+            'value': amount.encode(),
         }
         result = await self._provider_session.rpc(
             'eth_estimateGas',
@@ -168,9 +166,9 @@ class ClientSession:
         Estimates the amount of gas required to transact with a contract.
         """
         tx = {
-            'to': encode_address(call.contract_address),
+            'to': call.contract_address.encode(),
             'data': encode_data(call.data_bytes),
-            'value': encode_amount(amount),
+            'value': amount.encode(),
         }
         result = await self._provider_session.rpc(
             'eth_estimateGas',
@@ -183,7 +181,7 @@ class ClientSession:
         Calls the ``eth_gasPrice`` RPC method.
         """
         result = await self._provider_session.rpc('eth_gasPrice')
-        return decode_amount(result)
+        return Amount.decode(result)
 
     async def transfer(self, signer: Signer, destination_address: Address, amount: Amount):
         """
@@ -199,11 +197,11 @@ class ClientSession:
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
-            'to': encode_address(destination_address),
-            'value': encode_amount(amount),
+            'to': destination_address.encode(),
+            'value': amount.encode(),
             'gas': encode_quantity(gas),
-            'maxFeePerGas': encode_amount(max_gas_price),
-            'maxPriorityFeePerGas': encode_amount(max_tip),
+            'maxFeePerGas': max_gas_price.encode(),
+            'maxPriorityFeePerGas': max_tip.encode(),
             'nonce': encode_quantity(nonce),
         }
         signed_tx = signer.sign_transaction(tx)
@@ -227,10 +225,10 @@ class ClientSession:
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
-            'value': encode_amount(amount),
+            'value': amount.encode(),
             'gas': encode_quantity(gas),
-            'maxFeePerGas': encode_amount(max_gas_price),
-            'maxPriorityFeePerGas': encode_amount(max_tip),
+            'maxFeePerGas': max_gas_price.encode(),
+            'maxPriorityFeePerGas': max_tip.encode(),
             'nonce': encode_quantity(nonce),
             'data': encode_data(call.data_bytes)
         }
@@ -264,11 +262,11 @@ class ClientSession:
         tx = {
             'type': 2, # EIP-2930 transaction
             'chainId': encode_quantity(chain_id),
-            'to': encode_address(call.contract_address),
-            'value': encode_amount(amount),
+            'to': call.contract_address.encode(),
+            'value': amount.encode(),
             'gas': encode_quantity(gas),
-            'maxFeePerGas': encode_amount(max_gas_price),
-            'maxPriorityFeePerGas': encode_amount(max_tip),
+            'maxFeePerGas': max_gas_price.encode(),
+            'maxPriorityFeePerGas': max_tip.encode(),
             'nonce': encode_quantity(nonce),
             'data': encode_data(call.data_bytes)
         }

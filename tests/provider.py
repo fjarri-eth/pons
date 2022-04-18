@@ -9,7 +9,7 @@ from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 
 from pons._provider import Provider, ProviderSession
-from pons._entities import Amount, Address, encode_quantity, encode_address, encode_amount, decode_quantity
+from pons._entities import Amount, Address, encode_quantity, decode_quantity
 
 
 class EthereumTesterProvider(Provider):
@@ -55,7 +55,7 @@ class EthereumTesterProvider(Provider):
 
     async def eth_call(self, tx: dict, block: str) -> Union[List, str]:
         if 'from' not in tx:
-            tx['from'] = encode_address(self._default_address)
+            tx['from'] = self._default_address.encode()
         return self._ethereum_tester.call(tx, block)
 
     async def eth_get_transaction_receipt(self, tx_hash_hex):
@@ -67,7 +67,7 @@ class EthereumTesterProvider(Provider):
 
     async def eth_estimate_gas(self, tx: dict, block: str) -> str:
         if 'from' not in tx:
-            tx['from'] = encode_address(self._default_address)
+            tx['from'] = self._default_address.encode()
         if 'value' in tx:
             tx['value'] = decode_quantity(tx['value'])
         return encode_quantity(self._ethereum_tester.estimate_gas(tx, block))
@@ -85,7 +85,7 @@ class EthereumTesterProvider(Provider):
         result['timestamp'] = encode_quantity(result['timestamp'])
         for tx_info in result['transactions']:
             tx_info['gas'] = encode_quantity(tx_info['gas'])
-            tx_info['gasPrice'] = encode_amount(tx_info.pop('gas_price'))
+            tx_info['gasPrice'] = tx_info.pop('gas_price').encode()
 
         return result
 

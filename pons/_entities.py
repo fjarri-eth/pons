@@ -59,6 +59,13 @@ class Amount:
         """
         return self._wei / 10**18
 
+    def encode(self) -> str:
+        return encode_quantity(self.as_wei())
+
+    @classmethod
+    def decode(cls, val: str) -> 'Amount':
+        return cls(decode_quantity(val))
+
     def __eq__(self, other):
         if type(self) != type(other):
             raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
@@ -117,6 +124,13 @@ class Address:
         """
         return to_checksum_address(self._address_bytes)
 
+    def encode(self) -> str:
+        return self.as_checksum()
+
+    @classmethod
+    def decode(cls, val: str) -> 'Address':
+        return cls(decode_data(val))
+
     def __str__(self):
         return self.as_checksum()
 
@@ -159,6 +173,13 @@ class TxHash:
             raise ValueError(f"Transaction hash must be 32 bytes long, got {repr(tx_hash)}")
         self._tx_hash = tx_hash
 
+    def encode(self) -> str:
+        return encode_data(bytes(self))
+
+    @classmethod
+    def decode(cls, val: str) -> 'TxHash':
+        return TxHash(decode_data(val))
+
     def __bytes__(self):
         return self._tx_hash
 
@@ -189,23 +210,11 @@ def encode_data(val: bytes) -> str:
     return '0x' + val.hex()
 
 
-def encode_address(val: Address) -> str:
-    return val.as_checksum()
-
-
-def encode_amount(val: Amount) -> str:
-    return encode_quantity(val.as_wei())
-
-
 def encode_block(val: Union[int, Block]) -> str:
     if isinstance(val, Block):
         return val.value
     else:
         return encode_quantity(val)
-
-
-def encode_tx_hash(val: TxHash) -> str:
-    return encode_data(bytes(val))
 
 
 def decode_quantity(val: str) -> int:
@@ -218,15 +227,3 @@ def decode_data(val: str) -> bytes:
     if not val.startswith('0x'):
         raise ValueError("Encoded data must start with `0x`")
     return bytes.fromhex(val[2:])
-
-
-def decode_address(val: str) -> Address:
-    return Address(decode_data(val))
-
-
-def decode_amount(val: str) -> Amount:
-    return Amount(decode_quantity(val))
-
-
-def decode_tx_hash(val: str) -> TxHash:
-    return TxHash(decode_data(val))
