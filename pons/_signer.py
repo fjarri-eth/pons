@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import cached_property
 
 from eth_account.account import LocalAccount
 
@@ -21,7 +22,8 @@ class Signer(ABC):
     @abstractmethod
     def sign_transaction(self, tx: dict) -> bytes:
         """
-        Signs the given JSON transaction and returns the bytes of the signature.
+        Signs the given JSON transaction and returns the RLP-packed transaction
+        along with the signature.
         """
         pass
 
@@ -34,7 +36,7 @@ class AccountSigner(Signer):
     def __init__(self, account: LocalAccount):
         self._account = account
 
-    @property
+    @cached_property
     def address(self) -> Address:
         return Address.from_hex(self._account.address)
 
