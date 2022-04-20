@@ -144,7 +144,7 @@ class Constructor:
         payable = method_entry['stateMutability'] == "payable"
         return cls(inputs, payable=payable)
 
-    def __init__(self, inputs: Mapping[str, Type], payable: bool = False):
+    def __init__(self, inputs: Union[Mapping[str, Type], Sequence[Type]], payable: bool = False):
         self.inputs = Signature(inputs)
         self.payable = payable
 
@@ -186,7 +186,12 @@ class ReadMethod(Method):
 
         return cls(name=name, inputs=inputs, outputs=outputs)
 
-    def __init__(self, name: str, inputs: Mapping[str, Type], outputs: Union[Mapping[str, Type], Sequence[Type], Type]):
+    def __init__(
+            self,
+            name: str,
+            inputs: Union[Mapping[str, Type], Sequence[Type]],
+            outputs: Union[Mapping[str, Type], Sequence[Type], Type]):
+
         self._name = name
         self._inputs = Signature(inputs)
 
@@ -250,7 +255,12 @@ class WriteMethod(Method):
         payable = method_entry['stateMutability'] == "payable"
         return cls(name=name, inputs=inputs, payable=payable)
 
-    def __init__(self, name: str, inputs: Mapping[str, Type], payable: bool = False):
+    def __init__(
+            self,
+            name: str,
+            inputs: Union[Mapping[str, Type], Sequence[Type]],
+            payable: bool = False):
+
         self._name = name
         self._inputs = Signature(inputs)
         self.payable = payable
