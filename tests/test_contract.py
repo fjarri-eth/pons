@@ -6,16 +6,18 @@ import pytest
 from pons import abi
 from pons import *
 
-from .compile import compile_contract
+from .compile import compile_file
 
 
 @pytest.fixture
-def compiled_contract():
+def compiled_contracts():
     path = Path(__file__).resolve().parent / 'TestContract.sol'
-    yield compile_contract(path)
+    yield compile_file(path)
 
 
-async def test_abi_declaration(test_provider, compiled_contract):
+async def test_abi_declaration(test_provider, compiled_contracts):
+
+    compiled_contract = compiled_contracts["Test"]
 
     client = Client(provider=test_provider)
 

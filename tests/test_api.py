@@ -29,7 +29,9 @@ async def test_payment(test_provider):
         assert root_balance - root_balance_after > to_transfer
 
 
-async def test_contract(test_provider, compiled_contract):
+async def test_contract(test_provider, compiled_contracts):
+
+    compiled_contract = compiled_contracts["Test"]
 
     client = Client(provider=test_provider)
 
