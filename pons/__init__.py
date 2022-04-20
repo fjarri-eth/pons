@@ -5,4 +5,3 @@ from ._contract import CompiledContract, DeployedContract
 from ._entities import Amount, Address, Block, TxHash, TxReceipt
 from ._provider import HTTPProvider
 from ._signer import Signer, AccountSigner
-from ._solidity_types import Struct

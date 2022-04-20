@@ -1,7 +1,7 @@
 import pytest
 
 from pons import abi, Address
-from pons._solidity_types import type_from_abi_string, dispatch_type, dispatch_types
+from pons._abi_types import type_from_abi_string, dispatch_type, dispatch_types
 
 
 def test_uint():

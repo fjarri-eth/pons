@@ -11,7 +11,7 @@ from typing import (
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 
-from ._solidity_types import Type, dispatch_types
+from ._abi_types import Type, dispatch_types
 
 
 class StateMutability(Enum):

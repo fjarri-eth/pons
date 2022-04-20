@@ -1,6 +1,6 @@
 from typing import Optional
 
-from ._solidity_types import UInt, Int, Bytes, AddressType, String, Bool, Type, Struct
+from ._abi_types import UInt, Int, Bytes, AddressType, String, Bool, Type, Struct
 
 
 _py_int = int
