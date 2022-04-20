@@ -70,7 +70,7 @@ class Signature:
         """
         Returns the signature serialized in the canonical form as a string.
         """
-        return "(" + ",".join(tp.canonical_form() for tp in self._types) + ")"
+        return "(" + ",".join(tp.canonical_form for tp in self._types) + ")"
 
     def encode(self, *args, **kwargs) -> bytes:
         """

@@ -9,7 +9,7 @@ def test_uint():
         assert abi.uint(8).normalize(val) == val
         assert abi.uint(8).denormalize(val) == val
 
-    assert abi.uint(256).canonical_form() == "uint256"
+    assert abi.uint(256).canonical_form == "uint256"
     assert abi.uint(8) == abi.uint(8)
     assert abi.uint(8) != abi.uint(16)
 
@@ -32,7 +32,7 @@ def test_int():
         assert abi.int(8).normalize(val) == val
         assert abi.int(8).denormalize(val) == val
 
-    assert abi.int(256).canonical_form() == "int256"
+    assert abi.int(256).canonical_form == "int256"
     assert abi.int(8) == abi.int(8)
     assert abi.int(8) != abi.int(16)
 
@@ -56,8 +56,8 @@ def test_bytes():
     assert abi.bytes().normalize(b"foobar") == b"foobar"
     assert abi.bytes().denormalize(b"foobar") == b"foobar"
 
-    assert abi.bytes(3).canonical_form() == "bytes3"
-    assert abi.bytes().canonical_form() == "bytes"
+    assert abi.bytes(3).canonical_form == "bytes3"
+    assert abi.bytes().canonical_form == "bytes"
     assert abi.bytes(8) == abi.bytes(8)
     assert abi.bytes(8) != abi.bytes(16)
 
@@ -78,7 +78,7 @@ def test_address():
     assert abi.address.normalize(addr) == addr_bytes
     assert abi.address.denormalize(addr_bytes) == addr
 
-    assert abi.address.canonical_form() == "address"
+    assert abi.address.canonical_form == "address"
 
     with pytest.raises(TypeError, match="`address` must correspond to an `Address`-type value, got str"):
         abi.address.normalize("0x" + "01" * 20)
@@ -88,7 +88,7 @@ def test_string():
     assert abi.string.normalize("foo") == "foo"
     assert abi.string.denormalize("foo") == "foo"
 
-    assert abi.string.canonical_form() == "string"
+    assert abi.string.canonical_form == "string"
 
     with pytest.raises(TypeError, match="`string` must correspond to a `str`-type value, got bytes"):
         abi.string.normalize(b"foo")
@@ -98,7 +98,7 @@ def test_bool():
     assert abi.bool.normalize(True) == True
     assert abi.bool.denormalize(True) == True
 
-    assert abi.bool.canonical_form() == "bool"
+    assert abi.bool.canonical_form == "bool"
 
     with pytest.raises(TypeError, match="`bool` must correspond to a `bool`-type value, got int"):
         abi.bool.normalize(1)
@@ -110,8 +110,8 @@ def test_array():
     assert abi.uint(8)[...].normalize([1, 2, 3]) == [1, 2, 3]
     assert abi.uint(8)[...].denormalize([1, 2, 3]) == [1, 2, 3]
 
-    assert abi.uint(8)[2].canonical_form() == "uint8[2]"
-    assert abi.uint(8)[...].canonical_form() == "uint8[]"
+    assert abi.uint(8)[2].canonical_form == "uint8[2]"
+    assert abi.uint(8)[...].canonical_form == "uint8[]"
     assert abi.uint(8)[2] == abi.uint(8)[2]
     assert abi.uint(8)[...] == abi.uint(8)[...]
     assert abi.uint(8)[...] != abi.uint(8)[2]
@@ -133,7 +133,7 @@ def test_struct():
     assert s1.normalize([1, True]) == [1, True]
     assert s1.denormalize([1, True]) == dict(a=1, b=True)
 
-    assert s1.canonical_form() == "(uint8,bool)"
+    assert s1.canonical_form == "(uint8,bool)"
     assert str(s1) == "(uint8 a, bool b)"
     assert s1 == s1_copy
     assert s1 != s2
@@ -189,8 +189,8 @@ def test_dispatch_types():
 
 
 def test_making_arrays():
-    assert abi.uint(8)[2].canonical_form() == "uint8[2]"
-    assert abi.uint(8)[...][3][...].canonical_form() == "uint8[][3][]"
+    assert abi.uint(8)[2].canonical_form == "uint8[2]"
+    assert abi.uint(8)[...][3][...].canonical_form == "uint8[][3][]"
 
     with pytest.raises(TypeError, match="Invalid array size specifier type: float"):
         abi.uint(8)[1.0]

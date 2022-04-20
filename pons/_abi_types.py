@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import cached_property
 import re
 from typing import Optional, Any, Union, Iterable, Mapping, Dict
 
@@ -8,6 +9,7 @@ from ._entities import Address
 class Type(ABC):
     """The base type for Solidity types."""
 
+    @property
     @abstractmethod
     def canonical_form(self) -> str:
         """
@@ -32,7 +34,7 @@ class Type(ABC):
         ...
 
     def __str__(self):
-        return self.canonical_form()
+        return self.canonical_form
 
     def __getitem__(self, array_size: Union[int, Any]):
         # In Py3.10 they added EllipsisType which would work better here.
@@ -52,6 +54,7 @@ class UInt(Type):
             raise ValueError(f"Incorrect `uint` bit size: {bits}")
         self._bits = bits
 
+    @property
     def canonical_form(self):
         return f"uint{self._bits}"
 
@@ -59,12 +62,12 @@ class UInt(Type):
         # `bool` is a subclass of `int`, but we would rather be more strict
         # and prevent possible bugs.
         if not isinstance(val, int) or isinstance(val, bool):
-            raise TypeError(f"`{self.canonical_form()}` must correspond to an integer, got {type(val).__name__}")
+            raise TypeError(f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
         if val < 0:
-            raise ValueError(f"`{self.canonical_form()}` must correspond to a non-negative integer, got {val}")
+            raise ValueError(f"`{self.canonical_form}` must correspond to a non-negative integer, got {val}")
         if val >> self._bits != 0:
             raise ValueError(
-                f"`{self.canonical_form()}` must correspond to an unsigned integer under {self._bits} bits, got {val}")
+                f"`{self.canonical_form}` must correspond to an unsigned integer under {self._bits} bits, got {val}")
 
     def normalize(self, val):
         self._check_val(val)
@@ -85,6 +88,7 @@ class Int(Type):
             raise ValueError(f"Incorrect `int` bit size: {bits}")
         self._bits = bits
 
+    @property
     def canonical_form(self):
         return f"int{self._bits}"
 
@@ -92,10 +96,10 @@ class Int(Type):
         # `bool` is a subclass of `int`, but we would rather be more strict
         # and prevent possible bugs.
         if not isinstance(val, int) or isinstance(val, bool):
-            raise TypeError(f"`{self.canonical_form()}` must correspond to an integer, got {type(val).__name__}")
+            raise TypeError(f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
         if (val + (1 << (self._bits - 1))) >> self._bits != 0:
             raise ValueError(
-                f"`{self.canonical_form()}` must correspond to a signed integer under {self._bits} bits, got {val}")
+                f"`{self.canonical_form}` must correspond to a signed integer under {self._bits} bits, got {val}")
 
     def normalize(self, val):
         self._check_val(val)
@@ -116,12 +120,13 @@ class Bytes(Type):
             raise ValueError(f"Incorrect `bytes` size: {size}")
         self._size = size
 
+    @property
     def canonical_form(self):
         return f"bytes{self._size if self._size else ''}"
 
     def _check_val(self, val):
         if not isinstance(val, bytes):
-            raise TypeError(f"`{self.canonical_form()}` must correspond to a bytestring, got {type(val).__name__}")
+            raise TypeError(f"`{self.canonical_form}` must correspond to a bytestring, got {type(val).__name__}")
         if self._size is not None and len(val) != self._size:
             raise ValueError(f"Expected {self._size} bytes, got {len(val)}")
 
@@ -139,6 +144,7 @@ class Bytes(Type):
 
 class AddressType(Type):
 
+    @property
     def canonical_form(self):
         return "address"
 
@@ -156,6 +162,7 @@ class AddressType(Type):
 
 class String(Type):
 
+    @property
     def canonical_form(self):
         return "string"
 
@@ -177,6 +184,7 @@ class String(Type):
 
 class Bool(Type):
 
+    @property
     def canonical_form(self):
         return "bool"
 
@@ -202,8 +210,9 @@ class Array(Type):
         self._element_type = element_type
         self._size = size
 
+    @cached_property
     def canonical_form(self):
-        return self._element_type.canonical_form() + "[" + (str(self._size) if self._size else "") + "]"
+        return self._element_type.canonical_form + "[" + (str(self._size) if self._size else "") + "]"
 
     def _check_val(self, val):
         if not isinstance(val, Iterable):
@@ -230,8 +239,9 @@ class Struct(Type):
     def __init__(self, fields: Mapping[str, Type]):
         self._fields = fields
 
+    @cached_property
     def canonical_form(self):
-        return "(" + ",".join(field.canonical_form() for field in self._fields.values()) + ")"
+        return "(" + ",".join(field.canonical_form for field in self._fields.values()) + ")"
 
     def _check_val(self, val):
         if not isinstance(val, Iterable):
