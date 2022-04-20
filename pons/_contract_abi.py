@@ -187,6 +187,7 @@ class ReadMethod(Method):
         """
         Creates this object from a JSON ABI method entry.
         """
+        outputs: Union[Dict[str, Type], List[Type]]
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         outputs = dispatch_types(method_entry['outputs'])
@@ -195,7 +196,7 @@ class ReadMethod(Method):
         # The JSON ABI will have outputs in a dictionary even if they're anonymous.
         # We need to be stricter.
         if all(output == "" for output in outputs):
-            outputs = outputs.values()
+            outputs = list(outputs.values())
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     def __init__(self, name: str, inputs: Mapping[str, Type], outputs: Union[Mapping[str, Type], Sequence[Type], Type]):

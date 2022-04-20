@@ -1,3 +1,5 @@
+from typing import Optional
+
 from ._solidity_types import UInt, Int, Bytes, AddressType, String, Bool, Type, Struct
 
 
@@ -14,8 +16,8 @@ def int(bits: _py_int) -> Int:
     return Int(bits)
 
 
-def bytes(size: _py_int) -> Bytes:
-    """Returns the ``bytes<size>`` type."""
+def bytes(size: Optional[_py_int] = None) -> Bytes:
+    """Returns the ``bytes<size>`` type, or ``bytes`` if ``size`` is ``None``."""
     return Bytes(size)
 
 
