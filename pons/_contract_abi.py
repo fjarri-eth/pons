@@ -395,7 +395,7 @@ class ContractABI:
     Contract methods accessible as attributes of this object, with the type :py:class:`Method`.
     """
 
-    constructor: Optional[Constructor]
+    constructor: Constructor
     """Contract's constructor."""
 
     fallback: Optional[Fallback]
@@ -464,6 +464,10 @@ class ContractABI:
             read: Optional[Iterable[ReadMethod]] = None,
             write: Optional[Iterable[WriteMethod]] = None
             ):
+
+        if constructor is None:
+            constructor = Constructor(inputs=[])
+
         self.fallback = fallback
         self.receive = receive
         self.constructor = constructor

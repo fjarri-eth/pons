@@ -13,11 +13,7 @@ class BoundConstructor:
     def __init__(self, compiled_contract: 'CompiledContract'):
         self._bytecode = compiled_contract.bytecode
         self._contract_abi = compiled_contract.abi
-        constructor = compiled_contract.abi.constructor
-        if not constructor:
-            # TODO: can we make an empty constructor for contracts without one?
-            raise RuntimeError("This contract does not have a constructor")
-        self._constructor = constructor
+        self._constructor = compiled_contract.abi.constructor
 
     def __call__(self, *args, **kwargs) -> 'BoundConstructorCall':
         """

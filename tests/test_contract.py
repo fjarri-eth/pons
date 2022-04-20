@@ -15,6 +15,23 @@ def compiled_contracts():
     yield compile_file(path)
 
 
+async def test_empty_constructor(test_provider, compiled_contracts):
+
+    compiled_contract = compiled_contracts["NoConstructor"]
+
+    client = Client(provider=test_provider)
+
+    root_account = test_provider.root_account
+    root_signer = AccountSigner(root_account)
+    root_address = Address.from_hex(root_account.address)
+
+    async with client.session() as session:
+        deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
+        call = deployed_contract.read.getState(123)
+        result = await session.call(call)
+        assert result == [1 + 123]
+
+
 async def test_abi_declaration(test_provider, compiled_contracts):
 
     compiled_contract = compiled_contracts["Test"]

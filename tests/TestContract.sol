@@ -1,6 +1,15 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 
+contract NoConstructor {
+    uint256 public v1 = 1;
+
+    function getState(uint256 _x) public view returns (uint256) {
+        return v1 + _x;
+    }
+}
+
+
 contract Test {
     uint256 public v1;
     uint256 public v2;

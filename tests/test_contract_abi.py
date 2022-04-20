@@ -320,6 +320,12 @@ def test_contract_abi_init():
     assert isinstance(cabi.write.writeMethod, WriteMethod)
 
 
+def test_no_constructor():
+    cabi = ContractABI()
+    assert isinstance(cabi.constructor, Constructor)
+    assert cabi.constructor.inputs.canonical_form == "()"
+
+
 def test_contract_abi_errors():
     constructor_abi = dict(type="constructor", stateMutability="payable", inputs=[])
     with pytest.raises(ValueError, match="JSON ABI contains more than one constructor declarations"):
