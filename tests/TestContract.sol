@@ -1,35 +1,20 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 
-contract NoConstructor {
-    uint256 public v1 = 1;
-
-    function getState(uint256 _x) public view returns (uint256) {
-        return v1 + _x;
-    }
-}
-
-
-contract Test {
+contract JsonAbiTest {
     uint256 public v1;
-    uint256 public v2;
 
-    constructor(uint256 _v1, uint256 _v2) {
-        v1 = _v1;
-        v2 = _v2;
+    constructor(uint256 _v1, uint256 _v2) payable {
+        v1 = _v1 + _v2;
     }
 
     receive() external payable {
-        v1 = 1;
-        v2 = 2;
     }
 
-    fallback(bytes calldata) external returns (bytes memory) {
-        v1 = 1;
-        v2 = 2;
+    fallback(bytes calldata) external payable returns (bytes memory) {
     }
 
-    function setState(uint256 _v1) public {
+    function setState(uint256 _v1) public payable {
         v1 = _v1;
     }
 

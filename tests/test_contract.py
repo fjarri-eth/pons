@@ -1,10 +1,10 @@
-import pytest
 from pathlib import Path
 
 import pytest
 
 from pons import abi
-from pons import *
+from pons import Client, AccountSigner, Address, Constructor, ReadMethod, WriteMethod, Fallback, Receive
+from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod, BoundConstructor
 
 from .compile import compile_file
 
@@ -15,73 +15,76 @@ def compiled_contracts():
     yield compile_file(path)
 
 
-async def test_empty_constructor(test_provider, compiled_contracts):
+def test_abi_declaration(compiled_contracts):
+    """
+    Checks that the compiler output is parsed correctly.
+    """
 
-    compiled_contract = compiled_contracts["NoConstructor"]
+    compiled_contract = compiled_contracts["JsonAbiTest"]
 
-    client = Client(provider=test_provider)
+    cabi = compiled_contract.abi
 
-    root_account = test_provider.root_account
-    root_signer = AccountSigner(root_account)
-    root_address = Address.from_hex(root_account.address)
+    assert isinstance(cabi.constructor, Constructor)
+    assert str(cabi.constructor.inputs) == "(uint256 _v1, uint256 _v2)"
+    assert cabi.constructor.payable
 
-    async with client.session() as session:
-        deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
-        call = deployed_contract.read.getState(123)
-        result = await session.call(call)
-        assert result == [1 + 123]
+    assert isinstance(cabi.fallback, Fallback)
+    assert cabi.fallback.payable
+    assert isinstance(cabi.receive, Receive)
+    assert cabi.receive.payable
+
+    assert isinstance(cabi.read.v1, ReadMethod)
+    assert str(cabi.read.v1.inputs) == "()"
+    assert str(cabi.read.v1.outputs) == "(uint256)"
+
+    assert isinstance(cabi.read.getState, ReadMethod)
+    assert str(cabi.read.getState.inputs) == "(uint256 _x)"
+    assert str(cabi.read.getState.outputs) == "(uint256)"
+
+    assert isinstance(cabi.read.testStructs, ReadMethod)
+    assert str(cabi.read.testStructs.inputs) == "((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in)"
+    assert str(cabi.read.testStructs.outputs) == "((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)"
+
+    assert isinstance(cabi.write.setState, WriteMethod)
+    assert str(cabi.write.setState.inputs) == "(uint256 _v1)"
+    assert cabi.write.setState.payable
 
 
-async def test_abi_declaration(test_provider, compiled_contracts):
+def test_api_binding(compiled_contracts):
+    """
+    Checks that the methods are bound correctly on deploy.
+    """
 
-    compiled_contract = compiled_contracts["Test"]
+    compiled_contract = compiled_contracts["JsonAbiTest"]
 
-    client = Client(provider=test_provider)
+    address = Address(b"\xab" * 20)
+    deployed_contract = DeployedContract(compiled_contract.abi, address)
 
-    root_account = test_provider.root_account
-    root_signer = AccountSigner(root_account)
-    root_address = Address.from_hex(root_account.address)
+    assert deployed_contract.address == address
+    assert deployed_contract.abi == compiled_contract.abi
+    assert isinstance(deployed_contract.read.v1, BoundReadMethod)
+    assert isinstance(deployed_contract.read.getState, BoundReadMethod)
+    assert isinstance(deployed_contract.read.testStructs, BoundReadMethod)
+    assert isinstance(deployed_contract.write.setState, BoundWriteMethod)
 
-    # The contract was deployed earlier
-    async with client.session() as session:
-        deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(12345, 56789))
+    ctr_call = compiled_contract.constructor(1, 2)
+    assert ctr_call.payable
+    assert ctr_call.contract_abi == compiled_contract.abi
+    assert ctr_call.data_bytes == (
+        compiled_contract.bytecode
+        + b"\x00" * 31 + b"\x01"
+        + b"\x00" * 31 + b"\x02")
 
-    # Now all we have is this
-    inner_struct = abi.struct(inner1=abi.uint(256), inner2=abi.uint(256))
-    outer_struct = abi.struct(inner=inner_struct, outer1=abi.uint(256))
-    declared_abi = ContractABI(
-        constructor=Constructor(inputs=dict(_v1=abi.uint(256), _v2=abi.uint(256))),
-        write=[
-            WriteMethod(name='setState', inputs=dict(_v1=abi.uint(256)))
-        ],
-        read=[
-            ReadMethod(name='getState', inputs=dict(_x=abi.uint(256)), outputs=abi.uint(256)),
-            ReadMethod(
-                name='testStructs',
-                inputs=dict(inner_in=inner_struct, outer_in=outer_struct),
-                outputs=dict(inner_out=inner_struct, outer_out=outer_struct),
-                )
-            ]
-        )
+    read_call = deployed_contract.read.getState(3)
+    assert read_call.contract_address == address
+    assert read_call.data_bytes == (
+        compiled_contract.abi.read.getState.selector
+        + b"\x00" * 31 + b"\x03")
+    assert read_call.decode_output(b"\x00" * 31 + b"\x04") == [4]
 
-    contract_address = deployed_contract.address
-    deployed_contract = DeployedContract(declared_abi, contract_address)
-
-    async with client.session() as session:
-
-        # Transact with the contract
-
-        call = deployed_contract.write.setState(111)
-        await session.transact(root_signer, call)
-
-        # Call the contract
-
-        call = deployed_contract.read.getState(123)
-        result = await session.call(call)
-        assert result == 111 + 123
-
-        inner = dict(inner1=1, inner2=2)
-        outer = dict(inner=inner, outer1=3)
-        call = deployed_contract.read.testStructs(inner, outer)
-        result = await session.call(call)
-        assert result == [inner, outer]
+    write_call = deployed_contract.write.setState(5)
+    assert write_call.contract_address == address
+    assert write_call.payable
+    assert write_call.data_bytes == (
+        compiled_contract.abi.write.setState.selector
+        + b"\x00" * 31 + b"\x05")
