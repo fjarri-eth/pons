@@ -2,14 +2,34 @@
 PyEVM-based provider for tests.
 """
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from typing import Union, List
 
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
+from eth_tester.exceptions import TransactionNotFound, TransactionFailed
+from eth.exceptions import Revert
+from eth_utils.exceptions import ValidationError
 
-from pons._provider import Provider, ProviderSession
-from pons._entities import Amount, Address, encode_quantity, decode_quantity
+from pons._provider import Provider, ProviderSession, RPCError, RPCErrorCode
+from pons._entities import Amount, Address, encode_quantity, decode_quantity, encode_data
+
+
+@contextmanager
+def pyevm_errors_into_rpc_errors():
+    try:
+        yield
+    except TransactionFailed as exc:
+        reason, = exc.args
+        if isinstance(reason, Revert):
+            # TODO: unpack the data to get the revert reason
+            # The standard `revert(string)` is a EIP838 error.
+            raise RPCError(RPCErrorCode.EXECUTION_ERROR.value, "execution reverted", encode_data(reason.args[0]))
+        else:
+            # TODO: what are the other possible reasons? Do they have the same error code?
+            raise RPCError(RPCErrorCode.EXECUTION_ERROR.value, "transaction failed", reason)
+    except ValidationError as exc:
+        raise RPCError(RPCErrorCode.SERVER_ERROR.value, exc.args[0])
 
 
 class EthereumTesterProvider(Provider):
@@ -23,7 +43,13 @@ class EthereumTesterProvider(Provider):
         self.root_account = Account.from_key(backend.account_keys[0])
         self._default_address = Address.from_hex(self.root_account.address)
 
-    async def rpc(self, method, *args):
+    def disable_auto_mine_transactions(self):
+        self._ethereum_tester.disable_auto_mine_transactions()
+
+    def enable_auto_mine_transactions(self):
+        self._ethereum_tester.enable_auto_mine_transactions()
+
+    def rpc(self, method, *args):
         dispatch = dict(
             net_version=self.net_version,
             eth_chainId=self.eth_chain_id,
@@ -36,43 +62,51 @@ class EthereumTesterProvider(Provider):
             eth_gasPrice=self.eth_gas_price,
             eth_getBlockByNumber=self.eth_get_block_by_number,
             )
-        return await dispatch[method](*args)
+        return dispatch[method](*args)
 
-    async def net_version(self) -> str:
+    def net_version(self) -> str:
         return "0"
 
-    async def eth_chain_id(self) -> str:
+    def eth_chain_id(self) -> str:
         return encode_quantity(self._ethereum_tester.backend.chain.chain_id)
 
-    async def eth_get_balance(self, address: str, block: str) -> str:
+    def eth_get_balance(self, address: str, block: str) -> str:
         return encode_quantity(self._ethereum_tester.get_balance(address, block))
 
-    async def eth_get_transaction_count(self, address: str, block: str) -> str:
+    def eth_get_transaction_count(self, address: str, block: str) -> str:
         return encode_quantity(self._ethereum_tester.get_nonce(address, block))
 
-    async def eth_send_raw_transaction(self, tx_hex: str) -> str:
-        return self._ethereum_tester.send_raw_transaction(tx_hex)
+    def eth_send_raw_transaction(self, tx_hex: str) -> str:
+        with pyevm_errors_into_rpc_errors():
+            return self._ethereum_tester.send_raw_transaction(tx_hex)
 
-    async def eth_call(self, tx: dict, block: str) -> Union[List, str]:
+    def eth_call(self, tx: dict, block: str) -> Union[List, str]:
         if 'from' not in tx:
             tx['from'] = self._default_address.encode()
         return self._ethereum_tester.call(tx, block)
 
-    async def eth_get_transaction_receipt(self, tx_hash_hex):
-        result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
+    def eth_get_transaction_receipt(self, tx_hash_hex):
+        try:
+            result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
+        except TransactionNotFound:
+            return None
         result['contractAddress'] = result.pop('contract_address')
         result['status'] = encode_quantity(result.pop('status'))
         result['gasUsed'] = encode_quantity(result.pop('gas_used'))
         return result
 
-    async def eth_estimate_gas(self, tx: dict, block: str) -> str:
+    def eth_estimate_gas(self, tx: dict, block: str) -> str:
         if 'from' not in tx:
             tx['from'] = self._default_address.encode()
         if 'value' in tx:
             tx['value'] = decode_quantity(tx['value'])
-        return encode_quantity(self._ethereum_tester.estimate_gas(tx, block))
 
-    async def eth_gas_price(self):
+        with pyevm_errors_into_rpc_errors():
+            gas = self._ethereum_tester.estimate_gas(tx, block)
+
+        return encode_quantity(gas)
+
+    def eth_gas_price(self):
         # The specific algorithm is not enforced in the standard,
         # but this is the logic Infura uses. Seems to work for them.
         block_info = self._ethereum_tester.get_block_by_number('latest', False)
@@ -80,7 +114,7 @@ class EthereumTesterProvider(Provider):
         # Base fee plus 1 GWei
         return encode_quantity(block_info['base_fee_per_gas'] + 10**9)
 
-    async def eth_get_block_by_number(self, block: str, full_transactions: bool) -> str:
+    def eth_get_block_by_number(self, block: str, full_transactions: bool) -> str:
         result = self._ethereum_tester.get_block_by_number(block, True)
         result['timestamp'] = encode_quantity(result['timestamp'])
         for tx_info in result['transactions']:
@@ -100,4 +134,4 @@ class EthereumTesterProviderSession(ProviderSession):
         self._provider = provider
 
     async def rpc(self, method, *args):
-        return await self._provider.rpc(method, *args)
+        return self._provider.rpc(method, *args)

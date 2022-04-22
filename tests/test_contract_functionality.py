@@ -34,7 +34,7 @@ async def test_empty_constructor(test_provider, compiled_contracts):
     async with client.session() as session:
         deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
         call = deployed_contract.read.getState(123)
-        result = await session.call(call)
+        result = await session.eth_call(call)
         assert result == [1 + 123]
 
 
@@ -63,21 +63,21 @@ async def test_basics(test_provider, compiled_contracts):
         deployed_contract = await session.deploy(acc1_signer, call)
 
         # Check the state
-        assert await session.call(deployed_contract.read.v1()) == [12345]
-        assert await session.call(deployed_contract.read.v2()) == [56789]
+        assert await session.eth_call(deployed_contract.read.v1()) == [12345]
+        assert await session.eth_call(deployed_contract.read.v2()) == [56789]
 
         # Transact with the contract
         await session.transact(acc1_signer, deployed_contract.write.setState(111))
-        assert await session.call(deployed_contract.read.v1()) == [111]
+        assert await session.eth_call(deployed_contract.read.v1()) == [111]
 
         # Call the contract
 
-        result = await session.call(deployed_contract.read.getState(123))
+        result = await session.eth_call(deployed_contract.read.getState(123))
         assert result == [111 + 123]
 
         inner = dict(inner1=1, inner2=2)
         outer = dict(inner=inner, outer1=3)
-        result = await session.call(deployed_contract.read.testStructs(inner, outer))
+        result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
         assert result == [inner, outer]
 
 
@@ -132,10 +132,10 @@ async def test_abi_declaration(test_provider, compiled_contracts):
 
         # Call the contract
 
-        result = await session.call(deployed_contract.read.getState(123))
+        result = await session.eth_call(deployed_contract.read.getState(123))
         assert result == 111 + 123 # Note the lack of `[]` - we declared outputs as a single value
 
         inner = dict(inner1=1, inner2=2)
         outer = dict(inner=inner, outer1=3)
-        result = await session.call(deployed_contract.read.testStructs(inner, outer))
+        result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
         assert result == [inner, outer]

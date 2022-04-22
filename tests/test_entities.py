@@ -3,7 +3,8 @@ import os
 import pytest
 
 from pons import Amount, Address, TxHash, Block
-from pons._entities import encode_quantity, encode_data, encode_block, decode_quantity, decode_data
+from pons._entities import (
+    encode_quantity, encode_data, encode_block, decode_quantity, decode_data, DecodingError)
 
 
 def test_amount():
@@ -143,8 +144,8 @@ def test_encode_decode():
     assert encode_block(Block.PENDING) == "pending"
     assert encode_block(123) == "0x7b"
 
-    with pytest.raises(ValueError, match="Encoded quantity must start with `0x`"):
+    with pytest.raises(DecodingError, match="Encoded quantity must start with `0x`"):
         decode_quantity("616263")
 
-    with pytest.raises(ValueError, match="Encoded data must start with `0x`"):
+    with pytest.raises(DecodingError, match="Encoded data must start with `0x`"):
         decode_data("616263")

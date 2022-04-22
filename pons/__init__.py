@@ -1,5 +1,5 @@
 from . import abi
-from ._client import Client
+from ._client import Client, ResponseFormatError, ProviderError, ExecutionFailed, TransactionFailed
 from ._contract_abi import ContractABI, Constructor, ReadMethod, WriteMethod, Fallback, Receive
 from ._contract import CompiledContract, DeployedContract
 from ._entities import Amount, Address, Block, TxHash, TxReceipt

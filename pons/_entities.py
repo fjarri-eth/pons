@@ -5,6 +5,12 @@ from typing import NamedTuple, Union, Optional, Tuple
 from eth_utils import to_checksum_address, to_canonical_address
 
 
+class DecodingError(Exception):
+    """
+    Raised on an error when decoding a value in an RPC response.
+    """
+
+
 class Amount:
     """
     Represents a sum in the chain's native currency.
@@ -65,7 +71,10 @@ class Amount:
 
     @classmethod
     def decode(cls, val: str) -> 'Amount':
-        return cls(decode_quantity(val))
+        try:
+            return cls(decode_quantity(val))
+        except ValueError as e:
+            raise DecodingError(str(e)) from e
 
     def _check_type(self, other):
         if type(self) != type(other):
@@ -151,7 +160,10 @@ class Address:
 
     @classmethod
     def decode(cls, val: str) -> 'Address':
-        return cls(decode_data(val))
+        try:
+            return cls(decode_data(val))
+        except ValueError as e:
+            raise DecodingError(str(e)) from e
 
     def __str__(self):
         return self.checksum
@@ -200,7 +212,10 @@ class TxHash:
 
     @classmethod
     def decode(cls, val: str) -> 'TxHash':
-        return TxHash(decode_data(val))
+        try:
+            return TxHash(decode_data(val))
+        except ValueError as e:
+            raise DecodingError(str(e)) from e
 
     def __bytes__(self):
         return self._tx_hash
@@ -246,12 +261,22 @@ def encode_block(val: Union[int, Block]) -> str:
 
 
 def decode_quantity(val: str) -> int:
+    if not isinstance(val, str):
+        raise DecodingError("Encoded quantity must be a string")
     if not val.startswith('0x'):
-        raise ValueError("Encoded quantity must start with `0x`")
-    return int(val, 16)
+        raise DecodingError("Encoded quantity must start with `0x`")
+    try:
+        return int(val, 16)
+    except ValueError as e:
+        raise DecodingError(f"Could not convert encoded quantity to an integer: {e}") from e
 
 
 def decode_data(val: str) -> bytes:
+    if not isinstance(val, str):
+        raise DecodingError("Encoded data must be a string")
     if not val.startswith('0x'):
-        raise ValueError("Encoded data must start with `0x`")
-    return bytes.fromhex(val[2:])
+        raise DecodingError("Encoded data must start with `0x`")
+    try:
+        return bytes.fromhex(val[2:])
+    except ValueError as e:
+        raise DecodingError(f"Could not convert encoded data to bytes: {e}") from e
