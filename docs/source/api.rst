@@ -1,11 +1,11 @@
 API
----
+===
 
 .. automodule:: pons
 
 
 Clients
-~~~~~~~
+-------
 
 .. autoclass:: Client
    :members:
@@ -15,7 +15,7 @@ Clients
 
 
 Providers
-~~~~~~~~~
+---------
 
 .. autoclass:: pons._provider.Provider
 
@@ -24,7 +24,7 @@ Providers
 
 
 Errors
-~~~~~~
+------
 
 .. autoclass:: pons.RemoteError
 
@@ -32,7 +32,7 @@ Errors
 
 
 Signers
-~~~~~~~
+-------
 
 .. autoclass:: Signer
    :members:
@@ -42,7 +42,7 @@ Signers
 
 
 Contract ABI
-~~~~~~~~~~~~
+------------
 
 .. autoclass:: ContractABI
    :members:
@@ -69,7 +69,7 @@ Contract ABI
 
 
 Secondary classes
-^^^^^^^^^^^^^^^^^
+-----------------
 
 .. autoclass:: pons._contract_abi.ConstructorCall
    :members:
@@ -82,7 +82,7 @@ Secondary classes
 
 
 Utility classes
-^^^^^^^^^^^^^^^
+---------------
 
 .. autoclass:: pons._contract_abi.Methods()
    :show-inheritance:
@@ -97,7 +97,7 @@ Utility classes
 
 
 Compiled and deployed contracts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------
 
 .. autoclass:: CompiledContract
    :members:
@@ -107,7 +107,7 @@ Compiled and deployed contracts
 
 
 Secondary classes
-^^^^^^^^^^^^^^^^^
+-----------------
 
 .. autoclass:: pons._contract.BoundConstructor
    :members:
@@ -132,7 +132,7 @@ Secondary classes
 
 
 Entities
-~~~~~~~~
+--------
 
 .. autoclass:: Amount
    :members:
@@ -151,7 +151,7 @@ Entities
 
 
 Solidity types
-~~~~~~~~~~~~~~
+--------------
 
 .. autoclass:: pons._abi_types.Type
 
