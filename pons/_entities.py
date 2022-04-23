@@ -1,3 +1,4 @@
+from functools import cached_property
 from enum import Enum
 from typing import NamedTuple, Union, Optional, Tuple
 
@@ -36,7 +37,7 @@ class Amount:
 
     def __init__(self, wei: int):
         if not isinstance(wei, int):
-            raise TypeError(f"The amount must be an integer, got {repr(wei)}")
+            raise TypeError(f"The amount must be an integer, got {type(wei).__name__}")
         if wei < 0:
             raise ValueError(f"The amount must be non-negative, got {wei}")
         self._wei = wei
@@ -66,30 +67,50 @@ class Amount:
     def decode(cls, val: str) -> 'Amount':
         return cls(decode_quantity(val))
 
-    def __eq__(self, other):
+    def _check_type(self, other):
         if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
+            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+
+    def __hash__(self):
+        return hash(self._wei)
+
+    def __eq__(self, other):
+        self._check_type(other)
         return self._wei == other._wei
 
+    def __add__(self, other):
+        self._check_type(other)
+        return self.wei(self._wei + other._wei)
+
     def __sub__(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
+        self._check_type(other)
         return self.wei(self._wei - other._wei)
 
     def __mul__(self, other: int):
         if not isinstance(other, int):
-            raise TypeError(f"Expected an integer, got {type(other)}")
+            raise TypeError(f"Expected an integer, got {type(other).__name__}")
         return self.wei(self._wei * other)
 
+    def __floordiv__(self, other: int):
+        if not isinstance(other, int):
+            raise TypeError(f"Expected an integer, got {type(other).__name__}")
+        return self.wei(self._wei // other)
+
     def __gt__(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
+        self._check_type(other)
         return self._wei > other._wei
 
     def __ge__(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
+        self._check_type(other)
         return self._wei >= other._wei
+
+    def __lt__(self, other):
+        self._check_type(other)
+        return self._wei < other._wei
+
+    def __le__(self, other):
+        self._check_type(other)
+        return self._wei <= other._wei
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._wei})"
@@ -110,29 +131,30 @@ class Address:
 
     def __init__(self, address_bytes: bytes):
         if not isinstance(address_bytes, bytes):
-            raise TypeError(f"Address must be a bytestring, got {repr(address_bytes)}")
+            raise TypeError(f"Address must be a bytestring, got {type(address_bytes).__name__}")
         if len(address_bytes) != 20:
-            raise ValueError(f"Address must be 20 bytes long, got {repr(address_bytes)}")
+            raise ValueError(f"Address must be 20 bytes long, got {len(address_bytes)}")
         self._address_bytes = address_bytes
 
     def __bytes__(self):
         return self._address_bytes
 
-    def as_checksum(self) -> str:
+    @cached_property
+    def checksum(self) -> str:
         """
         Retunrs the checksummed hex representation of the address.
         """
         return to_checksum_address(self._address_bytes)
 
     def encode(self) -> str:
-        return self.as_checksum()
+        return self.checksum
 
     @classmethod
     def decode(cls, val: str) -> 'Address':
         return cls(decode_data(val))
 
     def __str__(self):
-        return self.as_checksum()
+        return self.checksum
 
     def __repr__(self):
         return f"{self.__class__.__name__}.from_hex({self})"
@@ -142,7 +164,7 @@ class Address:
 
     def __eq__(self, other):
         if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self)} and {type(other)}")
+            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
         return self._address_bytes == other._address_bytes
 
 
@@ -168,9 +190,9 @@ class TxHash:
 
     def __init__(self, tx_hash: bytes):
         if not isinstance(tx_hash, bytes):
-            raise TypeError(f"Transaction hash must be a bytestring, got {repr(tx_hash)}")
+            raise TypeError(f"Transaction hash must be a bytestring, got {type(tx_hash).__name__}")
         if len(tx_hash) != 32:
-            raise ValueError(f"Transaction hash must be 32 bytes long, got {repr(tx_hash)}")
+            raise ValueError(f"Transaction hash must be 32 bytes long, got {len(tx_hash)}")
         self._tx_hash = tx_hash
 
     def encode(self) -> str:
@@ -182,6 +204,12 @@ class TxHash:
 
     def __bytes__(self):
         return self._tx_hash
+
+    def __hash__(self):
+        return hash(self._tx_hash)
+
+    def __eq__(self, other):
+        return self._tx_hash == other._tx_hash
 
 
 class TxReceipt(NamedTuple):
