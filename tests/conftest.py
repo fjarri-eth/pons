@@ -1,17 +1,24 @@
 from pathlib import Path
 
+from eth_account import Account
 import pytest
 
-from .compile import compile_contract
+from pons import AccountSigner
+
 from .provider import EthereumTesterProvider
-
-
-@pytest.fixture
-def compiled_contract():
-    path = Path(__file__).resolve().parent / 'Test.sol'
-    yield compile_contract(path)
 
 
 @pytest.fixture
 def test_provider():
     yield EthereumTesterProvider()
+
+
+@pytest.fixture
+def root_signer(test_provider):
+    root_account = test_provider.root_account
+    yield AccountSigner(root_account)
+
+
+@pytest.fixture
+def another_signer():
+    return AccountSigner(Account.create())

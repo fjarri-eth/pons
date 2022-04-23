@@ -1,7 +1,6 @@
-from pathlib import Path
+from typing import Any
 
-from ._contract_abi import (
-    ContractABI, ConstructorCall, Constructor, ReadCall, WriteCall, Methods, ReadMethod, WriteMethod, Any)
+from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod
 from ._entities import Address
 
 
@@ -13,11 +12,7 @@ class BoundConstructor:
     def __init__(self, compiled_contract: 'CompiledContract'):
         self._bytecode = compiled_contract.bytecode
         self._contract_abi = compiled_contract.abi
-        constructor = compiled_contract.abi.constructor
-        if not constructor:
-            # TODO: can we make an empty constructor for contracts without one?
-            raise RuntimeError("This contract does not have a constructor")
-        self._constructor = constructor
+        self._constructor = compiled_contract.abi.constructor
 
     def __call__(self, *args, **kwargs) -> 'BoundConstructorCall':
         """
@@ -177,5 +172,7 @@ class DeployedContract:
         self.abi = abi
         self.address = address
 
-        self.read = Methods({method.name: BoundReadMethod(self.address, method) for method in self.abi.read})
-        self.write = Methods({method.name: BoundWriteMethod(self.address, method) for method in self.abi.write})
+        self.read = Methods(
+            {method.name: BoundReadMethod(self.address, method) for method in self.abi.read})
+        self.write = Methods(
+            {method.name: BoundWriteMethod(self.address, method) for method in self.abi.write})

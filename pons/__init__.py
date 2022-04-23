@@ -1,8 +1,7 @@
 from . import abi
-from ._client import Client
+from ._client import Client, RemoteError
 from ._contract_abi import ContractABI, Constructor, ReadMethod, WriteMethod, Fallback, Receive
 from ._contract import CompiledContract, DeployedContract
 from ._entities import Amount, Address, Block, TxHash, TxReceipt
-from ._provider import HTTPProvider
+from ._provider import HTTPProvider, Unreachable
 from ._signer import Signer, AccountSigner
-from ._solidity_types import Struct
