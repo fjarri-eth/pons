@@ -5,17 +5,9 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
-Under construction.
-
-
-0.3.0 (03-04-2022)
-~~~~~~~~~~~~~~~~~~
-
 Changed
 ^^^^^^^
 
-- Merged ``SigningClient`` into ``Client``, with the methods of the former now requiring an explicit ``Signer`` argument. (PR_1_)
-- Exposed provider sessions via ``Client.session()`` context manager; all the client methods were moved to the returned session object. (PR_1_)
 - Added type/value checks when normalizing contract arguments. (PR_4_)
 - Unpacking contract call results into specific types. (PR_4_)
 - ``Address.as_checksum()`` renamed to ``Address.checksum`` (a cached property). (PR_5_)
@@ -34,6 +26,20 @@ Added
 - ``RemoteError`` and ``Unreachable`` exception types to report errors from client sessions in a standardized way. (PR_5_)
 
 
+.. _PR_4: https://github.com/fjarri/pons/pull/4
+.. _PR_5: https://github.com/fjarri/pons/pull/5
+
+
+0.3.0 (03-04-2022)
+~~~~~~~~~~~~~~~~~~
+
+Changed
+^^^^^^^
+
+- Merged ``SigningClient`` into ``Client``, with the methods of the former now requiring an explicit ``Signer`` argument. (PR_1_)
+- Exposed provider sessions via ``Client.session()`` context manager; all the client methods were moved to the returned session object. (PR_1_)
+
+
 Fixed
 ^^^^^
 
@@ -45,8 +51,6 @@ Fixed
 .. _PR_1: https://github.com/fjarri/pons/pull/1
 .. _PR_2: https://github.com/fjarri/pons/pull/2
 .. _PR_3: https://github.com/fjarri/pons/pull/3
-.. _PR_4: https://github.com/fjarri/pons/pull/4
-.. _PR_5: https://github.com/fjarri/pons/pull/5
 
 
 0.2.0 (19-03-2022)
