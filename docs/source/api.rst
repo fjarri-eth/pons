@@ -23,6 +23,14 @@ Providers
    :show-inheritance:
 
 
+Errors
+~~~~~~
+
+.. autoclass:: pons.RemoteError
+
+.. autoclass:: pons.Unreachable
+
+
 Signers
 ~~~~~~~
 

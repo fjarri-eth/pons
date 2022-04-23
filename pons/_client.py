@@ -37,6 +37,8 @@ class Client:
 class RemoteError(Exception):
     """
     A base of all errors occurring on the provider's side.
+    Encompasses both errors returned via HTTP status codes
+    and the ones returned via the JSON response.
     """
 
 
@@ -256,6 +258,9 @@ class ClientSession:
         return Amount.decode(result)
 
     async def broadcast_transfer(self, signer: Signer, destination_address: Address, amount: Amount) -> TxHash:
+        """
+        Broadcasts the fund transfer transaction, but does not wait for it to be processed.
+        """
         chain_id = await self.eth_chain_id()
         gas = await self.estimate_transfer(signer.address, destination_address, amount)
         # TODO: implement gas strategies
