@@ -6,16 +6,36 @@ from eth_account import Account
 import pytest
 import trio
 
-from pons import (
-    Client, AccountSigner, Address, Amount, TxHash, ResponseFormatError, ExecutionFailed,
-    ProviderError, TransactionFailed)
+from pons import Client, AccountSigner, Address, Amount, TxHash
+from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
 
 from .compile import compile_file
+from .provider_server import ServerHandle
+from .provider import EthereumTesterProvider
 
 
 @pytest.fixture
-async def session(test_provider):
-    client = Client(provider=test_provider)
+async def test_server(nursery, test_provider):
+    handle = ServerHandle(test_provider)
+    await nursery.start(handle)
+    yield handle
+    handle.shutdown()
+
+
+@pytest.fixture(params=["direct", "http"])
+async def provider(request, test_provider, nursery):
+    if request.param == "direct":
+        yield test_provider
+    else:
+        handle = ServerHandle(test_provider)
+        await nursery.start(handle)
+        yield handle.http_provider
+        handle.shutdown()
+
+
+@pytest.fixture
+async def session(provider):
+    client = Client(provider=provider)
     async with client.session() as session:
         yield session
 
@@ -24,12 +44,6 @@ async def session(test_provider):
 def compiled_contracts():
     path = Path(__file__).resolve().parent / 'TestClient.sol'
     yield compile_file(path)
-
-
-@pytest.fixture
-def root_signer(test_provider):
-    root_account = test_provider.root_account
-    yield AccountSigner(root_account)
 
 
 @contextmanager
@@ -68,7 +82,7 @@ async def test_net_version(test_provider, session):
 async def test_net_version_type_check(test_provider, session):
     # Provider returning a bad value
     with monkeypatched(test_provider, "net_version", lambda: 0):
-        with pytest.raises(ResponseFormatError, match="net_version: expected a string result"):
+        with pytest.raises(BadResponseFormat, match="net_version: expected a string result"):
             net_version = await session.net_version()
 
 
@@ -82,13 +96,10 @@ async def test_eth_chain_id(test_provider, session):
     assert chain_id1 == chain_id2
 
 
-async def test_eth_get_balance(test_provider, session, root_signer):
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
-
+async def test_eth_get_balance(test_provider, session, root_signer, another_signer):
     to_transfer = Amount.ether(10)
-    await session.transfer(root_signer, acc1_address, to_transfer)
-    acc1_balance = await session.eth_get_balance(acc1_address)
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+    acc1_balance = await session.eth_get_balance(another_signer.address)
     assert acc1_balance == to_transfer
 
     # Non-existent address (which is technically just an unfunded address)
@@ -97,13 +108,10 @@ async def test_eth_get_balance(test_provider, session, root_signer):
     assert balance == Amount.ether(0)
 
 
-async def test_eth_get_transaction_receipt(test_provider, session, root_signer):
-
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
+async def test_eth_get_transaction_receipt(test_provider, session, root_signer, another_signer):
 
     test_provider.disable_auto_mine_transactions()
-    tx_hash = await session.broadcast_transfer(root_signer, acc1_address, Amount.ether(10))
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
     receipt = await session.eth_get_transaction_receipt(tx_hash)
     assert receipt is None
 
@@ -116,22 +124,17 @@ async def test_eth_get_transaction_receipt(test_provider, session, root_signer):
     assert receipt is None
 
 
-async def test_eth_get_transaction_count(test_provider, session, root_signer):
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
+async def test_eth_get_transaction_count(test_provider, session, root_signer, another_signer):
     assert await session.eth_get_transaction_count(root_signer.address) == 0
-    await session.transfer(root_signer, acc1_address, Amount.ether(10))
+    await session.transfer(root_signer, another_signer.address, Amount.ether(10))
     assert await session.eth_get_transaction_count(root_signer.address) == 1
 
 
-async def test_wait_for_transaction_receipt(test_provider, session, root_signer, autojump_clock):
-
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
+async def test_wait_for_transaction_receipt(test_provider, session, root_signer, another_signer, autojump_clock):
 
     to_transfer = Amount.ether(10)
     test_provider.disable_auto_mine_transactions()
-    tx_hash = await session.broadcast_transfer(root_signer, acc1_address, to_transfer)
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
 
     # The receipt won't be available until we mine, so the waiting should time out
     start_time = trio.current_time()
@@ -177,14 +180,12 @@ async def test_estimate_deploy(test_provider, session, compiled_contracts, root_
         await session.estimate_deploy(compiled_contract.constructor(0))
 
 
-async def test_estimate_transfer(test_provider, session, root_signer):
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
-    gas = await session.estimate_transfer(root_signer.address, acc1_address, Amount.ether(10))
+async def test_estimate_transfer(test_provider, session, root_signer, another_signer):
+    gas = await session.estimate_transfer(root_signer.address, another_signer.address, Amount.ether(10))
     assert isinstance(gas, int) and gas > 0
 
     with pytest.raises(ProviderError, match="Sender does not have enough balance to cover transaction value and gas"):
-        await session.estimate_transfer(root_signer.address, acc1_address, Amount.ether(1000))
+        await session.estimate_transfer(root_signer.address, another_signer.address, Amount.ether(1000))
 
 
 async def test_estimate_transact(test_provider, session, compiled_contracts, root_signer):
@@ -202,25 +203,19 @@ async def test_eth_gas_price(test_provider, session):
     assert isinstance(gas_price, Amount)
 
 
-async def test_transfer(test_provider, session, root_signer):
-
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
+async def test_transfer(test_provider, session, root_signer, another_signer):
 
     # Regular transfer
     root_balance = await session.eth_get_balance(root_signer.address)
     to_transfer = Amount.ether(10)
-    await session.transfer(root_signer, acc1_address, to_transfer)
+    await session.transfer(root_signer, another_signer.address, to_transfer)
     root_balance_after = await session.eth_get_balance(root_signer.address)
-    acc1_balance_after = await session.eth_get_balance(acc1_address)
+    acc1_balance_after = await session.eth_get_balance(another_signer.address)
     assert acc1_balance_after == to_transfer
     assert root_balance - root_balance_after > to_transfer
 
 
-async def test_transfer_failed(test_provider, session, root_signer):
-
-    acc1 = Account.create()
-    acc1_address = Address.from_hex(acc1.address)
+async def test_transfer_failed(test_provider, session, root_signer, another_signer):
 
     # TODO: it would be nice to reproduce the actual situation where this could happen
     # (tranfer was accepted for mining, but failed in the process,
@@ -233,7 +228,7 @@ async def test_transfer_failed(test_provider, session, root_signer):
 
     with monkeypatched(test_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
         with pytest.raises(TransactionFailed, match="Transfer failed"):
-            await session.transfer(root_signer, acc1_address, Amount.ether(10))
+            await session.transfer(root_signer, another_signer.address, Amount.ether(10))
 
 
 async def test_deploy(test_provider, session, compiled_contracts, root_signer):
@@ -270,7 +265,7 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
         return receipt
 
     with monkeypatched(test_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
-        with pytest.raises(ResponseFormatError, match="The deploy transaction succeeded, but `contractAddress` is not present in the receipt"):
+        with pytest.raises(BadResponseFormat, match="The deploy transaction succeeded, but `contractAddress` is not present in the receipt"):
             await session.deploy(root_signer, basic_contract.constructor(0))
 
 

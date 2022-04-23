@@ -14,7 +14,7 @@ class Provider(ABC):
 
     @abstractmethod
     @asynccontextmanager
-    async def session(self) -> AsyncIterator['ProviderSession']:
+    async def session(self) -> AsyncIterator["ProviderSession"]:
         """
         Opens a session to the provider
         (allowing the backend to perform multiple operations faster).
@@ -22,12 +22,10 @@ class Provider(ABC):
         yield # type: ignore
 
 
-class MissingField(Exception):
-    pass
-
-
-class UnexpectedResponseType(Exception):
-    pass
+class UnexpectedResponse(Exception):
+    """
+    Raised when the remote server's response is not of an expected format.
+    """
 
 
 class ResponseDict:
@@ -38,8 +36,8 @@ class ResponseDict:
 
     def __init__(self, response: Dict[str, Any]):
         if not isinstance(response, dict):
-            raise UnexpectedResponseType(
-                f"expected a dictionary as a response, got {type(response).__name__}")
+            raise UnexpectedResponse(
+                f"Expected a dictionary as a response, got {type(response).__name__}")
         self._response = response
 
     def __contains__(self, field: str):
@@ -49,7 +47,7 @@ class ResponseDict:
         try:
             contents = self._response[field]
         except KeyError as e:
-            raise MissingField(str(e)) from e
+            raise UnexpectedResponse(f"Expected field `{field}` is missing from the result") from e
         return contents
 
 
@@ -82,7 +80,7 @@ class HTTPProvider(Provider):
         self._url = url
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator['HTTPSession']:
+    async def session(self) -> AsyncIterator["HTTPSession"]:
         async with httpx.AsyncClient() as client:
             yield HTTPSession(self._url, client)
 
@@ -107,19 +105,30 @@ class RPCErrorCode(Enum):
 
 
 class RPCError(Exception):
+    """
+    A wrapper for a server error returned either as a proper RPC response,
+    or as an HTTP error code response.
+    """
 
     @classmethod
     def from_json(cls, response: Dict[str, Any]):
         error = ResponseDict(response)
-        data = error['data'] if 'data' in error else None
-        return cls(error['code'], error['message'], data)
+        data = error["data"] if "data" in error else None
+        return cls(error["code"], error["message"], data)
 
     def __init__(self, server_code: Union[int, str], message: str, data: Optional[Any] = None):
         super().__init__(server_code, message, data)
-        self.server_code = server_code
+        self.server_code = int(server_code)
         self.code = RPCErrorCode.from_json(server_code)
         self.message = message
         self.data = data
+
+
+class Unreachable(Exception):
+    """
+    Raised when there is a problem connecting to the provider.
+    """
+    pass
 
 
 class HTTPSession(ProviderSession):
@@ -136,15 +145,16 @@ class HTTPSession(ProviderSession):
             "id": 0
             }
         # TODO: wrap possible connection errors (anything that doesn't lead to an actual response)
-        response = await self._client.post(self._url, json=json)
+        try:
+            response = await self._client.post(self._url, json=json)
+        except Exception as e:
+            raise Unreachable(str(e)) from e
         if response.status_code != HTTPStatus.OK:
-            # TODO: use our own error class
-            raise RuntimeError(
-                f"Request failed with status {response.status_code}, contents: {response.content}")
+            raise RPCError(response.status_code, response.content.decode())
 
         response_json = response.json()
-        if 'error' in response_json:
-            raise RPCError.from_json(response_json['error'])
-        if 'result' not in response_json:
-            raise UnexpectedResponseType(response_json)
-        return response_json['result']
+        if "error" in response_json:
+            raise RPCError.from_json(response_json["error"])
+        if "result" not in response_json:
+            raise UnexpectedResponse(f"`result` is not present in the response: {response_json}")
+        return response_json["result"]

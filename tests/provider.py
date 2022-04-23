@@ -90,9 +90,13 @@ class EthereumTesterProvider(Provider):
             result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
         except TransactionNotFound:
             return None
-        result['contractAddress'] = result.pop('contract_address')
-        result['status'] = encode_quantity(result.pop('status'))
-        result['gasUsed'] = encode_quantity(result.pop('gas_used'))
+
+        # TODO: rename/encode the remaining fields. For now that's all we need.
+        result = dict(
+            contractAddress=result["contract_address"],
+            status=encode_quantity(result["status"]),
+            gasUsed=encode_quantity(result["gas_used"]),
+            )
         return result
 
     def eth_estimate_gas(self, tx: dict, block: str) -> str:

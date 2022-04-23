@@ -6,7 +6,7 @@ from typing import Union, Any, Optional, AsyncIterator
 import trio
 
 from ._contract import DeployedContract, CompiledContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
-from ._provider import Provider, ProviderSession, MissingField, UnexpectedResponseType, RPCError, RPCErrorCode
+from ._provider import Provider, ProviderSession, UnexpectedResponse, RPCError, RPCErrorCode
 from ._signer import Signer
 from ._entities import (
     Address, Amount, Block, TxHash, TxReceipt,
@@ -34,20 +34,26 @@ class Client:
             # TODO: incorporate cached values from the session back into the client
 
 
-class ResponseFormatError(Exception):
+class RemoteError(Exception):
+    """
+    A base of all errors occurring on the provider's side.
+    """
+
+
+class BadResponseFormat(RemoteError):
     """
     Raised if the RPC provider returned an unexpectedly formatted response.
     """
 
 
-class TransactionFailed(Exception):
+class TransactionFailed(RemoteError):
     """
     Raised if the transaction was submitted successfully,
     but the final receipt indicates a failure.
     """
 
 
-class ProviderError(Exception):
+class ProviderError(RemoteError):
     """
     A general problem with fulfilling the request at the provider's side.
     """
@@ -75,8 +81,8 @@ def rpc_call(method_name):
         async def _wrapped(*args, **kwds):
             try:
                 result = await func(*args, **kwds)
-            except (DecodingError, UnexpectedResponseType, MissingField) as e:
-                raise ResponseFormatError(f"{method_name}: {e}") from e
+            except (DecodingError, UnexpectedResponse) as e:
+                raise BadResponseFormat(f"{method_name}: {e}") from e
             except RPCError as e:
                 if e.code == RPCErrorCode.EXECUTION_ERROR:
                     data = decode_data(e.data) if e.data else None
@@ -311,7 +317,7 @@ class ClientSession:
             raise TransactionFailed(f"Deploy failed (receipt: {receipt})")
 
         if receipt.contract_address is None:
-            raise ResponseFormatError(
+            raise BadResponseFormat(
                 f"The deploy transaction succeeded, but `contractAddress` is not present "
                 f"in the receipt ({receipt})")
 
