@@ -1,11 +1,10 @@
 from contextlib import asynccontextmanager
-from enum import Enum
 from functools import wraps
 from typing import Union, Any, Optional, AsyncIterator
 
 import trio
 
-from ._contract import DeployedContract, CompiledContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
+from ._contract import DeployedContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
 from ._provider import Provider, ProviderSession, UnexpectedResponse, RPCError, RPCErrorCode
 from ._signer import Signer
 from ._entities import (
@@ -71,7 +70,9 @@ class ExecutionFailed(ProviderError):
         self.data = data
 
     def __str__(self):
-        return f"Execution failed: {self.message}" + (f" (data: {self.data.hex()})" if self.data else "")
+        return (
+            f"Execution failed: {self.message}" +
+            (f" (data: {self.data.hex()})" if self.data else ""))
 
 
 def rpc_call(method_name):
@@ -80,17 +81,17 @@ def rpc_call(method_name):
     """
     def _wrapper(func):
         @wraps(func)
-        async def _wrapped(*args, **kwds):
+        async def _wrapped(*args, **kwargs):
             try:
-                result = await func(*args, **kwds)
-            except (DecodingError, UnexpectedResponse) as e:
-                raise BadResponseFormat(f"{method_name}: {e}") from e
-            except RPCError as e:
-                if e.code == RPCErrorCode.EXECUTION_ERROR:
-                    data = decode_data(e.data) if e.data else None
-                    raise ExecutionFailed(e.message, data)
+                result = await func(*args, **kwargs)
+            except (DecodingError, UnexpectedResponse) as exc:
+                raise BadResponseFormat(f"{method_name}: {exc}") from exc
+            except RPCError as exc:
+                if exc.code == RPCErrorCode.EXECUTION_ERROR:
+                    data = decode_data(exc.data) if exc.data else None
+                    raise ExecutionFailed(exc.message, data) from exc
                 else:
-                    raise ProviderError(e.server_code, e.message, e.data)
+                    raise ProviderError(exc.server_code, exc.message, exc.data) from exc
             return result
         return _wrapped
 
@@ -130,7 +131,8 @@ class ClientSession:
         return self._chain_id
 
     @rpc_call("eth_getBalance")
-    async def eth_get_balance(self, address: Address, block: Union[int, Block] = Block.LATEST) -> Amount:
+    async def eth_get_balance(
+            self, address: Address, block: Union[int, Block] = Block.LATEST) -> Amount:
         """
         Calls the ``eth_getBalance`` RPC method.
         """
@@ -143,7 +145,8 @@ class ClientSession:
         """
         Calls the ``eth_getTransactionReceipt`` RPC method.
         """
-        result = await self._provider_session.rpc_dict('eth_getTransactionReceipt', tx_hash.encode())
+        result = await self._provider_session.rpc_dict(
+            'eth_getTransactionReceipt', tx_hash.encode())
         if not result:
             return None
 
@@ -156,7 +159,8 @@ class ClientSession:
             )
 
     @rpc_call("eth_getTransactionCount")
-    async def eth_get_transaction_count(self, address: Address, block: Union[int, Block] = Block.LATEST) -> int:
+    async def eth_get_transaction_count(
+            self, address: Address, block: Union[int, Block] = Block.LATEST) -> int:
         """
         Calls the ``eth_getTransactionCount`` RPC method.
         """
@@ -164,7 +168,8 @@ class ClientSession:
             'eth_getTransactionCount', address.encode(), encode_block(block))
         return decode_quantity(result)
 
-    async def wait_for_transaction_receipt(self, tx_hash: TxHash, poll_latency: float = 1.) -> TxReceipt:
+    async def wait_for_transaction_receipt(
+            self, tx_hash: TxHash, poll_latency: float = 1.) -> TxReceipt:
         """
         Queries the transaction receipt waiting for ``poll_latency`` between each attempt.
         """
@@ -215,7 +220,8 @@ class ClientSession:
         return decode_quantity(result)
 
     @rpc_call("eth_estimateGas")
-    async def estimate_transfer(self, source_address: Address, destination_address: Address, amount: Amount) -> int:
+    async def estimate_transfer(
+            self, source_address: Address, destination_address: Address, amount: Amount) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
         Raises an exception if there is not enough funds in ``source_address``.
@@ -257,7 +263,8 @@ class ClientSession:
         result = await self._provider_session.rpc('eth_gasPrice')
         return Amount.decode(result)
 
-    async def broadcast_transfer(self, signer: Signer, destination_address: Address, amount: Amount) -> TxHash:
+    async def broadcast_transfer(
+            self, signer: Signer, destination_address: Address, amount: Amount) -> TxHash:
         """
         Broadcasts the fund transfer transaction, but does not wait for it to be processed.
         """
@@ -290,7 +297,9 @@ class ClientSession:
         if not receipt.succeeded:
             raise TransactionFailed(f"Transfer failed (receipt: {receipt})")
 
-    async def deploy(self, signer: Signer, call: BoundConstructorCall, amount: Amount = Amount(0)) -> DeployedContract:
+    async def deploy(
+            self, signer: Signer, call: BoundConstructorCall, amount: Amount = Amount(0)
+            ) -> DeployedContract:
         """
         Deploys the contract passing ``args`` to the constructor.
         Waits for the transaction to be confirmed.

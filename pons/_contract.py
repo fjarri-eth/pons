@@ -1,7 +1,6 @@
-from pathlib import Path
+from typing import Any
 
-from ._contract_abi import (
-    ContractABI, ConstructorCall, Constructor, ReadCall, WriteCall, Methods, ReadMethod, WriteMethod, Any)
+from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod
 from ._entities import Address
 
 
@@ -173,5 +172,7 @@ class DeployedContract:
         self.abi = abi
         self.address = address
 
-        self.read = Methods({method.name: BoundReadMethod(self.address, method) for method in self.abi.read})
-        self.write = Methods({method.name: BoundWriteMethod(self.address, method) for method in self.abi.write})
+        self.read = Methods(
+            {method.name: BoundReadMethod(self.address, method) for method in self.abi.read})
+        self.write = Methods(
+            {method.name: BoundWriteMethod(self.address, method) for method in self.abi.write})

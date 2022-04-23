@@ -1,12 +1,8 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict
-from enum import Enum
 from functools import cached_property
 import inspect
-import re
 from typing import (
-    Any, Tuple, Iterable, List, Dict, Optional, Union, Mapping,
-    Iterable, TypeVar, Generic, Iterator, Sequence)
+    Any, Iterable, List, Dict, Optional, Union, Mapping, TypeVar, Generic, Iterator, Sequence)
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
@@ -133,13 +129,15 @@ class Constructor:
         Creates this object from a JSON ABI method entry.
         """
         if method_entry['type'] != 'constructor':
-            raise ValueError("Constructor object must be created from a JSON entry with type='constructor'")
+            raise ValueError(
+                "Constructor object must be created from a JSON entry with type='constructor'")
         if 'name' in method_entry:
             raise ValueError("Constructor's JSON entry cannot have a `name`")
         if 'outputs' in method_entry and method_entry['outputs']:
             raise ValueError("Constructor's JSON entry cannot have non-empty `outputs`")
         if method_entry['stateMutability'] not in ("nonpayable", "payable"):
-            raise ValueError("Constructor's JSON entry state mutability must be `nonpayable` or `payable`")
+            raise ValueError(
+                "Constructor's JSON entry state mutability must be `nonpayable` or `payable`")
         inputs = dispatch_types(method_entry.get('inputs', []))
         payable = method_entry['stateMutability'] == "payable"
         return cls(inputs, payable=payable)
@@ -170,12 +168,14 @@ class ReadMethod(Method):
         Creates this object from a JSON ABI method entry.
         """
         if method_entry['type'] != 'function':
-            raise ValueError("ReadMethod object must be created from a JSON entry with type='function'")
+            raise ValueError(
+                "ReadMethod object must be created from a JSON entry with type='function'")
 
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         if method_entry['stateMutability'] not in ("pure", "view"):
-            raise ValueError("Non-mutating method's JSON entry state mutability must be `pure` or `view`")
+            raise ValueError(
+                "Non-mutating method's JSON entry state mutability must be `pure` or `view`")
 
         # Outputs can be anonymous
         outputs: Union[Dict[str, Type], List[Type]]
@@ -244,14 +244,16 @@ class WriteMethod(Method):
         Creates this object from a JSON ABI method entry.
         """
         if method_entry['type'] != 'function':
-            raise ValueError("WriteMethod object must be created from a JSON entry with type='function'")
+            raise ValueError(
+                "WriteMethod object must be created from a JSON entry with type='function'")
 
         name = method_entry['name']
         inputs = dispatch_types(method_entry['inputs'])
         if 'outputs' in method_entry and method_entry['outputs']:
             raise ValueError("Mutating method's JSON entry cannot have non-empty `outputs`")
         if method_entry['stateMutability'] not in ("nonpayable", "payable"):
-            raise ValueError("Mutating method's JSON entry state mutability must be `nonpayable` or `payable`")
+            raise ValueError(
+                "Mutating method's JSON entry state mutability must be `nonpayable` or `payable`")
         payable = method_entry['stateMutability'] == "payable"
         return cls(name=name, inputs=inputs, payable=payable)
 
@@ -297,9 +299,11 @@ class Fallback:
         Creates this object from a JSON ABI method entry.
         """
         if method_entry['type'] != 'fallback':
-            raise ValueError("Fallback object must be created from a JSON entry with type='fallback'")
+            raise ValueError(
+                "Fallback object must be created from a JSON entry with type='fallback'")
         if method_entry['stateMutability'] not in ("nonpayable", "payable"):
-            raise ValueError("Fallback method's JSON entry state mutability must be `nonpayable` or `payable`")
+            raise ValueError(
+                "Fallback method's JSON entry state mutability must be `nonpayable` or `payable`")
         payable = method_entry['stateMutability'] == "payable"
         return cls(payable)
 
@@ -324,9 +328,11 @@ class Receive:
         Creates this object from a JSON ABI method entry.
         """
         if method_entry['type'] != 'receive':
-            raise ValueError("Receive object must be created from a JSON entry with type='fallback'")
+            raise ValueError(
+                "Receive object must be created from a JSON entry with type='fallback'")
         if method_entry['stateMutability'] not in ("nonpayable", "payable"):
-            raise ValueError("Receive method's JSON entry state mutability must be `nonpayable` or `payable`")
+            raise ValueError(
+                "Receive method's JSON entry state mutability must be `nonpayable` or `payable`")
         payable = method_entry['stateMutability'] == "payable"
         return cls(payable)
 

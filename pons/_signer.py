@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
+from typing import Mapping
 
 from eth_account.account import LocalAccount
 
@@ -17,15 +18,13 @@ class Signer(ABC):
         """
         Returns the address corresponding to the signer's private key.
         """
-        pass
 
     @abstractmethod
-    def sign_transaction(self, tx: dict) -> bytes:
+    def sign_transaction(self, tx_dict: Mapping) -> bytes:
         """
         Signs the given JSON transaction and returns the RLP-packed transaction
         along with the signature.
         """
-        pass
 
 
 class AccountSigner(Signer):
@@ -40,5 +39,5 @@ class AccountSigner(Signer):
     def address(self) -> Address:
         return Address.from_hex(self._account.address)
 
-    def sign_transaction(self, tx: dict) -> bytes:
-        return bytes(self._account.sign_transaction(tx).rawTransaction)
+    def sign_transaction(self, tx_dict: Mapping) -> bytes:
+        return bytes(self._account.sign_transaction(tx_dict).rawTransaction)

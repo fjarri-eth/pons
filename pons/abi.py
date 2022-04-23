@@ -3,20 +3,20 @@ from typing import Optional
 from ._abi_types import UInt, Int, Bytes, AddressType, String, Bool, Type, Struct
 
 
-_py_int = int
+_PyInt = int
 
 
-def uint(bits: _py_int) -> UInt:
+def uint(bits: _PyInt) -> UInt:
     """Returns the ``uint<bits>`` type."""
     return UInt(bits)
 
 
-def int(bits: _py_int) -> Int:
+def int(bits: _PyInt) -> Int:
     """Returns the ``int<bits>`` type."""
     return Int(bits)
 
 
-def bytes(size: Optional[_py_int] = None) -> Bytes:
+def bytes(size: Optional[_PyInt] = None) -> Bytes:
     """Returns the ``bytes<size>`` type, or ``bytes`` if ``size`` is ``None``."""
     return Bytes(size)
 

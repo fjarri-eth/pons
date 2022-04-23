@@ -1,6 +1,6 @@
 from functools import cached_property
 from enum import Enum
-from typing import NamedTuple, Union, Optional, Tuple
+from typing import NamedTuple, Union, Optional
 
 from eth_utils import to_checksum_address, to_canonical_address
 
@@ -162,8 +162,8 @@ class Address:
     def decode(cls, val: str) -> 'Address':
         try:
             return cls(decode_data(val))
-        except ValueError as e:
-            raise DecodingError(str(e)) from e
+        except ValueError as exc:
+            raise DecodingError(str(exc)) from exc
 
     def __str__(self):
         return self.checksum
@@ -214,8 +214,8 @@ class TxHash:
     def decode(cls, val: str) -> 'TxHash':
         try:
             return TxHash(decode_data(val))
-        except ValueError as e:
-            raise DecodingError(str(e)) from e
+        except ValueError as exc:
+            raise DecodingError(str(exc)) from exc
 
     def __bytes__(self):
         return self._tx_hash
@@ -267,8 +267,8 @@ def decode_quantity(val: str) -> int:
         raise DecodingError("Encoded quantity must start with `0x`")
     try:
         return int(val, 16)
-    except ValueError as e:
-        raise DecodingError(f"Could not convert encoded quantity to an integer: {e}") from e
+    except ValueError as exc:
+        raise DecodingError(f"Could not convert encoded quantity to an integer: {exc}") from exc
 
 
 def decode_data(val: str) -> bytes:
@@ -278,5 +278,5 @@ def decode_data(val: str) -> bytes:
         raise DecodingError("Encoded data must start with `0x`")
     try:
         return bytes.fromhex(val[2:])
-    except ValueError as e:
-        raise DecodingError(f"Could not convert encoded data to bytes: {e}") from e
+    except ValueError as exc:
+        raise DecodingError(f"Could not convert encoded data to bytes: {exc}") from exc

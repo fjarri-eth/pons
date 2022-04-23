@@ -46,8 +46,9 @@ class ResponseDict:
     def __getitem__(self, field: str) -> Any:
         try:
             contents = self._response[field]
-        except KeyError as e:
-            raise UnexpectedResponse(f"Expected field `{field}` is missing from the result") from e
+        except KeyError as exc:
+            raise UnexpectedResponse(
+                f"Expected field `{field}` is missing from the result") from exc
         return contents
 
 
@@ -100,7 +101,7 @@ class RPCErrorCode(Enum):
         val = int(val)
         try:
             return cls(val)
-        except Exception as e:
+        except ValueError:
             return cls.UNKNOWN_REASON
 
 
@@ -128,7 +129,6 @@ class Unreachable(Exception):
     """
     Raised when there is a problem connecting to the provider.
     """
-    pass
 
 
 class HTTPSession(ProviderSession):
@@ -144,11 +144,10 @@ class HTTPSession(ProviderSession):
             "params": list(args),
             "id": 0
             }
-        # TODO: wrap possible connection errors (anything that doesn't lead to an actual response)
         try:
             response = await self._client.post(self._url, json=json)
-        except Exception as e:
-            raise Unreachable(str(e)) from e
+        except Exception as exc:
+            raise Unreachable(str(exc)) from exc
         if response.status_code != HTTPStatus.OK:
             raise RPCError(response.status_code, response.content.decode())
 

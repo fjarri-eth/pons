@@ -62,12 +62,15 @@ class UInt(Type):
         # `bool` is a subclass of `int`, but we would rather be more strict
         # and prevent possible bugs.
         if not isinstance(val, int) or isinstance(val, bool):
-            raise TypeError(f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
+            raise TypeError(
+                f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
         if val < 0:
-            raise ValueError(f"`{self.canonical_form}` must correspond to a non-negative integer, got {val}")
+            raise ValueError(
+                f"`{self.canonical_form}` must correspond to a non-negative integer, got {val}")
         if val >> self._bits != 0:
             raise ValueError(
-                f"`{self.canonical_form}` must correspond to an unsigned integer under {self._bits} bits, got {val}")
+                f"`{self.canonical_form}` must correspond to an unsigned integer "
+                f"under {self._bits} bits, got {val}")
 
     def normalize(self, val):
         self._check_val(val)
@@ -96,10 +99,12 @@ class Int(Type):
         # `bool` is a subclass of `int`, but we would rather be more strict
         # and prevent possible bugs.
         if not isinstance(val, int) or isinstance(val, bool):
-            raise TypeError(f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
+            raise TypeError(
+                f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
         if (val + (1 << (self._bits - 1))) >> self._bits != 0:
             raise ValueError(
-                f"`{self.canonical_form}` must correspond to a signed integer under {self._bits} bits, got {val}")
+                f"`{self.canonical_form}` must correspond to a signed integer "
+                f"under {self._bits} bits, got {val}")
 
     def normalize(self, val):
         self._check_val(val)
@@ -126,7 +131,9 @@ class Bytes(Type):
 
     def _check_val(self, val):
         if not isinstance(val, bytes):
-            raise TypeError(f"`{self.canonical_form}` must correspond to a bytestring, got {type(val).__name__}")
+            raise TypeError(
+                f"`{self.canonical_form}` must correspond to a bytestring, "
+                f"got {type(val).__name__}")
         if self._size is not None and len(val) != self._size:
             raise ValueError(f"Expected {self._size} bytes, got {len(val)}")
 
@@ -150,7 +157,9 @@ class AddressType(Type):
 
     def normalize(self, val):
         if not isinstance(val, Address):
-            raise TypeError(f"`address` must correspond to an `Address`-type value, got {type(val).__name__}")
+            raise TypeError(
+                f"`address` must correspond to an `Address`-type value, "
+                f"got {type(val).__name__}")
         return bytes(val)
 
     def denormalize(self, val):
@@ -168,7 +177,8 @@ class String(Type):
 
     def _check_val(self, val):
         if not isinstance(val, str):
-            raise TypeError(f"`string` must correspond to a `str`-type value, got {type(val).__name__}")
+            raise TypeError(
+                f"`string` must correspond to a `str`-type value, got {type(val).__name__}")
 
     def normalize(self, val):
         self._check_val(val)
@@ -190,7 +200,8 @@ class Bool(Type):
 
     def _check_val(self, val):
         if not isinstance(val, bool):
-            raise TypeError(f"`bool` must correspond to a `bool`-type value, got {type(val).__name__}")
+            raise TypeError(
+                f"`bool` must correspond to a `bool`-type value, got {type(val).__name__}")
 
     def normalize(self, val):
         self._check_val(val)
@@ -212,7 +223,9 @@ class Array(Type):
 
     @cached_property
     def canonical_form(self):
-        return self._element_type.canonical_form + "[" + (str(self._size) if self._size else "") + "]"
+        return (
+            self._element_type.canonical_form +
+            "[" + (str(self._size) if self._size else "") + "]")
 
     def _check_val(self, val):
         if not isinstance(val, Iterable):
@@ -247,12 +260,13 @@ class Struct(Type):
         if not isinstance(val, Iterable):
             raise TypeError(f"Expected an iterable, got {type(val).__name__}")
         if len(val) != len(self._fields):
-           raise ValueError(f"Expected {len(self._fields)} elements, got {len(val)}")
+            raise ValueError(f"Expected {len(self._fields)} elements, got {len(val)}")
 
     def normalize(self, val):
         if isinstance(val, Mapping):
             if val.keys() != self._fields.keys():
-                raise ValueError(f"Expected fields {list(self._fields.keys())}, got {list(val.keys())}")
+                raise ValueError(
+                    f"Expected fields {list(self._fields.keys())}, got {list(val.keys())}")
             return [tp.normalize(val[name]) for name, tp in self._fields.items()]
         else:
             self._check_val(val)
