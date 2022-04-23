@@ -111,6 +111,9 @@ def test_address():
     with pytest.raises(ValueError):
         Address.from_hex(random_addr_checksum[:-1])
 
+    with pytest.raises(DecodingError, match="Address must be 20 bytes long, got 19"):
+        Address.decode("0x" + random_addr[:-1].hex())
+
 
 def test_tx_hash():
     tx_hash_bytes = os.urandom(32)
@@ -133,19 +136,40 @@ def test_tx_hash():
     with pytest.raises(ValueError, match="Transaction hash must be 32 bytes long, got 31"):
         TxHash(tx_hash_bytes[:-1])
 
+    with pytest.raises(DecodingError, match="Transaction hash must be 32 bytes long, got 31"):
+        TxHash.decode("0x" + tx_hash_bytes[:-1].hex())
 
-def test_encode_decode():
+
+def test_encode_decode_quantity():
     assert encode_quantity(100) == "0x64"
     assert decode_quantity("0x64") == 100
-    assert encode_data(b"abc") == "0x616263"
-    assert decode_data("0x616263") == b"abc"
-    assert encode_block(Block.LATEST) == "latest"
-    assert encode_block(Block.EARLIEST) == "earliest"
-    assert encode_block(Block.PENDING) == "pending"
-    assert encode_block(123) == "0x7b"
+
+    with pytest.raises(DecodingError, match="Encoded quantity must be a string"):
+        decode_quantity(100)
 
     with pytest.raises(DecodingError, match="Encoded quantity must start with `0x`"):
         decode_quantity("616263")
 
+    with pytest.raises(DecodingError, match="Could not convert encoded quantity to an integer"):
+        decode_quantity("0xefgh")
+
+
+def test_encode_decode_data():
+    assert encode_data(b"abc") == "0x616263"
+    assert decode_data("0x616263") == b"abc"
+
+    with pytest.raises(DecodingError, match="Encoded data must be a string"):
+        decode_data(616263)
+
     with pytest.raises(DecodingError, match="Encoded data must start with `0x`"):
         decode_data("616263")
+
+    with pytest.raises(DecodingError, match="Could not convert encoded data to bytes"):
+        decode_data("0xefgh")
+
+
+def test_encode_block():
+    assert encode_block(Block.LATEST) == "latest"
+    assert encode_block(Block.EARLIEST) == "earliest"
+    assert encode_block(Block.PENDING) == "pending"
+    assert encode_block(123) == "0x7b"

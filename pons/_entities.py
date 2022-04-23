@@ -71,10 +71,10 @@ class Amount:
 
     @classmethod
     def decode(cls, val: str) -> 'Amount':
-        try:
-            return cls(decode_quantity(val))
-        except ValueError as e:
-            raise DecodingError(str(e)) from e
+        # `decode_data` will raise DecodingError on any error,
+        # and if it succeeds, constructor won't raise anything -
+        # the value is already guaranteed to be `int` and non-negative
+        return cls(decode_quantity(val))
 
     def _check_type(self, other):
         if type(self) != type(other):
