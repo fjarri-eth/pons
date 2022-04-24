@@ -26,11 +26,13 @@ def struct(**kwargs: Type) -> Struct:
     return Struct(kwargs)
 
 
-address = AddressType()
-"""``address`` type."""
+address: AddressType = AddressType()
+"""
+``address`` type.
+"""
 
-string = String()
+string: String = String()
 """``string`` type."""
 
-bool = Bool()
+bool: Bool = Bool()
 """``bool`` type."""

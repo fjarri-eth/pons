@@ -33,6 +33,7 @@ release = "0.4.0"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinxcontrib_trio",
+    "sphinx.ext.intersphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -58,3 +59,7 @@ html_static_path = ["_static"]
 
 # Do not prepend module to type names when it can be resolved.
 python_use_unqualified_type_names = True
+
+intersphinx_mapping = {
+    "eth_account": ("https://eth-account.readthedocs.io/en/stable/", None),
+}
