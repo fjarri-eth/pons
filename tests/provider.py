@@ -20,11 +20,15 @@ def pyevm_errors_into_rpc_errors():
     try:
         yield
     except TransactionFailed as exc:
-        reason, = exc.args
+        (reason,) = exc.args
         if isinstance(reason, Revert):
             # TODO: unpack the data to get the revert reason
             # The standard `revert(string)` is a EIP838 error.
-            raise RPCError(RPCErrorCode.EXECUTION_ERROR.value, "execution reverted", encode_data(reason.args[0]))
+            raise RPCError(
+                RPCErrorCode.EXECUTION_ERROR.value,
+                "execution reverted",
+                encode_data(reason.args[0]),
+            )
         else:
             # TODO: what are the other possible reasons? Do they have the same error code?
             raise RPCError(RPCErrorCode.EXECUTION_ERROR.value, "transaction failed", reason)
@@ -33,11 +37,10 @@ def pyevm_errors_into_rpc_errors():
 
 
 class EthereumTesterProvider(Provider):
-
     def __init__(self, root_balance_eth: int = 100):
         custom_genesis_state = PyEVMBackend.generate_genesis_state(
-            num_accounts=1,
-            overrides=dict(balance=Amount.ether(root_balance_eth).as_wei()))
+            num_accounts=1, overrides=dict(balance=Amount.ether(root_balance_eth).as_wei())
+        )
         backend = PyEVMBackend(genesis_state=custom_genesis_state)
         self._ethereum_tester = EthereumTester(backend)
         self.root_account = Account.from_key(backend.account_keys[0])
@@ -61,7 +64,7 @@ class EthereumTesterProvider(Provider):
             eth_estimateGas=self.eth_estimate_gas,
             eth_gasPrice=self.eth_gas_price,
             eth_getBlockByNumber=self.eth_get_block_by_number,
-            )
+        )
         return dispatch[method](*args)
 
     def net_version(self) -> str:
@@ -81,8 +84,8 @@ class EthereumTesterProvider(Provider):
             return self._ethereum_tester.send_raw_transaction(tx_hex)
 
     def eth_call(self, tx: dict, block: str) -> Union[List, str]:
-        if 'from' not in tx:
-            tx['from'] = self._default_address.encode()
+        if "from" not in tx:
+            tx["from"] = self._default_address.encode()
         return self._ethereum_tester.call(tx, block)
 
     def eth_get_transaction_receipt(self, tx_hash_hex):
@@ -96,14 +99,14 @@ class EthereumTesterProvider(Provider):
             contractAddress=result["contract_address"],
             status=encode_quantity(result["status"]),
             gasUsed=encode_quantity(result["gas_used"]),
-            )
+        )
         return result
 
     def eth_estimate_gas(self, tx: dict, block: str) -> str:
-        if 'from' not in tx:
-            tx['from'] = self._default_address.encode()
-        if 'value' in tx:
-            tx['value'] = decode_quantity(tx['value'])
+        if "from" not in tx:
+            tx["from"] = self._default_address.encode()
+        if "value" in tx:
+            tx["value"] = decode_quantity(tx["value"])
 
         with pyevm_errors_into_rpc_errors():
             gas = self._ethereum_tester.estimate_gas(tx, block)
@@ -113,17 +116,17 @@ class EthereumTesterProvider(Provider):
     def eth_gas_price(self):
         # The specific algorithm is not enforced in the standard,
         # but this is the logic Infura uses. Seems to work for them.
-        block_info = self._ethereum_tester.get_block_by_number('latest', False)
+        block_info = self._ethereum_tester.get_block_by_number("latest", False)
 
         # Base fee plus 1 GWei
-        return encode_quantity(block_info['base_fee_per_gas'] + 10**9)
+        return encode_quantity(block_info["base_fee_per_gas"] + 10**9)
 
     def eth_get_block_by_number(self, block: str, full_transactions: bool) -> str:
         result = self._ethereum_tester.get_block_by_number(block, True)
-        result['timestamp'] = encode_quantity(result['timestamp'])
-        for tx_info in result['transactions']:
-            tx_info['gas'] = encode_quantity(tx_info['gas'])
-            tx_info['gasPrice'] = tx_info.pop('gas_price').encode()
+        result["timestamp"] = encode_quantity(result["timestamp"])
+        for tx_info in result["transactions"]:
+            tx_info["gas"] = encode_quantity(tx_info["gas"])
+            tx_info["gasPrice"] = tx_info.pop("gas_price").encode()
 
         return result
 
@@ -133,7 +136,6 @@ class EthereumTesterProvider(Provider):
 
 
 class EthereumTesterProviderSession(ProviderSession):
-
     def __init__(self, provider):
         self._provider = provider
 

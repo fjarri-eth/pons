@@ -32,7 +32,7 @@ def make_app(provider):
     # Since we need to use an externally passed context in the app (``ursula_server``),
     # we have to create the app inside a function.
 
-    app = QuartTrio('provider')
+    app = QuartTrio("provider")
 
     @app.route("/", methods=["POST"])
     async def entry_point():
@@ -73,7 +73,9 @@ class ServerHandle:
         config.bind = [f"{self._host}:{self._port}"]
         config.worker_class = "trio"
         app = make_app(self._provider)
-        await serve(app, config, shutdown_trigger=self._shutdown_event.wait, task_status=task_status)
+        await serve(
+            app, config, shutdown_trigger=self._shutdown_event.wait, task_status=task_status
+        )
 
     def shutdown(self):
         self._shutdown_event.set()

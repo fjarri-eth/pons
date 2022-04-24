@@ -21,9 +21,15 @@ def test_uint():
         abi.uint(128).normalize(True)
     with pytest.raises(TypeError, match="`uint128` must correspond to an integer, got str"):
         abi.uint(128).normalize("abc")
-    with pytest.raises(ValueError, match="`uint128` must correspond to a non-negative integer, got -1"):
+    with pytest.raises(
+        ValueError, match="`uint128` must correspond to a non-negative integer, got -1"
+    ):
         abi.uint(128).normalize(-1)
-    with pytest.raises(ValueError, match="`uint128` must correspond to an unsigned integer under 128 bits, got " + str(2**128)):
+    with pytest.raises(
+        ValueError,
+        match="`uint128` must correspond to an unsigned integer under 128 bits, got "
+        + str(2**128),
+    ):
         abi.uint(128).normalize(2**128)
 
 
@@ -44,9 +50,16 @@ def test_int():
         abi.int(128).normalize(True)
     with pytest.raises(TypeError, match="`int128` must correspond to an integer, got str"):
         abi.int(128).normalize("abc")
-    with pytest.raises(ValueError, match="`int128` must correspond to a signed integer under 128 bits, got " + str(-2**127-1)):
-        abi.int(128).normalize(-2**127-1)
-    with pytest.raises(ValueError, match="`int128` must correspond to a signed integer under 128 bits, got " + str(2**127)):
+    with pytest.raises(
+        ValueError,
+        match="`int128` must correspond to a signed integer under 128 bits, got "
+        + str(-(2**127) - 1),
+    ):
+        abi.int(128).normalize(-(2**127) - 1)
+    with pytest.raises(
+        ValueError,
+        match="`int128` must correspond to a signed integer under 128 bits, got " + str(2**127),
+    ):
         abi.int(128).normalize(2**127)
 
 
@@ -80,7 +93,9 @@ def test_address():
 
     assert abi.address.canonical_form == "address"
 
-    with pytest.raises(TypeError, match="`address` must correspond to an `Address`-type value, got str"):
+    with pytest.raises(
+        TypeError, match="`address` must correspond to an `Address`-type value, got str"
+    ):
         abi.address.normalize("0x" + "01" * 20)
 
 
@@ -90,7 +105,9 @@ def test_string():
 
     assert abi.string.canonical_form == "string"
 
-    with pytest.raises(TypeError, match="`string` must correspond to a `str`-type value, got bytes"):
+    with pytest.raises(
+        TypeError, match="`string` must correspond to a `str`-type value, got bytes"
+    ):
         abi.string.normalize(b"foo")
 
 
@@ -167,7 +184,8 @@ def test_dispatch_type():
         components=[
             dict(name="field1", type="bool"),
             dict(name="field2", type="address"),
-        ])
+        ],
+    )
     assert dispatch_type(struct_array) == abi.struct(field1=abi.bool, field2=abi.address)[2]
 
     with pytest.raises(ValueError, match=r"Incorrect type format: uint8\(2\)"):
@@ -180,9 +198,12 @@ def test_dispatch_types():
     entries = [
         dict(name="param2", type="uint8"),
         dict(name="param1", type="uint16[2]"),
-        ]
+    ]
     # Check that the order is preserved, too
-    assert list(dispatch_types(entries).items()) == [("param2", abi.uint(8)), ("param1", abi.uint(16)[2])]
+    assert list(dispatch_types(entries).items()) == [
+        ("param2", abi.uint(8)),
+        ("param1", abi.uint(16)[2]),
+    ]
 
     with pytest.raises(ValueError, match="All ABI entries must have distinct names"):
         dispatch_types([dict(name="", type="uint8"), dict(name="", type="uint16[2]")])
@@ -202,15 +223,12 @@ def check_normalization_roundtrip():
         field1=abi.uint(8),
         field2=abi.uint(16)[2],
         field3=abi.address,
-        field4=abi.struct(inner1=abi.bool, inner2=abi.string))
+        field4=abi.struct(inner1=abi.bool, inner2=abi.string),
+    )
 
-    addr = Address(b'\x01'*20)
+    addr = Address(b"\x01" * 20)
 
-    value = dict(
-        field1=1,
-        field2=[2, 3],
-        field3=addr,
-        field4=dict(inner2="abcd", inner1=True))
+    value = dict(field1=1, field2=[2, 3], field3=addr, field4=dict(inner2="abcd", inner1=True))
 
     expected_normalized = [1, [2, 3], bytes(addr), [True, "abcd"]]
 

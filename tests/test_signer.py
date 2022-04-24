@@ -16,7 +16,7 @@ def test_signer():
     assert isinstance(sig, bytes)
     # the length may vary depending on the integers in the signature (they're not padded)
     payload_length = sig[1]
-    assert len(sig) == payload_length + 2 # 2 bytes for the header + length byte
+    assert len(sig) == payload_length + 2  # 2 bytes for the header + length byte
     # Packed transaction values
     # 0xf8 = 0xf7 + 1 -> start of a list, payload length in 1 byte
     # <1 byte> -> payload length

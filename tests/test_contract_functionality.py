@@ -5,15 +5,24 @@ import pytest
 import trio
 
 from pons import (
-    Client, AccountSigner, Address, Amount, ContractABI, abi,
-    Constructor, ReadMethod, WriteMethod, DeployedContract)
+    Client,
+    AccountSigner,
+    Address,
+    Amount,
+    ContractABI,
+    abi,
+    Constructor,
+    ReadMethod,
+    WriteMethod,
+    DeployedContract,
+)
 
 from .compile import compile_file
 
 
 @pytest.fixture
 def compiled_contracts():
-    path = Path(__file__).resolve().parent / 'TestContractFunctionality.sol'
+    path = Path(__file__).resolve().parent / "TestContractFunctionality.sol"
     yield compile_file(path)
 
 
@@ -110,18 +119,16 @@ async def test_abi_declaration(test_provider, compiled_contracts):
     outer_struct = abi.struct(inner=inner_struct, outer1=abi.uint(256))
     declared_abi = ContractABI(
         constructor=Constructor(inputs=dict(_v1=abi.uint(256), _v2=abi.uint(256))),
-        write=[
-            WriteMethod(name='setState', inputs=dict(_v1=abi.uint(256)))
-        ],
+        write=[WriteMethod(name="setState", inputs=dict(_v1=abi.uint(256)))],
         read=[
-            ReadMethod(name='getState', inputs=dict(_x=abi.uint(256)), outputs=abi.uint(256)),
+            ReadMethod(name="getState", inputs=dict(_x=abi.uint(256)), outputs=abi.uint(256)),
             ReadMethod(
-                name='testStructs',
+                name="testStructs",
                 inputs=dict(inner_in=inner_struct, outer_in=outer_struct),
                 outputs=dict(inner_out=inner_struct, outer_out=outer_struct),
-                )
-            ]
-        )
+            ),
+        ],
+    )
 
     deployed_contract = DeployedContract(declared_abi, previously_deployed_contract.address)
 
@@ -133,7 +140,7 @@ async def test_abi_declaration(test_provider, compiled_contracts):
         # Call the contract
 
         result = await session.eth_call(deployed_contract.read.getState(123))
-        assert result == 111 + 123 # Note the lack of `[]` - we declared outputs as a single value
+        assert result == 111 + 123  # Note the lack of `[]` - we declared outputs as a single value
 
         inner = dict(inner1=1, inner2=2)
         outer = dict(inner=inner, outer1=3)

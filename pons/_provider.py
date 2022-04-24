@@ -19,7 +19,7 @@ class Provider(ABC):
         Opens a session to the provider
         (allowing the backend to perform multiple operations faster).
         """
-        yield # type: ignore
+        yield  # type: ignore
 
 
 class UnexpectedResponse(Exception):
@@ -37,7 +37,8 @@ class ResponseDict:
     def __init__(self, response: Dict[str, Any]):
         if not isinstance(response, dict):
             raise UnexpectedResponse(
-                f"Expected a dictionary as a response, got {type(response).__name__}")
+                f"Expected a dictionary as a response, got {type(response).__name__}"
+            )
         self._response = response
 
     def __contains__(self, field: str):
@@ -48,7 +49,8 @@ class ResponseDict:
             contents = self._response[field]
         except KeyError as exc:
             raise UnexpectedResponse(
-                f"Expected field `{field}` is missing from the result") from exc
+                f"Expected field `{field}` is missing from the result"
+            ) from exc
         return contents
 
 
@@ -132,18 +134,12 @@ class Unreachable(Exception):
 
 
 class HTTPSession(ProviderSession):
-
     def __init__(self, url: str, http_client: httpx.AsyncClient):
         self._url = url
         self._client = http_client
 
     async def rpc(self, method: str, *args):
-        json = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": list(args),
-            "id": 0
-            }
+        json = {"jsonrpc": "2.0", "method": method, "params": list(args), "id": 0}
         try:
             response = await self._client.post(self._url, json=json)
         except Exception as exc:

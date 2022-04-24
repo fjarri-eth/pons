@@ -4,7 +4,13 @@ import pytest
 
 from pons import Amount, Address, TxHash, Block
 from pons._entities import (
-    encode_quantity, encode_data, encode_block, decode_quantity, decode_data, DecodingError)
+    encode_quantity,
+    encode_data,
+    encode_block,
+    decode_quantity,
+    decode_data,
+    DecodingError,
+)
 
 
 def test_amount():

@@ -48,7 +48,6 @@ class Type(ABC):
 
 
 class UInt(Type):
-
     def __init__(self, bits: int):
         if bits <= 0 or bits > 256 or bits % 8 != 0:
             raise ValueError(f"Incorrect `uint` bit size: {bits}")
@@ -63,14 +62,17 @@ class UInt(Type):
         # and prevent possible bugs.
         if not isinstance(val, int) or isinstance(val, bool):
             raise TypeError(
-                f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
+                f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}"
+            )
         if val < 0:
             raise ValueError(
-                f"`{self.canonical_form}` must correspond to a non-negative integer, got {val}")
+                f"`{self.canonical_form}` must correspond to a non-negative integer, got {val}"
+            )
         if val >> self._bits != 0:
             raise ValueError(
                 f"`{self.canonical_form}` must correspond to an unsigned integer "
-                f"under {self._bits} bits, got {val}")
+                f"under {self._bits} bits, got {val}"
+            )
 
     def normalize(self, val):
         self._check_val(val)
@@ -85,7 +87,6 @@ class UInt(Type):
 
 
 class Int(Type):
-
     def __init__(self, bits: int):
         if bits <= 0 or bits > 256 or bits % 8 != 0:
             raise ValueError(f"Incorrect `int` bit size: {bits}")
@@ -100,11 +101,13 @@ class Int(Type):
         # and prevent possible bugs.
         if not isinstance(val, int) or isinstance(val, bool):
             raise TypeError(
-                f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}")
+                f"`{self.canonical_form}` must correspond to an integer, got {type(val).__name__}"
+            )
         if (val + (1 << (self._bits - 1))) >> self._bits != 0:
             raise ValueError(
                 f"`{self.canonical_form}` must correspond to a signed integer "
-                f"under {self._bits} bits, got {val}")
+                f"under {self._bits} bits, got {val}"
+            )
 
     def normalize(self, val):
         self._check_val(val)
@@ -119,7 +122,6 @@ class Int(Type):
 
 
 class Bytes(Type):
-
     def __init__(self, size: Optional[int] = None):
         if size is not None and (size <= 0 or size > 32):
             raise ValueError(f"Incorrect `bytes` size: {size}")
@@ -133,7 +135,8 @@ class Bytes(Type):
         if not isinstance(val, bytes):
             raise TypeError(
                 f"`{self.canonical_form}` must correspond to a bytestring, "
-                f"got {type(val).__name__}")
+                f"got {type(val).__name__}"
+            )
         if self._size is not None and len(val) != self._size:
             raise ValueError(f"Expected {self._size} bytes, got {len(val)}")
 
@@ -150,7 +153,6 @@ class Bytes(Type):
 
 
 class AddressType(Type):
-
     @property
     def canonical_form(self):
         return "address"
@@ -159,7 +161,8 @@ class AddressType(Type):
         if not isinstance(val, Address):
             raise TypeError(
                 f"`address` must correspond to an `Address`-type value, "
-                f"got {type(val).__name__}")
+                f"got {type(val).__name__}"
+            )
         return bytes(val)
 
     def denormalize(self, val):
@@ -170,7 +173,6 @@ class AddressType(Type):
 
 
 class String(Type):
-
     @property
     def canonical_form(self):
         return "string"
@@ -178,7 +180,8 @@ class String(Type):
     def _check_val(self, val):
         if not isinstance(val, str):
             raise TypeError(
-                f"`string` must correspond to a `str`-type value, got {type(val).__name__}")
+                f"`string` must correspond to a `str`-type value, got {type(val).__name__}"
+            )
 
     def normalize(self, val):
         self._check_val(val)
@@ -193,7 +196,6 @@ class String(Type):
 
 
 class Bool(Type):
-
     @property
     def canonical_form(self):
         return "bool"
@@ -201,7 +203,8 @@ class Bool(Type):
     def _check_val(self, val):
         if not isinstance(val, bool):
             raise TypeError(
-                f"`bool` must correspond to a `bool`-type value, got {type(val).__name__}")
+                f"`bool` must correspond to a `bool`-type value, got {type(val).__name__}"
+            )
 
     def normalize(self, val):
         self._check_val(val)
@@ -216,7 +219,6 @@ class Bool(Type):
 
 
 class Array(Type):
-
     def __init__(self, element_type: Type, size: Optional[int] = None):
         self._element_type = element_type
         self._size = size
@@ -224,8 +226,8 @@ class Array(Type):
     @cached_property
     def canonical_form(self):
         return (
-            self._element_type.canonical_form +
-            "[" + (str(self._size) if self._size else "") + "]")
+            self._element_type.canonical_form + "[" + (str(self._size) if self._size else "") + "]"
+        )
 
     def _check_val(self, val):
         if not isinstance(val, Iterable):
@@ -242,13 +244,14 @@ class Array(Type):
         return [self._element_type.denormalize(item) for item in val]
 
     def __eq__(self, other):
-        return (isinstance(other, Array)
+        return (
+            isinstance(other, Array)
             and self._element_type == other._element_type
-            and self._size == other._size)
+            and self._size == other._size
+        )
 
 
 class Struct(Type):
-
     def __init__(self, fields: Mapping[str, Type]):
         self._fields = fields
 
@@ -266,7 +269,8 @@ class Struct(Type):
         if isinstance(val, Mapping):
             if val.keys() != self._fields.keys():
                 raise ValueError(
-                    f"Expected fields {list(self._fields.keys())}, got {list(val.keys())}")
+                    f"Expected fields {list(self._fields.keys())}, got {list(val.keys())}"
+                )
             return [tp.normalize(val[name]) for name, tp in self._fields.items()]
         else:
             self._check_val(val)
@@ -285,7 +289,8 @@ class Struct(Type):
             isinstance(other, Struct)
             and self._fields == other._fields
             # structs with the same fields but in different order are not equal
-            and list(self._fields) == list(other._fields))
+            and list(self._fields) == list(other._fields)
+        )
 
 
 _UINT_RE = re.compile(r"uint(\d+)")
@@ -293,10 +298,11 @@ _INT_RE = re.compile(r"int(\d+)")
 _BYTES_RE = re.compile(r"bytes(\d+)?")
 
 _NO_PARAMS = {
-    'address': AddressType(),
-    'string': String(),
-    'bool': Bool(),
+    "address": AddressType(),
+    "string": String(),
+    "bool": Bool(),
 }
+
 
 def type_from_abi_string(abi_string: str) -> Type:
     if match := _UINT_RE.match(abi_string):
@@ -313,7 +319,7 @@ def type_from_abi_string(abi_string: str) -> Type:
 
 
 def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
-    type_str = abi_entry['type']
+    type_str = abi_entry["type"]
     match = re.match(r"^([\w\d\[\]]*?)(\[(\d+)?\])?$", type_str)
     if not match:
         raise ValueError(f"Incorrect type format: {type_str}")
@@ -326,13 +332,13 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
 
     if is_array:
         element_entry = dict(abi_entry)
-        element_entry['type'] = element_type_name
+        element_entry["type"] = element_type_name
         element_type = dispatch_type(element_entry)
         return Array(element_type, array_size)
-    elif element_type_name == 'tuple':
+    elif element_type_name == "tuple":
         fields = {}
-        for component in abi_entry['components']:
-            fields[component['name']] = dispatch_type(component)
+        for component in abi_entry["components"]:
+            fields[component["name"]] = dispatch_type(component)
         return Struct(fields)
     else:
         return type_from_abi_string(element_type_name)
@@ -340,7 +346,7 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
 
 def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Dict[str, Type]:
     # Since we are returning a dictionary, need to be sure we don't silently merge entries
-    names = [entry['name'] for entry in abi_entry]
+    names = [entry["name"] for entry in abi_entry]
     if len(names) != len(set(names)):
         raise ValueError("All ABI entries must have distinct names")
-    return {entry['name']: dispatch_type(entry) for entry in abi_entry}
+    return {entry["name"]: dispatch_type(entry) for entry in abi_entry}

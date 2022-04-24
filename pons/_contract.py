@@ -9,12 +9,12 @@ class BoundConstructor:
     A constructor bound to a specific contract's bytecode.
     """
 
-    def __init__(self, compiled_contract: 'CompiledContract'):
+    def __init__(self, compiled_contract: "CompiledContract"):
         self._bytecode = compiled_contract.bytecode
         self._contract_abi = compiled_contract.abi
         self._constructor = compiled_contract.abi.constructor
 
-    def __call__(self, *args, **kwargs) -> 'BoundConstructorCall':
+    def __call__(self, *args, **kwargs) -> "BoundConstructorCall":
         """
         Returns a constructor call with encoded arguments and bytecode.
         """
@@ -52,7 +52,7 @@ class BoundReadMethod:
         self._contract_address = contract_address
         self._method = method
 
-    def __call__(self, *args, **kwargs) -> 'BoundReadCall':
+    def __call__(self, *args, **kwargs) -> "BoundReadCall":
         """
         Returns a contract call with encoded arguments bound to a specific address.
         """
@@ -92,7 +92,7 @@ class BoundWriteMethod:
         self.contract_address = contract_address
         self.method = method
 
-    def __call__(self, *args, **kwargs) -> 'BoundWriteCall':
+    def __call__(self, *args, **kwargs) -> "BoundWriteCall":
         """
         Returns a contract call with encoded arguments bound to a specific address.
         """
@@ -132,7 +132,7 @@ class CompiledContract:
     """Contract's bytecode."""
 
     @classmethod
-    def from_compiler_output(cls, json_abi: list, bytecode: bytes) -> 'CompiledContract':
+    def from_compiler_output(cls, json_abi: list, bytecode: bytes) -> "CompiledContract":
         """
         Creates a compiled contract object from the output of a Solidity compiler.
         """
@@ -173,6 +173,8 @@ class DeployedContract:
         self.address = address
 
         self.read = Methods(
-            {method.name: BoundReadMethod(self.address, method) for method in self.abi.read})
+            {method.name: BoundReadMethod(self.address, method) for method in self.abi.read}
+        )
         self.write = Methods(
-            {method.name: BoundWriteMethod(self.address, method) for method in self.abi.write})
+            {method.name: BoundWriteMethod(self.address, method) for method in self.abi.write}
+        )
