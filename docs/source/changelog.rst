@@ -5,6 +5,12 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
+Under construction.
+
+
+0.4.0 (23-04-2022)
+~~~~~~~~~~~~~~~~~~
+
 Changed
 ^^^^^^^
 
