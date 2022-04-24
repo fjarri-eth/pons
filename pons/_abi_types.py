@@ -48,6 +48,10 @@ class Type(ABC):
 
 
 class UInt(Type):
+    """
+    Corresponds to the Solidity ``uint<bits>`` type.
+    """
+
     def __init__(self, bits: int):
         if bits <= 0 or bits > 256 or bits % 8 != 0:
             raise ValueError(f"Incorrect `uint` bit size: {bits}")
@@ -87,6 +91,10 @@ class UInt(Type):
 
 
 class Int(Type):
+    """
+    Corresponds to the Solidity ``int<bits>`` type.
+    """
+
     def __init__(self, bits: int):
         if bits <= 0 or bits > 256 or bits % 8 != 0:
             raise ValueError(f"Incorrect `int` bit size: {bits}")
@@ -122,6 +130,10 @@ class Int(Type):
 
 
 class Bytes(Type):
+    """
+    Corresponds to the Solidity ``bytes<size>`` type.
+    """
+
     def __init__(self, size: Optional[int] = None):
         if size is not None and (size <= 0 or size > 32):
             raise ValueError(f"Incorrect `bytes` size: {size}")
@@ -153,6 +165,11 @@ class Bytes(Type):
 
 
 class AddressType(Type):
+    """
+    Corresponds to the Solidity ``address`` type.
+    Not to be confused with :py:class:`~pons.Address` which represents an address value.
+    """
+
     @property
     def canonical_form(self):
         return "address"
@@ -173,6 +190,10 @@ class AddressType(Type):
 
 
 class String(Type):
+    """
+    Corresponds to the Solidity ``string`` type.
+    """
+
     @property
     def canonical_form(self):
         return "string"
@@ -196,6 +217,10 @@ class String(Type):
 
 
 class Bool(Type):
+    """
+    Corresponds to the Solidity ``bool`` type.
+    """
+
     @property
     def canonical_form(self):
         return "bool"
@@ -219,6 +244,10 @@ class Bool(Type):
 
 
 class Array(Type):
+    """
+    Corresponds to the Solidity array (``[<size>]``) type.
+    """
+
     def __init__(self, element_type: Type, size: Optional[int] = None):
         self._element_type = element_type
         self._size = size
@@ -252,6 +281,10 @@ class Array(Type):
 
 
 class Struct(Type):
+    """
+    Corresponds to the Solidity struct type.
+    """
+
     def __init__(self, fields: Mapping[str, Type]):
         self._fields = fields
 

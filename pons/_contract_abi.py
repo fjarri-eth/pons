@@ -409,14 +409,23 @@ class WriteCall:
         self.data_bytes = data_bytes
 
 
+# This is force-documented as :py:class in ``api.rst``
+# because Sphinx cannot resolve typevars correctly.
+# See https://github.com/sphinx-doc/sphinx/issues/9705
 MethodType = TypeVar("MethodType")
 
 
 class Methods(Generic[MethodType]):
     """
+    Bases: ``Generic`` [``MethodType``]
+
     A holder for named methods which can be accessed as attributes,
     or iterated over.
     """
+
+    # :show-inheritance: is turned off in ``api.rst``, and we are documenting the base manually
+    # (although without hyperlinking which I cannot get to work).
+    # See https://github.com/sphinx-doc/sphinx/issues/9705
 
     def __init__(self, methods_dict: Mapping[str, MethodType]):
         self._methods_dict = methods_dict
@@ -438,7 +447,8 @@ class ContractABI:
     """
     A wrapper for contract ABI.
 
-    Contract methods accessible as attributes of this object, with the type :py:class:`Method`.
+    Contract methods accessible as attributes of this object,
+    with the type :py:class:`~pons._contract_abi.Method`.
     """
 
     constructor: Constructor

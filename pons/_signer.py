@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Mapping
 
-from eth_account.account import LocalAccount
+from eth_account.signers.base import BaseAccount
 
 from ._entities import Address
 
@@ -29,10 +29,10 @@ class Signer(ABC):
 
 class AccountSigner(Signer):
     """
-    A signer wrapper for ``eth_account.LocalAccount``.
+    A signer wrapper for ``eth_account.BaseAccount`` implementors.
     """
 
-    def __init__(self, account: LocalAccount):
+    def __init__(self, account: BaseAccount):
         self._account = account
 
     @cached_property

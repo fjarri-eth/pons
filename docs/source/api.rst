@@ -85,9 +85,12 @@ Utility classes
 ---------------
 
 .. autoclass:: pons._contract_abi.Methods()
-   :show-inheritance:
    :members:
    :special-members: __getattr__, __iter__
+
+.. class:: pons._contract_abi.MethodType
+
+   Generic method type parameter.
 
 .. autoclass:: pons._contract_abi.Signature
    :members:
@@ -153,10 +156,43 @@ Entities
 Solidity types
 --------------
 
-.. autoclass:: pons._abi_types.Type
-
 Type aliases are exported from the ``abi`` submodule.
 Arrays can be obtained from ``Type`` objects by indexing them (either with an integer for a fixed-size array, or with ``...`` for a variable-sized array).
 
-.. automodule:: pons.abi
-   :members:
+Helper aliases are exported from ``pons.abi`` submodule:
+
+.. autofunction:: pons.abi.uint
+
+.. autofunction:: pons.abi.int
+
+.. autofunction:: pons.abi.bytes
+
+.. autodata:: pons.abi.address
+   :no-value:
+
+.. autodata:: pons.abi.string
+   :no-value:
+
+.. autodata:: pons.abi.bool
+   :no-value:
+
+.. autofunction:: pons.abi.struct
+
+
+Actual type objects, for reference:
+
+.. autoclass:: pons._abi_types.Type
+
+.. autoclass:: pons._abi_types.UInt
+
+.. autoclass:: pons._abi_types.Int
+
+.. autoclass:: pons._abi_types.Bytes
+
+.. autoclass:: pons._abi_types.AddressType
+
+.. autoclass:: pons._abi_types.String
+
+.. autoclass:: pons._abi_types.Bool
+
+.. autoclass:: pons._abi_types.Struct
