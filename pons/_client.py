@@ -4,12 +4,33 @@ from typing import Union, Any, Optional, AsyncIterator
 
 import trio
 
-from ._contract import DeployedContract, BoundConstructorCall, BoundReadCall, BoundWriteCall
-from ._provider import Provider, ProviderSession, UnexpectedResponse, RPCError, RPCErrorCode
+from ._contract import (
+    DeployedContract,
+    BoundConstructorCall,
+    BoundReadCall,
+    BoundWriteCall,
+)
+from ._provider import (
+    Provider,
+    ProviderSession,
+    UnexpectedResponse,
+    RPCError,
+    RPCErrorCode,
+)
 from ._signer import Signer
 from ._entities import (
-    Address, Amount, Block, TxHash, TxReceipt,
-    encode_quantity, encode_data, encode_block, decode_quantity, decode_data, DecodingError)
+    Address,
+    Amount,
+    Block,
+    TxHash,
+    TxReceipt,
+    encode_quantity,
+    encode_data,
+    encode_block,
+    decode_quantity,
+    decode_data,
+    DecodingError,
+)
 
 
 class Client:
@@ -23,7 +44,7 @@ class Client:
         self._chain_id: Optional[int] = None
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator['ClientSession']:
+    async def session(self) -> AsyncIterator["ClientSession"]:
         """
         Opens a session to the client allowing the backend to optimize sequential requests.
         """
@@ -64,21 +85,23 @@ class ExecutionFailed(ProviderError):
     """
     Raised if the transaction failed during execution.
     """
+
     def __init__(self, message: str, data: Optional[bytes]):
         super().__init__(message, data)
         self.message = message
         self.data = data
 
     def __str__(self):
-        return (
-            f"Execution failed: {self.message}" +
-            (f" (data: {self.data.hex()})" if self.data else ""))
+        return f"Execution failed: {self.message}" + (
+            f" (data: {self.data.hex()})" if self.data else ""
+        )
 
 
 def rpc_call(method_name):
     """
     Catches various response formatting errors and returns them in a unified way.
     """
+
     def _wrapper(func):
         @wraps(func)
         async def _wrapped(*args, **kwargs):
@@ -93,6 +116,7 @@ def rpc_call(method_name):
                 else:
                     raise ProviderError(exc.server_code, exc.message, exc.data) from exc
             return result
+
         return _wrapped
 
     return _wrapper
@@ -114,7 +138,7 @@ class ClientSession:
         Calls the ``net_version`` RPC method.
         """
         if self._net_version is None:
-            result = await self._provider_session.rpc('net_version')
+            result = await self._provider_session.rpc("net_version")
             if not isinstance(result, str):
                 raise DecodingError("expected a string result")
             self._net_version = result
@@ -126,18 +150,20 @@ class ClientSession:
         Calls the ``eth_chainId`` RPC method.
         """
         if self._chain_id is None:
-            result = await self._provider_session.rpc('eth_chainId')
+            result = await self._provider_session.rpc("eth_chainId")
             self._chain_id = decode_quantity(result)
         return self._chain_id
 
     @rpc_call("eth_getBalance")
     async def eth_get_balance(
-            self, address: Address, block: Union[int, Block] = Block.LATEST) -> Amount:
+        self, address: Address, block: Union[int, Block] = Block.LATEST
+    ) -> Amount:
         """
         Calls the ``eth_getBalance`` RPC method.
         """
         result = await self._provider_session.rpc(
-            'eth_getBalance', address.encode(), encode_block(block))
+            "eth_getBalance", address.encode(), encode_block(block)
+        )
         return Amount.decode(result)
 
     @rpc_call("eth_getTransactionReceipt")
@@ -146,30 +172,34 @@ class ClientSession:
         Calls the ``eth_getTransactionReceipt`` RPC method.
         """
         result = await self._provider_session.rpc_dict(
-            'eth_getTransactionReceipt', tx_hash.encode())
+            "eth_getTransactionReceipt", tx_hash.encode()
+        )
         if not result:
             return None
 
-        contract_address = result['contractAddress']
+        contract_address = result["contractAddress"]
 
         return TxReceipt(
-            succeeded=(decode_quantity(result['status']) == 1),
+            succeeded=(decode_quantity(result["status"]) == 1),
             contract_address=Address.decode(contract_address) if contract_address else None,
-            gas_used=decode_quantity(result['gasUsed']),
-            )
+            gas_used=decode_quantity(result["gasUsed"]),
+        )
 
     @rpc_call("eth_getTransactionCount")
     async def eth_get_transaction_count(
-            self, address: Address, block: Union[int, Block] = Block.LATEST) -> int:
+        self, address: Address, block: Union[int, Block] = Block.LATEST
+    ) -> int:
         """
         Calls the ``eth_getTransactionCount`` RPC method.
         """
         result = await self._provider_session.rpc(
-            'eth_getTransactionCount', address.encode(), encode_block(block))
+            "eth_getTransactionCount", address.encode(), encode_block(block)
+        )
         return decode_quantity(result)
 
     async def wait_for_transaction_receipt(
-            self, tx_hash: TxHash, poll_latency: float = 1.) -> TxReceipt:
+        self, tx_hash: TxHash, poll_latency: float = 1.0
+    ) -> TxReceipt:
         """
         Queries the transaction receipt waiting for ``poll_latency`` between each attempt.
         """
@@ -186,12 +216,13 @@ class ClientSession:
         Returns the decoded output.
         """
         result = await self._provider_session.rpc(
-            'eth_call',
+            "eth_call",
             {
-                'to': call.contract_address.encode(),
-                'data': encode_data(call.data_bytes)
+                "to": call.contract_address.encode(),
+                "data": encode_data(call.data_bytes),
             },
-            encode_block(block))
+            encode_block(block),
+        )
 
         encoded_output = decode_data(result)
         return call.decode_output(encoded_output)
@@ -201,7 +232,7 @@ class ClientSession:
         """
         Sends a signed and serialized transaction.
         """
-        result = await self._provider_session.rpc('eth_sendRawTransaction', encode_data(tx_bytes))
+        result = await self._provider_session.rpc("eth_sendRawTransaction", encode_data(tx_bytes))
         return TxHash.decode(result)
 
     @rpc_call("eth_estimateGas")
@@ -210,18 +241,16 @@ class ClientSession:
         Estimates the amount of gas required to deploy the contract with the given args.
         """
         tx = {
-            'data': encode_data(call.data_bytes),
-            'value': amount.encode(),
+            "data": encode_data(call.data_bytes),
+            "value": amount.encode(),
         }
-        result = await self._provider_session.rpc(
-            'eth_estimateGas',
-            tx,
-            encode_block(Block.LATEST))
+        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
         return decode_quantity(result)
 
     @rpc_call("eth_estimateGas")
     async def estimate_transfer(
-            self, source_address: Address, destination_address: Address, amount: Amount) -> int:
+        self, source_address: Address, destination_address: Address, amount: Amount
+    ) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
         Raises an exception if there is not enough funds in ``source_address``.
@@ -229,14 +258,11 @@ class ClientSession:
         # source_address and amount are optional,
         # but if they are specified, we will fail here instead of later.
         tx = {
-            'from': source_address.encode(),
-            'to': destination_address.encode(),
-            'value': amount.encode(),
+            "from": source_address.encode(),
+            "to": destination_address.encode(),
+            "value": amount.encode(),
         }
-        result = await self._provider_session.rpc(
-            'eth_estimateGas',
-            tx,
-            encode_block(Block.LATEST))
+        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
         return decode_quantity(result)
 
     @rpc_call("eth_estimateGas")
@@ -245,14 +271,11 @@ class ClientSession:
         Estimates the amount of gas required to transact with a contract.
         """
         tx = {
-            'to': call.contract_address.encode(),
-            'data': encode_data(call.data_bytes),
-            'value': amount.encode(),
+            "to": call.contract_address.encode(),
+            "data": encode_data(call.data_bytes),
+            "value": amount.encode(),
         }
-        result = await self._provider_session.rpc(
-            'eth_estimateGas',
-            tx,
-            encode_block(Block.LATEST))
+        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
         return decode_quantity(result)
 
     @rpc_call("eth_gasPrice")
@@ -260,11 +283,12 @@ class ClientSession:
         """
         Calls the ``eth_gasPrice`` RPC method.
         """
-        result = await self._provider_session.rpc('eth_gasPrice')
+        result = await self._provider_session.rpc("eth_gasPrice")
         return Amount.decode(result)
 
     async def broadcast_transfer(
-            self, signer: Signer, destination_address: Address, amount: Amount) -> TxHash:
+        self, signer: Signer, destination_address: Address, amount: Amount
+    ) -> TxHash:
         """
         Broadcasts the fund transfer transaction, but does not wait for it to be processed.
         """
@@ -275,14 +299,14 @@ class ClientSession:
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
         tx = {
-            'type': 2, # EIP-2930 transaction
-            'chainId': encode_quantity(chain_id),
-            'to': destination_address.encode(),
-            'value': amount.encode(),
-            'gas': encode_quantity(gas),
-            'maxFeePerGas': max_gas_price.encode(),
-            'maxPriorityFeePerGas': max_tip.encode(),
-            'nonce': encode_quantity(nonce),
+            "type": 2,  # EIP-2930 transaction
+            "chainId": encode_quantity(chain_id),
+            "to": destination_address.encode(),
+            "value": amount.encode(),
+            "gas": encode_quantity(gas),
+            "maxFeePerGas": max_gas_price.encode(),
+            "maxPriorityFeePerGas": max_tip.encode(),
+            "nonce": encode_quantity(nonce),
         }
         signed_tx = signer.sign_transaction(tx)
         return await self._eth_send_raw_transaction(signed_tx)
@@ -298,8 +322,8 @@ class ClientSession:
             raise TransactionFailed(f"Transfer failed (receipt: {receipt})")
 
     async def deploy(
-            self, signer: Signer, call: BoundConstructorCall, amount: Amount = Amount(0)
-            ) -> DeployedContract:
+        self, signer: Signer, call: BoundConstructorCall, amount: Amount = Amount(0)
+    ) -> DeployedContract:
         """
         Deploys the contract passing ``args`` to the constructor.
         Waits for the transaction to be confirmed.
@@ -314,14 +338,14 @@ class ClientSession:
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
         tx = {
-            'type': 2, # EIP-2930 transaction
-            'chainId': encode_quantity(chain_id),
-            'value': amount.encode(),
-            'gas': encode_quantity(gas),
-            'maxFeePerGas': max_gas_price.encode(),
-            'maxPriorityFeePerGas': max_tip.encode(),
-            'nonce': encode_quantity(nonce),
-            'data': encode_data(call.data_bytes)
+            "type": 2,  # EIP-2930 transaction
+            "chainId": encode_quantity(chain_id),
+            "value": amount.encode(),
+            "gas": encode_quantity(gas),
+            "maxFeePerGas": max_gas_price.encode(),
+            "maxPriorityFeePerGas": max_tip.encode(),
+            "nonce": encode_quantity(nonce),
+            "data": encode_data(call.data_bytes),
         }
         signed_tx = signer.sign_transaction(tx)
         tx_hash = await self._eth_send_raw_transaction(signed_tx)
@@ -333,7 +357,8 @@ class ClientSession:
         if receipt.contract_address is None:
             raise BadResponseFormat(
                 f"The deploy transaction succeeded, but `contractAddress` is not present "
-                f"in the receipt ({receipt})")
+                f"in the receipt ({receipt})"
+            )
 
         return DeployedContract(call.contract_abi, receipt.contract_address)
 
@@ -352,15 +377,15 @@ class ClientSession:
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
         tx = {
-            'type': 2, # EIP-2930 transaction
-            'chainId': encode_quantity(chain_id),
-            'to': call.contract_address.encode(),
-            'value': amount.encode(),
-            'gas': encode_quantity(gas),
-            'maxFeePerGas': max_gas_price.encode(),
-            'maxPriorityFeePerGas': max_tip.encode(),
-            'nonce': encode_quantity(nonce),
-            'data': encode_data(call.data_bytes)
+            "type": 2,  # EIP-2930 transaction
+            "chainId": encode_quantity(chain_id),
+            "to": call.contract_address.encode(),
+            "value": amount.encode(),
+            "gas": encode_quantity(gas),
+            "maxFeePerGas": max_gas_price.encode(),
+            "maxPriorityFeePerGas": max_tip.encode(),
+            "nonce": encode_quantity(nonce),
+            "data": encode_data(call.data_bytes),
         }
         signed_tx = signer.sign_transaction(tx)
         tx_hash = await self._eth_send_raw_transaction(signed_tx)

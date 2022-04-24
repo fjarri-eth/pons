@@ -6,7 +6,7 @@ from pons._client import ProviderError, BadResponseFormat
 from pons._provider import RPCError
 
 from .provider_server import ServerHandle
-from . import provider_server # For monkeypatching purposes
+from . import provider_server  # For monkeypatching purposes
 
 
 @pytest.fixture
@@ -37,14 +37,23 @@ async def test_dict_request_introspection(session, root_signer, another_signer):
     # It is invoked when the error response is checked for the "data" field,
     # so we trigger an intentionally bad transaction.
     # A little roundabout, is there a better way?
-    with pytest.raises(ProviderError, match="Sender does not have enough balance to cover transaction value and gas"):
-        await session.estimate_transfer(root_signer.address, another_signer.address, Amount.ether(1000))
+    with pytest.raises(
+        ProviderError,
+        match="Sender does not have enough balance to cover transaction value and gas",
+    ):
+        await session.estimate_transfer(
+            root_signer.address, another_signer.address, Amount.ether(1000)
+        )
 
 
-async def test_unexpected_response_type(test_provider, session, monkeypatch, root_signer, another_signer):
+async def test_unexpected_response_type(
+    test_provider, session, monkeypatch, root_signer, another_signer
+):
     monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda tx_hash: "something")
 
-    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
+    tx_hash = await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
 
     with pytest.raises(BadResponseFormat, match="Expected a dictionary as a response, got str"):
         receipt = await session.eth_get_transaction_receipt(tx_hash)
@@ -53,31 +62,41 @@ async def test_unexpected_response_type(test_provider, session, monkeypatch, roo
 async def test_missing_field(test_provider, session, monkeypatch, root_signer, another_signer):
 
     orig_eth_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+
     def faulty_eth_get_transaction_receipt(tx_hash):
         receipt = orig_eth_get_transaction_receipt(tx_hash)
         del receipt["status"]
         return receipt
 
-    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", faulty_eth_get_transaction_receipt)
+    monkeypatch.setattr(
+        test_provider, "eth_get_transaction_receipt", faulty_eth_get_transaction_receipt
+    )
 
-    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
+    tx_hash = await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
 
-    with pytest.raises(BadResponseFormat, match="Expected field `status` is missing from the result"):
+    with pytest.raises(
+        BadResponseFormat, match="Expected field `status` is missing from the result"
+    ):
         receipt = await session.eth_get_transaction_receipt(tx_hash)
 
 
-async def test_none_instead_of_dict(test_provider, session, monkeypatch, root_signer, another_signer):
+async def test_none_instead_of_dict(
+    test_provider, session, monkeypatch, root_signer, another_signer
+):
     # Check that a None can be returned in a call that expects a `dict`
     # (the interpretation of such an event is up to the client).
     # `eth_getTransactionReceipt` can return a None normally (if there's no receipt yet),
     # but we force it here, just in case.
     monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda tx_hash: None)
-    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
+    tx_hash = await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
     assert await session.eth_get_transaction_receipt(tx_hash) is None
 
 
 async def test_unknown_rpc_status_code(test_provider, session, monkeypatch):
-
     def faulty_net_version():
         # This is a known exception type, and it will be transferred through the network
         # keeping the status code.
@@ -90,7 +109,6 @@ async def test_unknown_rpc_status_code(test_provider, session, monkeypatch):
 
 
 async def test_non_ok_http_status(test_provider, session, monkeypatch):
-
     def faulty_net_version():
         # A generic exception will generate a 500 status code
         raise Exception("Something unexpected happened")
@@ -107,6 +125,7 @@ async def test_neither_result_nor_error_field(test_provider, session, monkeypatc
     # Unfortunately we can't achieve that by just patching the provider, have to patch the server
 
     orig_process_request = provider_server.process_request
+
     async def faulty_process_request(*args, **kwargs):
         result = await orig_process_request(*args, **kwargs)
         del result["result"]
@@ -122,6 +141,8 @@ async def test_unreachable_provider():
     bad_provider = HTTPProvider("https://127.0.0.1:8889")
     client = Client(bad_provider)
     async with client.session() as session:
-        with trio.fail_after(1): # Shouldn't be necessary, but just so that the test doesn't hang
-            with pytest.raises(Unreachable, match=r"all attempts to connect to 127\.0\.0\.1:8889 failed"):
+        with trio.fail_after(1):  # Shouldn't be necessary, but just so that the test doesn't hang
+            with pytest.raises(
+                Unreachable, match=r"all attempts to connect to 127\.0\.0\.1:8889 failed"
+            ):
                 await session.net_version()

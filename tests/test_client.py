@@ -42,7 +42,7 @@ async def session(provider):
 
 @pytest.fixture
 def compiled_contracts():
-    path = Path(__file__).resolve().parent / 'TestClient.sol'
+    path = Path(__file__).resolve().parent / "TestClient.sol"
     yield compile_file(path)
 
 
@@ -60,6 +60,7 @@ def fail_transaction_receipts():
     # in a transaction receipt could happen
     # (transaction was accepted for mining, but failed in the process).
     orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+
     def mock_get_transaction_receipt(tx_hash_hex):
         receipt = orig_get_transaction_receipt(tx_hash_hex)
         receipt["status"] = "0x0"
@@ -111,7 +112,9 @@ async def test_eth_get_balance(test_provider, session, root_signer, another_sign
 async def test_eth_get_transaction_receipt(test_provider, session, root_signer, another_signer):
 
     test_provider.disable_auto_mine_transactions()
-    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
+    tx_hash = await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
     receipt = await session.eth_get_transaction_receipt(tx_hash)
     assert receipt is None
 
@@ -130,7 +133,9 @@ async def test_eth_get_transaction_count(test_provider, session, root_signer, an
     assert await session.eth_get_transaction_count(root_signer.address) == 1
 
 
-async def test_wait_for_transaction_receipt(test_provider, session, root_signer, another_signer, autojump_clock):
+async def test_wait_for_transaction_receipt(
+    test_provider, session, root_signer, another_signer, autojump_clock
+):
 
     to_transfer = Amount.ether(10)
     test_provider.disable_auto_mine_transactions()
@@ -181,11 +186,18 @@ async def test_estimate_deploy(test_provider, session, compiled_contracts, root_
 
 
 async def test_estimate_transfer(test_provider, session, root_signer, another_signer):
-    gas = await session.estimate_transfer(root_signer.address, another_signer.address, Amount.ether(10))
+    gas = await session.estimate_transfer(
+        root_signer.address, another_signer.address, Amount.ether(10)
+    )
     assert isinstance(gas, int) and gas > 0
 
-    with pytest.raises(ProviderError, match="Sender does not have enough balance to cover transaction value and gas"):
-        await session.estimate_transfer(root_signer.address, another_signer.address, Amount.ether(1000))
+    with pytest.raises(
+        ProviderError,
+        match="Sender does not have enough balance to cover transaction value and gas",
+    ):
+        await session.estimate_transfer(
+            root_signer.address, another_signer.address, Amount.ether(1000)
+        )
 
 
 async def test_estimate_transact(test_provider, session, compiled_contracts, root_signer):
@@ -221,6 +233,7 @@ async def test_transfer_failed(test_provider, session, root_signer, another_sign
     # (tranfer was accepted for mining, but failed in the process,
     # and the resulting receipt has a 0 status).
     orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+
     def mock_get_transaction_receipt(tx_hash_hex):
         receipt = orig_get_transaction_receipt(tx_hash_hex)
         receipt["status"] = "0x0"
@@ -248,7 +261,9 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
     await session.deploy(root_signer, basic_contract.constructor(1), Amount.ether(0))
 
     # Payable constructor
-    contract = await session.deploy(root_signer, payable_constructor.constructor(1), Amount.ether(1))
+    contract = await session.deploy(
+        root_signer, payable_constructor.constructor(1), Amount.ether(1)
+    )
     balance = await session.eth_get_balance(contract.address)
     assert balance == Amount.ether(1)
 
@@ -259,13 +274,17 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
 
     # Test the provider returning an empty `contractAddress`
     orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+
     def mock_get_transaction_receipt(tx_hash_hex):
         receipt = orig_get_transaction_receipt(tx_hash_hex)
         receipt["contractAddress"] = None
         return receipt
 
     with monkeypatched(test_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
-        with pytest.raises(BadResponseFormat, match="The deploy transaction succeeded, but `contractAddress` is not present in the receipt"):
+        with pytest.raises(
+            BadResponseFormat,
+            match="The deploy transaction succeeded, but `contractAddress` is not present in the receipt",
+        ):
             await session.deploy(root_signer, basic_contract.constructor(0))
 
 
@@ -285,7 +304,9 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
     await session.transact(root_signer, deployed_contract.write.setState(456), Amount.ether(0))
 
     # Payable transact
-    await session.transact(root_signer, deployed_contract.write.payableSetState(456), Amount.ether(1))
+    await session.transact(
+        root_signer, deployed_contract.write.payableSetState(456), Amount.ether(1)
+    )
     balance = await session.eth_get_balance(deployed_contract.address)
     assert balance == Amount.ether(1)
 

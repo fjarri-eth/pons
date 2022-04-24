@@ -3,7 +3,16 @@ from pathlib import Path
 import pytest
 
 from pons import abi
-from pons import Client, AccountSigner, Address, Constructor, ReadMethod, WriteMethod, Fallback, Receive
+from pons import (
+    Client,
+    AccountSigner,
+    Address,
+    Constructor,
+    ReadMethod,
+    WriteMethod,
+    Fallback,
+    Receive,
+)
 from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod, BoundConstructor
 
 from .compile import compile_file
@@ -11,7 +20,7 @@ from .compile import compile_file
 
 @pytest.fixture
 def compiled_contracts():
-    path = Path(__file__).resolve().parent / 'TestContract.sol'
+    path = Path(__file__).resolve().parent / "TestContract.sol"
     yield compile_file(path)
 
 
@@ -42,8 +51,14 @@ def test_abi_declaration(compiled_contracts):
     assert str(cabi.read.getState.outputs) == "(uint256)"
 
     assert isinstance(cabi.read.testStructs, ReadMethod)
-    assert str(cabi.read.testStructs.inputs) == "((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in)"
-    assert str(cabi.read.testStructs.outputs) == "((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)"
+    assert (
+        str(cabi.read.testStructs.inputs)
+        == "((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in)"
+    )
+    assert (
+        str(cabi.read.testStructs.outputs)
+        == "((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)"
+    )
 
     assert isinstance(cabi.write.setState, WriteMethod)
     assert str(cabi.write.setState.inputs) == "(uint256 _v1)"
@@ -71,20 +86,19 @@ def test_api_binding(compiled_contracts):
     assert ctr_call.payable
     assert ctr_call.contract_abi == compiled_contract.abi
     assert ctr_call.data_bytes == (
-        compiled_contract.bytecode
-        + b"\x00" * 31 + b"\x01"
-        + b"\x00" * 31 + b"\x02")
+        compiled_contract.bytecode + b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x02"
+    )
 
     read_call = deployed_contract.read.getState(3)
     assert read_call.contract_address == address
     assert read_call.data_bytes == (
-        compiled_contract.abi.read.getState.selector
-        + b"\x00" * 31 + b"\x03")
+        compiled_contract.abi.read.getState.selector + b"\x00" * 31 + b"\x03"
+    )
     assert read_call.decode_output(b"\x00" * 31 + b"\x04") == [4]
 
     write_call = deployed_contract.write.setState(5)
     assert write_call.contract_address == address
     assert write_call.payable
     assert write_call.data_bytes == (
-        compiled_contract.abi.write.setState.selector
-        + b"\x00" * 31 + b"\x05")
+        compiled_contract.abi.write.setState.selector + b"\x00" * 31 + b"\x05"
+    )

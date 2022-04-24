@@ -2,7 +2,18 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 import inspect
 from typing import (
-    Any, Iterable, List, Dict, Optional, Union, Mapping, TypeVar, Generic, Iterator, Sequence)
+    Any,
+    Iterable,
+    List,
+    Dict,
+    Optional,
+    Union,
+    Mapping,
+    TypeVar,
+    Generic,
+    Iterator,
+    Sequence,
+)
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
@@ -17,15 +28,21 @@ class Signature:
 
     def __init__(self, parameters: Union[Mapping[str, Type], Sequence[Type]]):
         if isinstance(parameters, Mapping):
-            self._signature = inspect.Signature(parameters=[
-                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                for name, tp in parameters.items()])
+            self._signature = inspect.Signature(
+                parameters=[
+                    inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                    for name, tp in parameters.items()
+                ]
+            )
             self._types = list(parameters.values())
             self._named_parameters = True
         else:
-            self._signature = inspect.Signature(parameters=[
-                inspect.Parameter(f"_{i}", inspect.Parameter.POSITIONAL_ONLY)
-                for i in range(len(parameters))])
+            self._signature = inspect.Signature(
+                parameters=[
+                    inspect.Parameter(f"_{i}", inspect.Parameter.POSITIONAL_ONLY)
+                    for i in range(len(parameters))
+                ]
+            )
             self._types = list(parameters)
             self._named_parameters = False
 
@@ -73,7 +90,8 @@ class Signature:
         if self._named_parameters:
             params = ", ".join(
                 f"{tp.canonical_form} {name}"
-                for name, tp in zip(self._signature.parameters, self._types))
+                for name, tp in zip(self._signature.parameters, self._types)
+            )
         else:
             params = ", ".join(f"{tp.canonical_form}" for tp in self._types)
         return f"({params})"
@@ -124,29 +142,31 @@ class Constructor:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> 'Constructor':
+    def from_json(cls, method_entry: Dict[str, Any]) -> "Constructor":
         """
         Creates this object from a JSON ABI method entry.
         """
-        if method_entry['type'] != 'constructor':
+        if method_entry["type"] != "constructor":
             raise ValueError(
-                "Constructor object must be created from a JSON entry with type='constructor'")
-        if 'name' in method_entry:
+                "Constructor object must be created from a JSON entry with type='constructor'"
+            )
+        if "name" in method_entry:
             raise ValueError("Constructor's JSON entry cannot have a `name`")
-        if 'outputs' in method_entry and method_entry['outputs']:
+        if "outputs" in method_entry and method_entry["outputs"]:
             raise ValueError("Constructor's JSON entry cannot have non-empty `outputs`")
-        if method_entry['stateMutability'] not in ("nonpayable", "payable"):
+        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
-                "Constructor's JSON entry state mutability must be `nonpayable` or `payable`")
-        inputs = dispatch_types(method_entry.get('inputs', []))
-        payable = method_entry['stateMutability'] == "payable"
+                "Constructor's JSON entry state mutability must be `nonpayable` or `payable`"
+            )
+        inputs = dispatch_types(method_entry.get("inputs", []))
+        payable = method_entry["stateMutability"] == "payable"
         return cls(inputs, payable=payable)
 
     def __init__(self, inputs: Union[Mapping[str, Type], Sequence[Type]], payable: bool = False):
         self.inputs = Signature(inputs)
         self.payable = payable
 
-    def __call__(self, *args, **kwargs) -> 'ConstructorCall':
+    def __call__(self, *args, **kwargs) -> "ConstructorCall":
         """
         Returns an encoded call with given arguments.
         """
@@ -163,34 +183,37 @@ class ReadMethod(Method):
     """
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> 'ReadMethod':
+    def from_json(cls, method_entry: Dict[str, Any]) -> "ReadMethod":
         """
         Creates this object from a JSON ABI method entry.
         """
-        if method_entry['type'] != 'function':
+        if method_entry["type"] != "function":
             raise ValueError(
-                "ReadMethod object must be created from a JSON entry with type='function'")
+                "ReadMethod object must be created from a JSON entry with type='function'"
+            )
 
-        name = method_entry['name']
-        inputs = dispatch_types(method_entry['inputs'])
-        if method_entry['stateMutability'] not in ("pure", "view"):
+        name = method_entry["name"]
+        inputs = dispatch_types(method_entry["inputs"])
+        if method_entry["stateMutability"] not in ("pure", "view"):
             raise ValueError(
-                "Non-mutating method's JSON entry state mutability must be `pure` or `view`")
+                "Non-mutating method's JSON entry state mutability must be `pure` or `view`"
+            )
 
         # Outputs can be anonymous
         outputs: Union[Dict[str, Type], List[Type]]
-        if all(entry['name'] == "" for entry in method_entry['outputs']):
-            outputs = [dispatch_type(entry) for entry in method_entry['outputs']]
+        if all(entry["name"] == "" for entry in method_entry["outputs"]):
+            outputs = [dispatch_type(entry) for entry in method_entry["outputs"]]
         else:
-            outputs = dispatch_types(method_entry['outputs'])
+            outputs = dispatch_types(method_entry["outputs"])
 
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     def __init__(
-            self,
-            name: str,
-            inputs: Union[Mapping[str, Type], Sequence[Type]],
-            outputs: Union[Mapping[str, Type], Sequence[Type], Type]):
+        self,
+        name: str,
+        inputs: Union[Mapping[str, Type], Sequence[Type]],
+        outputs: Union[Mapping[str, Type], Sequence[Type], Type],
+    ):
 
         self._name = name
         self._inputs = Signature(inputs)
@@ -211,7 +234,7 @@ class ReadMethod(Method):
     def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args, **kwargs) -> 'ReadCall':
+    def __call__(self, *args, **kwargs) -> "ReadCall":
         """
         Returns an encoded call with given arguments.
         """
@@ -239,29 +262,32 @@ class WriteMethod(Method):
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> 'WriteMethod':
+    def from_json(cls, method_entry: Dict[str, Any]) -> "WriteMethod":
         """
         Creates this object from a JSON ABI method entry.
         """
-        if method_entry['type'] != 'function':
+        if method_entry["type"] != "function":
             raise ValueError(
-                "WriteMethod object must be created from a JSON entry with type='function'")
+                "WriteMethod object must be created from a JSON entry with type='function'"
+            )
 
-        name = method_entry['name']
-        inputs = dispatch_types(method_entry['inputs'])
-        if 'outputs' in method_entry and method_entry['outputs']:
+        name = method_entry["name"]
+        inputs = dispatch_types(method_entry["inputs"])
+        if "outputs" in method_entry and method_entry["outputs"]:
             raise ValueError("Mutating method's JSON entry cannot have non-empty `outputs`")
-        if method_entry['stateMutability'] not in ("nonpayable", "payable"):
+        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
-                "Mutating method's JSON entry state mutability must be `nonpayable` or `payable`")
-        payable = method_entry['stateMutability'] == "payable"
+                "Mutating method's JSON entry state mutability must be `nonpayable` or `payable`"
+            )
+        payable = method_entry["stateMutability"] == "payable"
         return cls(name=name, inputs=inputs, payable=payable)
 
     def __init__(
-            self,
-            name: str,
-            inputs: Union[Mapping[str, Type], Sequence[Type]],
-            payable: bool = False):
+        self,
+        name: str,
+        inputs: Union[Mapping[str, Type], Sequence[Type]],
+        payable: bool = False,
+    ):
 
         self._name = name
         self._inputs = Signature(inputs)
@@ -275,7 +301,7 @@ class WriteMethod(Method):
     def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args, **kwargs) -> 'WriteCall':
+    def __call__(self, *args, **kwargs) -> "WriteCall":
         """
         Returns an encoded call with given arguments.
         """
@@ -294,17 +320,19 @@ class Fallback:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> 'Fallback':
+    def from_json(cls, method_entry: Dict[str, Any]) -> "Fallback":
         """
         Creates this object from a JSON ABI method entry.
         """
-        if method_entry['type'] != 'fallback':
+        if method_entry["type"] != "fallback":
             raise ValueError(
-                "Fallback object must be created from a JSON entry with type='fallback'")
-        if method_entry['stateMutability'] not in ("nonpayable", "payable"):
+                "Fallback object must be created from a JSON entry with type='fallback'"
+            )
+        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
-                "Fallback method's JSON entry state mutability must be `nonpayable` or `payable`")
-        payable = method_entry['stateMutability'] == "payable"
+                "Fallback method's JSON entry state mutability must be `nonpayable` or `payable`"
+            )
+        payable = method_entry["stateMutability"] == "payable"
         return cls(payable)
 
     def __init__(self, payable: bool = False):
@@ -323,17 +351,19 @@ class Receive:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> 'Receive':
+    def from_json(cls, method_entry: Dict[str, Any]) -> "Receive":
         """
         Creates this object from a JSON ABI method entry.
         """
-        if method_entry['type'] != 'receive':
+        if method_entry["type"] != "receive":
             raise ValueError(
-                "Receive object must be created from a JSON entry with type='fallback'")
-        if method_entry['stateMutability'] not in ("nonpayable", "payable"):
+                "Receive object must be created from a JSON entry with type='fallback'"
+            )
+        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
-                "Receive method's JSON entry state mutability must be `nonpayable` or `payable`")
-        payable = method_entry['stateMutability'] == "payable"
+                "Receive method's JSON entry state mutability must be `nonpayable` or `payable`"
+            )
+        payable = method_entry["stateMutability"] == "payable"
         return cls(payable)
 
     def __init__(self, payable: bool = False):
@@ -379,7 +409,7 @@ class WriteCall:
         self.data_bytes = data_bytes
 
 
-MethodType = TypeVar('MethodType')
+MethodType = TypeVar("MethodType")
 
 
 class Methods(Generic[MethodType]):
@@ -427,7 +457,7 @@ class ContractABI:
     """Contract's mutating methods."""
 
     @classmethod
-    def from_json(cls, json_abi: list) -> 'ContractABI':
+    def from_json(cls, json_abi: list) -> "ContractABI":
         constructor = None
         fallback = None
         receive = None
@@ -437,30 +467,31 @@ class ContractABI:
 
         for entry in json_abi:
 
-            if entry['type'] == 'constructor':
+            if entry["type"] == "constructor":
                 if constructor:
                     raise ValueError("JSON ABI contains more than one constructor declarations")
                 constructor = Constructor.from_json(entry)
 
-            elif entry['type'] == 'function':
-                if entry['name'] in methods:
+            elif entry["type"] == "function":
+                if entry["name"] in methods:
                     # TODO: add support for overloaded methods
                     raise ValueError(
-                        f"JSON ABI contains more than one declarations of `{entry['name']}`")
+                        f"JSON ABI contains more than one declarations of `{entry['name']}`"
+                    )
 
-                methods.add(entry['name'])
+                methods.add(entry["name"])
 
-                if entry['stateMutability'] in ("pure", "view"):
+                if entry["stateMutability"] in ("pure", "view"):
                     read.append(ReadMethod.from_json(entry))
                 else:
                     write.append(WriteMethod.from_json(entry))
 
-            elif entry['type'] == 'fallback':
+            elif entry["type"] == "fallback":
                 if fallback:
                     raise ValueError("JSON ABI contains more than one fallback declarations")
                 fallback = Fallback.from_json(entry)
 
-            elif entry['type'] == 'receive':
+            elif entry["type"] == "receive":
                 if receive:
                     raise ValueError("JSON ABI contains more than one receive method declarations")
                 receive = Receive.from_json(entry)
@@ -469,17 +500,21 @@ class ContractABI:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
         return cls(
-            constructor=constructor, fallback=fallback, receive=receive,
-            read=read, write=write)
+            constructor=constructor,
+            fallback=fallback,
+            receive=receive,
+            read=read,
+            write=write,
+        )
 
     def __init__(
-            self,
-            constructor: Optional[Constructor] = None,
-            fallback: Optional[Fallback] = None,
-            receive: Optional[Receive] = None,
-            read: Optional[Iterable[ReadMethod]] = None,
-            write: Optional[Iterable[WriteMethod]] = None
-            ):
+        self,
+        constructor: Optional[Constructor] = None,
+        fallback: Optional[Fallback] = None,
+        receive: Optional[Receive] = None,
+        read: Optional[Iterable[ReadMethod]] = None,
+        write: Optional[Iterable[WriteMethod]] = None,
+    ):
 
         if constructor is None:
             constructor = Constructor(inputs=[])
@@ -492,10 +527,11 @@ class ContractABI:
 
     def __str__(self):
         all_methods = (
-            ([self.constructor] if self.constructor else []) +
-            ([self.fallback] if self.fallback else []) +
-            ([self.receive] if self.receive else []) +
-            list(self.read) +
-            list(self.write))
+            ([self.constructor] if self.constructor else [])
+            + ([self.fallback] if self.fallback else [])
+            + ([self.receive] if self.receive else [])
+            + list(self.read)
+            + list(self.write)
+        )
         method_list = ["    " + str(method) for method in all_methods]
         return "{\n" + "\n".join(method_list) + "\n}"

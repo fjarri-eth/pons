@@ -41,7 +41,12 @@ docs = [
 lint = [
     "mypy>=0.941",
     "trio-typing[mypy]>=0.7.0",
+    "black",
 ]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
 
 [tool]
 [tool.pdm]

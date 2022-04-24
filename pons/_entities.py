@@ -21,21 +21,21 @@ class Amount:
     """
 
     @classmethod
-    def wei(cls, value: int) -> 'Amount':
+    def wei(cls, value: int) -> "Amount":
         """
         Creates a sum from the amount in wei (``10^(-18)`` of the main unit).
         """
         return cls(value)
 
     @classmethod
-    def gwei(cls, value: Union[int, float]) -> 'Amount':
+    def gwei(cls, value: Union[int, float]) -> "Amount":
         """
         Creates a sum from the amount in gwei (``10^(-9)`` of the main unit).
         """
         return cls(int(10**9 * value))
 
     @classmethod
-    def ether(cls, value: Union[int, float]) -> 'Amount':
+    def ether(cls, value: Union[int, float]) -> "Amount":
         """
         Creates a sum from the amount in the main currency unit.
         """
@@ -70,7 +70,7 @@ class Amount:
         return encode_quantity(self.as_wei())
 
     @classmethod
-    def decode(cls, val: str) -> 'Amount':
+    def decode(cls, val: str) -> "Amount":
         # `decode_data` will raise DecodingError on any error,
         # and if it succeeds, constructor won't raise anything -
         # the value is already guaranteed to be `int` and non-negative
@@ -131,7 +131,7 @@ class Address:
     """
 
     @classmethod
-    def from_hex(cls, address_str: str) -> 'Address':
+    def from_hex(cls, address_str: str) -> "Address":
         """
         Creates the address from a hex representation
         (with or without the ``0x`` prefix, checksummed or not).
@@ -159,7 +159,7 @@ class Address:
         return self.checksum
 
     @classmethod
-    def decode(cls, val: str) -> 'Address':
+    def decode(cls, val: str) -> "Address":
         try:
             return cls(decode_data(val))
         except ValueError as exc:
@@ -185,13 +185,13 @@ class Block(Enum):
     Block aliases supported by Ethereum RPC.
     """
 
-    LATEST = 'latest'
+    LATEST = "latest"
     """The latest confirmed block"""
 
-    EARLIEST = 'earliest'
+    EARLIEST = "earliest"
     """The earliest block"""
 
-    PENDING = 'pending'
+    PENDING = "pending"
     """Currently pending block"""
 
 
@@ -211,7 +211,7 @@ class TxHash:
         return encode_data(bytes(self))
 
     @classmethod
-    def decode(cls, val: str) -> 'TxHash':
+    def decode(cls, val: str) -> "TxHash":
         try:
             return TxHash(decode_data(val))
         except ValueError as exc:
@@ -250,7 +250,7 @@ def encode_quantity(val: int) -> str:
 
 
 def encode_data(val: bytes) -> str:
-    return '0x' + val.hex()
+    return "0x" + val.hex()
 
 
 def encode_block(val: Union[int, Block]) -> str:
@@ -263,7 +263,7 @@ def encode_block(val: Union[int, Block]) -> str:
 def decode_quantity(val: str) -> int:
     if not isinstance(val, str):
         raise DecodingError("Encoded quantity must be a string")
-    if not val.startswith('0x'):
+    if not val.startswith("0x"):
         raise DecodingError("Encoded quantity must start with `0x`")
     try:
         return int(val, 16)
@@ -274,7 +274,7 @@ def decode_quantity(val: str) -> int:
 def decode_data(val: str) -> bytes:
     if not isinstance(val, str):
         raise DecodingError("Encoded data must be a string")
-    if not val.startswith('0x'):
+    if not val.startswith("0x"):
         raise DecodingError("Encoded data must start with `0x`")
     try:
         return bytes.fromhex(val[2:])
