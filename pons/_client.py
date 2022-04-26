@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from functools import wraps
 from typing import Union, Any, Optional, AsyncIterator
 
-import trio
+import anyio
 
 from ._contract import (
     DeployedContract,
@@ -207,7 +207,7 @@ class ClientSession:
             receipt = await self.eth_get_transaction_receipt(tx_hash)
             if receipt:
                 return receipt
-            await trio.sleep(poll_latency)
+            await anyio.sleep(poll_latency)
 
     @rpc_call("eth_call")
     async def eth_call(self, call: BoundReadCall, block: Union[int, Block] = Block.LATEST) -> Any:
