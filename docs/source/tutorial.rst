@@ -3,6 +3,13 @@
 Tutorial
 ========
 
+
+Async support
+-------------
+
+While the examples and tests use ``trio``, ``pons`` is ``anyio``-based and supports all the corresponding backends.
+
+
 Sessions
 --------
 

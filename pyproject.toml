@@ -6,11 +6,11 @@ authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
 ]
 dependencies = [
-    "trio>=0.19.0",
     "httpx>=0.22",
     "eth-account>=0.5",
     "eth-utils>=1.10",
     "eth-abi>=2",
+    "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
 ]
 requires-python = ">=3.8"
@@ -22,6 +22,7 @@ homepage = "https://github.com/fjarri/pons"
 [project.optional-dependencies]
 dev = [
     "pytest>=6",
+    "trio>=0.19.0",
     "pytest-trio",
     "pytest-cov",
     "py-solc-x>=1",

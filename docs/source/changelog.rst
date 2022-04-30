@@ -5,7 +5,13 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
-Under construction.
+Added
+^^^^^
+
+- ``anyio`` support instead of just ``trio``. (PR_27_)
+
+
+.. _PR_27: https://github.com/fjarri/pons/pull/27
 
 
 0.4.0 (23-04-2022)
