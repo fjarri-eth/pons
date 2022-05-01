@@ -25,6 +25,8 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    # Cannot use PDM because `mypy` does not handle the PEP582 `__pypackages__` directory well.
+    # See https://github.com/python/mypy/issues/10633
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
