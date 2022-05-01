@@ -1,7 +1,7 @@
 import pytest
 
 from pons import abi, Constructor, ReadMethod, WriteMethod, Fallback, Receive, ContractABI
-from pons._contract_abi import Signature
+from pons._contract_abi import Signature, ABIDecodingError
 
 
 def test_signature_from_dict():
@@ -158,6 +158,19 @@ def test_read_method_single_output():
 
     encoded_bytes = b"\x00" * 31 + b"\x01"
     assert read.decode_output(encoded_bytes) == 1
+
+
+async def test_decoding_error():
+    """
+    Checks handling of an event when data returned by `eth_call` does not match
+    the output signature of the method.
+    """
+    read = ReadMethod(name="someMethod", inputs=[], outputs=[abi.uint(256), abi.uint(256)])
+
+    encoded_bytes = b"\x00" * 31 + b"\x01"  # Only one uint256
+
+    with pytest.raises(ABIDecodingError, match="Tried to read 32 bytes.  Only got 0 bytes"):
+        read.decode_output(encoded_bytes)
 
 
 def test_read_method_errors():

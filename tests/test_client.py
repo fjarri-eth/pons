@@ -6,7 +6,18 @@ from eth_account import Account
 import pytest
 import trio
 
-from pons import Client, AccountSigner, Address, Amount, TxHash
+from pons import (
+    abi,
+    ABIDecodingError,
+    AccountSigner,
+    Address,
+    Amount,
+    Client,
+    ContractABI,
+    DeployedContract,
+    ReadMethod,
+    TxHash,
+)
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
 
 from .compile import compile_file
@@ -158,6 +169,30 @@ async def test_eth_call(test_provider, session, compiled_contracts, root_signer)
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     result = await session.eth_call(deployed_contract.read.getState(456))
     assert result == [123 + 456]
+
+
+async def test_eth_call_decoding_error(test_provider, session, compiled_contracts, root_signer):
+    """
+    Tests that `eth_call()` propagates an error on mismatch of the declared output signature
+    and the bytestring received from the provider (as opposed to wrapping it in another exception).
+    """
+    compiled_contract = compiled_contracts["BasicContract"]
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
+
+    wrong_abi = ContractABI(
+        read=[
+            ReadMethod(
+                name="getState",
+                inputs=[abi.uint(256)],
+                # the actual method in in BasicContract returns only one uint256
+                outputs=[abi.uint(256), abi.uint(256)],
+            )
+        ]
+    )
+    wrong_contract = DeployedContract(abi=wrong_abi, address=deployed_contract.address)
+
+    with pytest.raises(ABIDecodingError, match="Tried to read 32 bytes.  Only got 0 bytes"):
+        await session.eth_call(wrong_contract.read.getState(456))
 
 
 async def test_estimate_deploy(test_provider, session, compiled_contracts, root_signer):

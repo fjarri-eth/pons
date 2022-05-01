@@ -26,6 +26,8 @@ Providers
 Errors
 ------
 
+.. autoclass:: pons.ABIDecodingError
+
 .. autoclass:: pons.RemoteError
 
 .. autoclass:: pons.Unreachable
