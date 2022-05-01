@@ -14,14 +14,6 @@ from .provider_server import ServerHandle
 from .provider import EthereumTesterProvider
 
 
-@pytest.fixture
-async def test_server(nursery, test_provider):
-    handle = ServerHandle(test_provider)
-    await nursery.start(handle)
-    yield handle
-    handle.shutdown()
-
-
 @pytest.fixture(params=["direct", "http"])
 async def provider(request, test_provider, nursery):
     if request.param == "direct":

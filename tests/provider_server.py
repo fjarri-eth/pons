@@ -1,8 +1,10 @@
 import http
 import sys
 
-from quart_trio import QuartTrio
-from quart import make_response, request
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+
 from hypercorn.config import Config
 from hypercorn.trio import serve
 import trio
@@ -24,6 +26,18 @@ async def process_request(provider, data):
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
+async def entry_point(request):
+    data = await request.json()
+    provider = request.app.state.provider
+    try:
+        result = await process_request(provider, data)
+    except Exception as e:
+        # A catch-all for any unexpected errors
+        return Response(str(e), status_code=http.HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    return JSONResponse(result)
+
+
 def make_app(provider):
     """
     Creates and returns an ASGI app.
@@ -32,19 +46,12 @@ def make_app(provider):
     # Since we need to use an externally passed context in the app (``ursula_server``),
     # we have to create the app inside a function.
 
-    app = QuartTrio("provider")
+    routes = [
+        Route("/", entry_point, methods=["POST"]),
+    ]
 
-    @app.route("/", methods=["POST"])
-    async def entry_point():
-        data = await request.json
-
-        try:
-            result = await process_request(provider, data)
-        except Exception as e:
-            # A catch-all for any unexpected errors
-            return await make_response(str(e), http.HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        return await make_response(result)
+    app = Starlette(routes=routes)
+    app.state.provider = provider
 
     return app
 
