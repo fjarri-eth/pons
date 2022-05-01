@@ -94,7 +94,11 @@ class Signature:
             normalized_values = decode_single(self.canonical_form, value_bytes)
         except BackendDecodingError as exc:
             # wrap possible `eth_abi` errors
-            raise ABIDecodingError(str(exc)) from exc
+            message = (
+                f"Could not decode the return value "
+                f"with the expected signature {self.canonical_form}: {str(exc)}"
+            )
+            raise ABIDecodingError(message) from exc
 
         return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
 

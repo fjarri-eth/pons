@@ -191,7 +191,12 @@ async def test_eth_call_decoding_error(test_provider, session, compiled_contract
     )
     wrong_contract = DeployedContract(abi=wrong_abi, address=deployed_contract.address)
 
-    with pytest.raises(ABIDecodingError, match="Tried to read 32 bytes.  Only got 0 bytes"):
+    expected_message = (
+        r"Could not decode the return value with the expected signature \(uint256,uint256\): "
+        r"Tried to read 32 bytes.  Only got 0 bytes"
+    )
+
+    with pytest.raises(ABIDecodingError, match=expected_message):
         await session.eth_call(wrong_contract.read.getState(456))
 
 

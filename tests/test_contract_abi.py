@@ -169,7 +169,12 @@ async def test_decoding_error():
 
     encoded_bytes = b"\x00" * 31 + b"\x01"  # Only one uint256
 
-    with pytest.raises(ABIDecodingError, match="Tried to read 32 bytes.  Only got 0 bytes"):
+    expected_message = (
+        r"Could not decode the return value with the expected signature \(uint256,uint256\): "
+        r"Tried to read 32 bytes.  Only got 0 bytes"
+    )
+
+    with pytest.raises(ABIDecodingError, match=expected_message):
         read.decode_output(encoded_bytes)
 
 
