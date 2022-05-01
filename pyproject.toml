@@ -31,7 +31,7 @@ dev = [
     # with eth-* stuff in the main dependencies.
     # TODO: make our own mock around Pyevm.
     "eth-tester[pyevm]",
-    "quart-trio",
+    "starlette",
     "hypercorn",
 ]
 docs = [
