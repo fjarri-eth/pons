@@ -46,28 +46,16 @@ def monkeypatched(obj, attr, patch):
     setattr(obj, attr, original_value)
 
 
-@contextmanager
-def fail_transaction_receipts():
-    # TODO: it would be nice to reproduce the actual situation when `status=0`
-    # in a transaction receipt could happen
-    # (transaction was accepted for mining, but failed in the process).
-    orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
-
-    def mock_get_transaction_receipt(tx_hash_hex):
-        receipt = orig_get_transaction_receipt(tx_hash_hex)
-        receipt["status"] = "0x0"
-        return receipt
-
-    with monkeypatched(test_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
-        yield
-
-
 async def test_net_version(test_provider, session):
     net_version1 = await session.net_version()
     assert net_version1 == "0"
 
+    # This is not going to get called
+    def wrong_net_version():
+        raise NotImplementedError()  # pragma: no cover
+
     # The result should have been cached the first time
-    with monkeypatched(test_provider, "net_version", lambda: "wrong_value"):
+    with monkeypatched(test_provider, "net_version", wrong_net_version):
         net_version2 = await session.net_version()
     assert net_version1 == net_version2
 
@@ -83,8 +71,12 @@ async def test_eth_chain_id(test_provider, session):
     chain_id1 = await session.eth_chain_id()
     assert chain_id1 == 2299111 * 57099167
 
+    # This is not going to get called
+    def wrong_chain_id():
+        raise NotImplementedError()  # pragma: no cover
+
     # The result should have been cached the first time
-    with monkeypatched(test_provider, "eth_chain_id", lambda: "wrong_value"):
+    with monkeypatched(test_provider, "eth_chain_id", wrong_chain_id):
         chain_id2 = await session.eth_chain_id()
     assert chain_id1 == chain_id2
 
