@@ -9,9 +9,11 @@ Added
 ^^^^^
 
 - ``anyio`` support instead of just ``trio``. (PR_27_)
+- Raise ``ABIDecodingError`` on mismatch between the declared contract ABI and the bytestring returned from ``ethCall``. (PR_29_)
 
 
 .. _PR_27: https://github.com/fjarri/pons/pull/27
+.. _PR_29: https://github.com/fjarri/pons/pull/29
 
 
 0.4.0 (23-04-2022)

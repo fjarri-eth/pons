@@ -17,8 +17,15 @@ from typing import (
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
+from eth_abi.exceptions import DecodingError as BackendDecodingError
 
 from ._abi_types import Type, dispatch_types, dispatch_type
+
+
+class ABIDecodingError(Exception):
+    """
+    Raised on an error when decoding a value in an Eth ABI encoded bytestring.
+    """
 
 
 class Signature:
@@ -83,7 +90,16 @@ class Signature:
         """
         Decodes the packed bytestring into a list of values.
         """
-        normalized_values = decode_single(self.canonical_form, value_bytes)
+        try:
+            normalized_values = decode_single(self.canonical_form, value_bytes)
+        except BackendDecodingError as exc:
+            # wrap possible `eth_abi` errors
+            message = (
+                f"Could not decode the return value "
+                f"with the expected signature {self.canonical_form}: {str(exc)}"
+            )
+            raise ABIDecodingError(message) from exc
+
         return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
 
     def __str__(self):

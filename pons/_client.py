@@ -29,7 +29,7 @@ from ._entities import (
     encode_block,
     decode_quantity,
     decode_data,
-    DecodingError,
+    RPCDecodingError,
 )
 
 
@@ -107,7 +107,7 @@ def rpc_call(method_name):
         async def _wrapped(*args, **kwargs):
             try:
                 result = await func(*args, **kwargs)
-            except (DecodingError, UnexpectedResponse) as exc:
+            except (RPCDecodingError, UnexpectedResponse) as exc:
                 raise BadResponseFormat(f"{method_name}: {exc}") from exc
             except RPCError as exc:
                 if exc.code == RPCErrorCode.EXECUTION_ERROR:
@@ -140,7 +140,7 @@ class ClientSession:
         if self._net_version is None:
             result = await self._provider_session.rpc("net_version")
             if not isinstance(result, str):
-                raise DecodingError("expected a string result")
+                raise RPCDecodingError("expected a string result")
             self._net_version = result
         return self._net_version
 
