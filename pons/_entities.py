@@ -5,7 +5,7 @@ from typing import NamedTuple, Union, Optional
 from eth_utils import to_checksum_address, to_canonical_address
 
 
-class DecodingError(Exception):
+class RPCDecodingError(Exception):
     """
     Raised on an error when decoding a value in an RPC response.
     """
@@ -71,7 +71,7 @@ class Amount:
 
     @classmethod
     def decode(cls, val: str) -> "Amount":
-        # `decode_data` will raise DecodingError on any error,
+        # `decode_data` will raise RPCDecodingError on any error,
         # and if it succeeds, constructor won't raise anything -
         # the value is already guaranteed to be `int` and non-negative
         return cls(decode_quantity(val))
@@ -163,7 +163,7 @@ class Address:
         try:
             return cls(decode_data(val))
         except ValueError as exc:
-            raise DecodingError(str(exc)) from exc
+            raise RPCDecodingError(str(exc)) from exc
 
     def __str__(self):
         return self.checksum
@@ -215,7 +215,7 @@ class TxHash:
         try:
             return TxHash(decode_data(val))
         except ValueError as exc:
-            raise DecodingError(str(exc)) from exc
+            raise RPCDecodingError(str(exc)) from exc
 
     def __bytes__(self):
         return self._tx_hash
@@ -262,21 +262,21 @@ def encode_block(val: Union[int, Block]) -> str:
 
 def decode_quantity(val: str) -> int:
     if not isinstance(val, str):
-        raise DecodingError("Encoded quantity must be a string")
+        raise RPCDecodingError("Encoded quantity must be a string")
     if not val.startswith("0x"):
-        raise DecodingError("Encoded quantity must start with `0x`")
+        raise RPCDecodingError("Encoded quantity must start with `0x`")
     try:
         return int(val, 16)
     except ValueError as exc:
-        raise DecodingError(f"Could not convert encoded quantity to an integer: {exc}") from exc
+        raise RPCDecodingError(f"Could not convert encoded quantity to an integer: {exc}") from exc
 
 
 def decode_data(val: str) -> bytes:
     if not isinstance(val, str):
-        raise DecodingError("Encoded data must be a string")
+        raise RPCDecodingError("Encoded data must be a string")
     if not val.startswith("0x"):
-        raise DecodingError("Encoded data must start with `0x`")
+        raise RPCDecodingError("Encoded data must start with `0x`")
     try:
         return bytes.fromhex(val[2:])
     except ValueError as exc:
-        raise DecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
+        raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
