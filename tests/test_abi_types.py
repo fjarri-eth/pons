@@ -217,7 +217,7 @@ def test_making_arrays():
         abi.uint(8)[1.0]
 
 
-def check_normalization_roundtrip():
+def test_normalization_roundtrip():
 
     struct = abi.struct(
         field1=abi.uint(8),
@@ -234,7 +234,6 @@ def check_normalization_roundtrip():
 
     # normalize() loses info on struct field names
     assert struct.normalize(value) == expected_normalized
-    assert struct.normalize(expected_normalized) == expected_normalized
 
     # denormalize() should recover struct field names
     assert struct.denormalize(expected_normalized) == value
