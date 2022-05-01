@@ -287,13 +287,20 @@ class ClientSession:
         return Amount.decode(result)
 
     async def broadcast_transfer(
-        self, signer: Signer, destination_address: Address, amount: Amount
+        self,
+        signer: Signer,
+        destination_address: Address,
+        amount: Amount,
+        gas: Optional[int] = None,
     ) -> TxHash:
         """
         Broadcasts the fund transfer transaction, but does not wait for it to be processed.
+        If ``gas`` is ``None``, the required amount of gas is estimated first,
+        otherwise the provided value is used.
         """
         chain_id = await self.eth_chain_id()
-        gas = await self.estimate_transfer(signer.address, destination_address, amount)
+        if gas is None:
+            gas = await self.estimate_transfer(signer.address, destination_address, amount)
         # TODO: implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
@@ -311,28 +318,43 @@ class ClientSession:
         signed_tx = signer.sign_transaction(tx)
         return await self._eth_send_raw_transaction(signed_tx)
 
-    async def transfer(self, signer: Signer, destination_address: Address, amount: Amount):
+    async def transfer(
+        self,
+        signer: Signer,
+        destination_address: Address,
+        amount: Amount,
+        gas: Optional[int] = None,
+    ):
         """
         Transfers funds from the address of the attached signer to the destination address.
+        If ``gas`` is ``None``, the required amount of gas is estimated first,
+        otherwise the provided value is used.
         Waits for the transaction to be confirmed.
         """
-        tx_hash = await self.broadcast_transfer(signer, destination_address, amount)
+        tx_hash = await self.broadcast_transfer(signer, destination_address, amount, gas=gas)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
         if not receipt.succeeded:
             raise TransactionFailed(f"Transfer failed (receipt: {receipt})")
 
     async def deploy(
-        self, signer: Signer, call: BoundConstructorCall, amount: Amount = Amount(0)
+        self,
+        signer: Signer,
+        call: BoundConstructorCall,
+        amount: Amount = Amount(0),
+        gas: Optional[int] = None,
     ) -> DeployedContract:
         """
         Deploys the contract passing ``args`` to the constructor.
+        If ``gas`` is ``None``, the required amount of gas is estimated first,
+        otherwise the provided value is used.
         Waits for the transaction to be confirmed.
         """
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This constructor does not accept an associated payment")
 
         chain_id = await self.eth_chain_id()
-        gas = await self.estimate_deploy(call, amount=amount)
+        if gas is None:
+            gas = await self.estimate_deploy(call, amount=amount)
         # TODO: implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
@@ -362,16 +384,25 @@ class ClientSession:
 
         return DeployedContract(call.contract_abi, receipt.contract_address)
 
-    async def transact(self, signer: Signer, call: BoundWriteCall, amount: Amount = Amount(0)):
+    async def transact(
+        self,
+        signer: Signer,
+        call: BoundWriteCall,
+        amount: Amount = Amount(0),
+        gas: Optional[int] = None,
+    ):
         """
         Transacts with the contract using a prepared method call.
+        If ``gas`` is ``None``, the required amount of gas is estimated first,
+        otherwise the provided value is used.
         Waits for the transaction to be confirmed.
         """
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This method does not accept an associated payment")
 
         chain_id = await self.eth_chain_id()
-        gas = await self.estimate_transact(call, amount=amount)
+        if gas is None:
+            gas = await self.estimate_transact(call, amount=amount)
         # TODO: implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
