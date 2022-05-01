@@ -31,7 +31,10 @@ def pyevm_errors_into_rpc_errors():
             )
         else:
             # TODO: what are the other possible reasons? Do they have the same error code?
-            raise RPCError(RPCErrorCode.EXECUTION_ERROR.value, "transaction failed", reason)
+            # Since I don't know how to hit this line, skipping coverage for it.
+            raise RPCError(
+                RPCErrorCode.EXECUTION_ERROR.value, "transaction failed", reason
+            )  # pragma: no cover
     except ValidationError as exc:
         raise RPCError(RPCErrorCode.SERVER_ERROR.value, exc.args[0])
 
@@ -63,7 +66,6 @@ class EthereumTesterProvider(Provider):
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
             eth_gasPrice=self.eth_gas_price,
-            eth_getBlockByNumber=self.eth_get_block_by_number,
         )
         return dispatch[method](*args)
 
@@ -84,8 +86,9 @@ class EthereumTesterProvider(Provider):
             return self._ethereum_tester.send_raw_transaction(tx_hex)
 
     def eth_call(self, tx: dict, block: str) -> Union[List, str]:
-        if "from" not in tx:
-            tx["from"] = self._default_address.encode()
+        assert "from" not in tx
+        # EthereumTester needs it for whatever reason
+        tx["from"] = self._default_address.encode()
         return self._ethereum_tester.call(tx, block)
 
     def eth_get_transaction_receipt(self, tx_hash_hex):
@@ -105,8 +108,7 @@ class EthereumTesterProvider(Provider):
     def eth_estimate_gas(self, tx: dict, block: str) -> str:
         if "from" not in tx:
             tx["from"] = self._default_address.encode()
-        if "value" in tx:
-            tx["value"] = decode_quantity(tx["value"])
+        tx["value"] = decode_quantity(tx["value"])
 
         with pyevm_errors_into_rpc_errors():
             gas = self._ethereum_tester.estimate_gas(tx, block)
@@ -120,15 +122,6 @@ class EthereumTesterProvider(Provider):
 
         # Base fee plus 1 GWei
         return encode_quantity(block_info["base_fee_per_gas"] + 10**9)
-
-    def eth_get_block_by_number(self, block: str, full_transactions: bool) -> str:
-        result = self._ethereum_tester.get_block_by_number(block, True)
-        result["timestamp"] = encode_quantity(result["timestamp"])
-        for tx_info in result["transactions"]:
-            tx_info["gas"] = encode_quantity(tx_info["gas"])
-            tx_info["gasPrice"] = tx_info.pop("gas_price").encode()
-
-        return result
 
     @asynccontextmanager
     async def session(self):
