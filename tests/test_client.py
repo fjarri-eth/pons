@@ -251,6 +251,24 @@ async def test_transfer(test_provider, session, root_signer, another_signer):
     assert root_balance - root_balance_after > to_transfer
 
 
+async def test_transfer_custom_gas(test_provider, session, root_signer, another_signer):
+
+    root_balance = await session.eth_get_balance(root_signer.address)
+    to_transfer = Amount.ether(10)
+
+    # Override gas estimate
+    # The standard transfer gas cost is 21000, we're being cautious here.
+    await session.transfer(root_signer, another_signer.address, to_transfer, gas=22000)
+    root_balance_after = await session.eth_get_balance(root_signer.address)
+    acc1_balance_after = await session.eth_get_balance(another_signer.address)
+    assert acc1_balance_after == to_transfer
+    assert root_balance - root_balance_after > to_transfer
+
+    # Not enough gas
+    with pytest.raises(ProviderError, match="Insufficient gas"):
+        await session.transfer(root_signer, another_signer.address, to_transfer, gas=20000)
+
+
 async def test_transfer_failed(test_provider, session, root_signer, another_signer):
 
     # TODO: it would be nice to reproduce the actual situation where this could happen
@@ -291,10 +309,9 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
     balance = await session.eth_get_balance(contract.address)
     assert balance == Amount.ether(1)
 
-    # TODO: won't need to monkeypatch when we can override gas estimate by normal means
-    with monkeypatched(test_provider, "eth_estimate_gas", lambda *args: hex(300000)):
-        with pytest.raises(TransactionFailed, match="Deploy failed"):
-            await session.deploy(root_signer, construction_error.constructor(0))
+    # Not enough gas
+    with pytest.raises(TransactionFailed, match="Deploy failed"):
+        await session.deploy(root_signer, construction_error.constructor(0), gas=300000)
 
     # Test the provider returning an empty `contractAddress`
     orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
@@ -334,7 +351,6 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
     balance = await session.eth_get_balance(deployed_contract.address)
     assert balance == Amount.ether(1)
 
-    # TODO: won't need to monkeypatch when we can override gas estimate by normal means
-    with monkeypatched(test_provider, "eth_estimate_gas", lambda *args: hex(300000)):
-        with pytest.raises(TransactionFailed, match="Transact failed"):
-            await session.transact(root_signer, deployed_contract.write.faultySetState(0))
+    # Not enough gas
+    with pytest.raises(TransactionFailed, match="Transact failed"):
+        await session.transact(root_signer, deployed_contract.write.faultySetState(0), gas=300000)
