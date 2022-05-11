@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from functools import cached_property
 from enum import Enum
 from typing import NamedTuple, Union, Optional
@@ -13,7 +14,86 @@ class RPCDecodingError(Exception):
     """
 
 
-class Amount:
+class TypedData(ABC):
+    def __init__(self, value: bytes):
+        if not isinstance(value, bytes):
+            raise TypeError(
+                f"{self.__class__.__name__} must be a bytestring, got {type(value).__name__}"
+            )
+        if len(value) != self._length():
+            raise ValueError(
+                f"{self.__class__.__name__} must be {self._length()} bytes long, got {len(value)}"
+            )
+        self._value = value
+
+    @abstractmethod
+    def _length(self) -> int:
+        ...
+
+    def encode(self) -> str:
+        return encode_data(self._value)
+
+    @classmethod
+    def decode(cls, val: str):
+        try:
+            return cls(decode_data(val))
+        except ValueError as exc:
+            raise RPCDecodingError(str(exc)) from exc
+
+    def __bytes__(self):
+        return self._value
+
+    def __hash__(self):
+        return hash(self._value)
+
+    def _check_type(self, other):
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+
+    def __eq__(self, other):
+        self._check_type(other)
+        return self._value == other._value
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(bytes.fromhex("{self._value.hex()}"))'
+
+
+class TypedQuantity:
+    def __init__(self, value: int):
+        if not isinstance(value, int):
+            raise TypeError(
+                f"{self.__class__.__name__} must be an integer, got {type(value).__name__}"
+            )
+        if value < 0:
+            raise ValueError(f"{self.__class__.__name__} must be non-negative, got {value}")
+        self._value = value
+
+    def encode(self) -> str:
+        return encode_quantity(self._value)
+
+    @classmethod
+    def decode(cls, val: str) -> "Amount":
+        # `decode_quantity` will raise RPCDecodingError on any error,
+        # and if it succeeds, constructor won't raise anything -
+        # the value is already guaranteed to be `int` and non-negative
+        return cls(decode_quantity(val))
+
+    def __hash__(self):
+        return hash(self._value)
+
+    def _check_type(self, other):
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+
+    def __eq__(self, other):
+        self._check_type(other)
+        return self._value == other._value
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._value})"
+
+
+class Amount(TypedQuantity):
     """
     Represents a sum in the chain's native currency.
 
@@ -43,94 +123,66 @@ class Amount:
         """
         return cls(int(10**18 * value))
 
-    def __init__(self, wei: int):
-        if not isinstance(wei, int):
-            raise TypeError(f"The amount must be an integer, got {type(wei).__name__}")
-        if wei < 0:
-            raise ValueError(f"The amount must be non-negative, got {wei}")
-        self._wei = wei
-
     def as_wei(self) -> int:
         """
         Returns the amount in wei.
         """
-        return self._wei
+        return self._value
 
     def as_gwei(self) -> float:
         """
         Returns the amount in gwei.
         """
-        return self._wei / 10**9
+        return self._value / 10**9
 
     def as_ether(self) -> float:
         """
         Returns the amount in the main currency unit.
         """
-        return self._wei / 10**18
-
-    def encode(self) -> str:
-        return encode_quantity(self.as_wei())
-
-    @classmethod
-    def decode(cls, val: str) -> "Amount":
-        # `decode_data` will raise RPCDecodingError on any error,
-        # and if it succeeds, constructor won't raise anything -
-        # the value is already guaranteed to be `int` and non-negative
-        return cls(decode_quantity(val))
-
-    def _check_type(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
-
-    def __hash__(self):
-        return hash(self._wei)
-
-    def __eq__(self, other):
-        self._check_type(other)
-        return self._wei == other._wei
+        return self._value / 10**18
 
     def __add__(self, other):
         self._check_type(other)
-        return self.wei(self._wei + other._wei)
+        return self.wei(self._value + other._value)
 
     def __sub__(self, other):
         self._check_type(other)
-        return self.wei(self._wei - other._wei)
+        return self.wei(self._value - other._value)
 
     def __mul__(self, other: int):
         if not isinstance(other, int):
             raise TypeError(f"Expected an integer, got {type(other).__name__}")
-        return self.wei(self._wei * other)
+        return self.wei(self._value * other)
 
     def __floordiv__(self, other: int):
         if not isinstance(other, int):
             raise TypeError(f"Expected an integer, got {type(other).__name__}")
-        return self.wei(self._wei // other)
+        return self.wei(self._value // other)
 
     def __gt__(self, other):
         self._check_type(other)
-        return self._wei > other._wei
+        return self._value > other._value
 
     def __ge__(self, other):
         self._check_type(other)
-        return self._wei >= other._wei
+        return self._value >= other._value
 
     def __lt__(self, other):
         self._check_type(other)
-        return self._wei < other._wei
+        return self._value < other._value
 
     def __le__(self, other):
         self._check_type(other)
-        return self._wei <= other._wei
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self._wei})"
+        return self._value <= other._value
 
 
-class Address:
+class Address(TypedData):
     """
     Represents an Ethereum address.
     """
+
+    def _length(self):
+        return 20
 
     @classmethod
     def from_hex(cls, address_str: str) -> "Address":
@@ -140,46 +192,23 @@ class Address:
         """
         return cls(to_canonical_address(address_str))
 
-    def __init__(self, address_bytes: bytes):
-        if not isinstance(address_bytes, bytes):
-            raise TypeError(f"Address must be a bytestring, got {type(address_bytes).__name__}")
-        if len(address_bytes) != 20:
-            raise ValueError(f"Address must be 20 bytes long, got {len(address_bytes)}")
-        self._address_bytes = address_bytes
-
-    def __bytes__(self):
-        return self._address_bytes
-
     @cached_property
     def checksum(self) -> str:
         """
         Retunrs the checksummed hex representation of the address.
         """
-        return to_checksum_address(self._address_bytes)
+        return to_checksum_address(self._value)
 
     def encode(self) -> str:
+        # Overriding the base class method to encode into a checksummed address -
+        # some providers require it.
         return self.checksum
-
-    @classmethod
-    def decode(cls, val: str) -> "Address":
-        try:
-            return cls(decode_data(val))
-        except ValueError as exc:
-            raise RPCDecodingError(str(exc)) from exc
 
     def __str__(self):
         return self.checksum
 
     def __repr__(self):
-        return f"{self.__class__.__name__}.from_hex({self})"
-
-    def __hash__(self):
-        return hash(self._address_bytes)
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
-        return self._address_bytes == other._address_bytes
+        return f"{self.__class__.__name__}.from_hex({self.checksum})"
 
 
 class Block(Enum):
@@ -197,39 +226,13 @@ class Block(Enum):
     """Currently pending block"""
 
 
-class TxHash:
+class TxHash(TypedData):
     """
     A wrapper for the transaction hash.
     """
 
-    def __init__(self, tx_hash: bytes):
-        if not isinstance(tx_hash, bytes):
-            raise TypeError(f"Transaction hash must be a bytestring, got {type(tx_hash).__name__}")
-        if len(tx_hash) != 32:
-            raise ValueError(f"Transaction hash must be 32 bytes long, got {len(tx_hash)}")
-        self._tx_hash = tx_hash
-
-    def encode(self) -> str:
-        return encode_data(bytes(self))
-
-    @classmethod
-    def decode(cls, val: str) -> "TxHash":
-        try:
-            return TxHash(decode_data(val))
-        except ValueError as exc:
-            raise RPCDecodingError(str(exc)) from exc
-
-    def __bytes__(self):
-        return self._tx_hash
-
-    def __hash__(self):
-        return hash(self._tx_hash)
-
-    def __eq__(self, other):
-        return self._tx_hash == other._tx_hash
-
-    def __repr__(self):
-        return f"TxHash(bytes.fromhex('{self._tx_hash.hex()}'))"
+    def _length(self):
+        return 32
 
 
 class TxReceipt(NamedTuple):

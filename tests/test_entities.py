@@ -21,14 +21,14 @@ def test_amount():
     assert Amount.gwei(100).as_wei() == 100 * 10**9
     assert Amount.ether(100).as_wei() == 100 * 10**18
 
-    with pytest.raises(TypeError, match="The amount must be an integer, got float"):
+    with pytest.raises(TypeError, match="Amount must be an integer, got float"):
         Amount.wei(100.0)
 
     # other constructors cast to integer
     assert Amount.gwei(100.0).as_wei() == 100 * 10**9
     assert Amount.ether(100.0).as_wei() == 100 * 10**18
 
-    with pytest.raises(ValueError, match="The amount must be non-negative, got -100"):
+    with pytest.raises(ValueError, match="Amount must be non-negative, got -100"):
         Amount.wei(-100)
 
     # Encoding
@@ -121,31 +121,19 @@ def test_address():
         Address.decode("0x" + random_addr[:-1].hex())
 
 
-def test_tx_hash():
-    tx_hash_bytes = os.urandom(32)
-    tx_hash_bytes2 = os.urandom(32)
+def test_typed_data():
+    # This is not covered by Address tests, since it overrides those methods
+    data = os.urandom(32)
+    tx_hash = TxHash(data)
+    assert repr(tx_hash) == f'TxHash(bytes.fromhex("{data.hex()}"))'
+    assert tx_hash.encode() == "0x" + data.hex()
 
-    assert bytes(TxHash(tx_hash_bytes)) == tx_hash_bytes
 
-    assert TxHash(tx_hash_bytes) == TxHash(tx_hash_bytes)
-    assert TxHash(tx_hash_bytes) != TxHash(tx_hash_bytes2)
-
-    tx_hash_set = {TxHash(tx_hash_bytes), TxHash(tx_hash_bytes2), TxHash(tx_hash_bytes)}
-    assert len(tx_hash_set) == 2
-
-    assert TxHash(tx_hash_bytes).encode() == "0x" + tx_hash_bytes.hex()
-    assert TxHash.decode("0x" + tx_hash_bytes.hex()) == TxHash(tx_hash_bytes)
-
-    assert tx_hash_bytes.hex() in repr(TxHash(tx_hash_bytes))
-
-    with pytest.raises(TypeError, match="Transaction hash must be a bytestring, got str"):
-        TxHash("foo")
-
-    with pytest.raises(ValueError, match="Transaction hash must be 32 bytes long, got 31"):
-        TxHash(tx_hash_bytes[:-1])
-
-    with pytest.raises(RPCDecodingError, match="Transaction hash must be 32 bytes long, got 31"):
-        TxHash.decode("0x" + tx_hash_bytes[:-1].hex())
+def test_typed_data_lengths():
+    # Just try to create the corresponding types,
+    # it will cover their respective length methods.
+    # Everything else is in the base class which is tested elsewhere
+    TxHash(os.urandom(32))
 
 
 def test_tx_receipt():
