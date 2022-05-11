@@ -4,6 +4,8 @@ from typing import NamedTuple, Union, Optional
 
 from eth_utils import to_checksum_address, to_canonical_address
 
+from ._provider import ResponseDict
+
 
 class RPCDecodingError(Exception):
     """
@@ -243,6 +245,15 @@ class TxReceipt(NamedTuple):
 
     gas_used: int
     """The amount of gas used by the transaction."""
+
+    @classmethod
+    def decode(cls, val: ResponseDict) -> "TxReceipt":
+        contract_address = val["contractAddress"]
+        return cls(
+            succeeded=(decode_quantity(val["status"]) == 1),
+            contract_address=Address.decode(contract_address) if contract_address else None,
+            gas_used=decode_quantity(val["gasUsed"]),
+        )
 
 
 def encode_quantity(val: int) -> str:

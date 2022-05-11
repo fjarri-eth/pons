@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from pons import Amount, Address, TxHash, Block
+from pons import Amount, Address, TxHash, Block, TxReceipt
 from pons._entities import (
     encode_quantity,
     encode_data,
@@ -144,6 +144,35 @@ def test_tx_hash():
 
     with pytest.raises(RPCDecodingError, match="Transaction hash must be 32 bytes long, got 31"):
         TxHash.decode("0x" + tx_hash_bytes[:-1].hex())
+
+
+def test_tx_receipt():
+
+    address = Address(os.urandom(20))
+
+    tx_receipt = TxReceipt.decode(
+        {
+            "contractAddress": address.encode(),
+            "status": "0x1",
+            "gasUsed": "0x1234",
+        }
+    )
+
+    assert tx_receipt.succeeded
+    assert tx_receipt.contract_address == address
+    assert tx_receipt.gas_used == 0x1234
+
+    tx_receipt = TxReceipt.decode(
+        {
+            "contractAddress": None,
+            "status": "0x0",
+            "gasUsed": "0x1234",
+        }
+    )
+
+    assert not tx_receipt.succeeded
+    assert tx_receipt.contract_address is None
+    assert tx_receipt.gas_used == 0x1234
 
 
 def test_encode_decode_quantity():

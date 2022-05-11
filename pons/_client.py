@@ -176,14 +176,7 @@ class ClientSession:
         )
         if not result:
             return None
-
-        contract_address = result["contractAddress"]
-
-        return TxReceipt(
-            succeeded=(decode_quantity(result["status"]) == 1),
-            contract_address=Address.decode(contract_address) if contract_address else None,
-            gas_used=decode_quantity(result["gasUsed"]),
-        )
+        return TxReceipt.decode(result)
 
     @rpc_call("eth_getTransactionCount")
     async def eth_get_transaction_count(
