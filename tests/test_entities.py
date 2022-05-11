@@ -136,6 +136,8 @@ def test_tx_hash():
     assert TxHash(tx_hash_bytes).encode() == "0x" + tx_hash_bytes.hex()
     assert TxHash.decode("0x" + tx_hash_bytes.hex()) == TxHash(tx_hash_bytes)
 
+    assert tx_hash_bytes.hex() in repr(TxHash(tx_hash_bytes))
+
     with pytest.raises(TypeError, match="Transaction hash must be a bytestring, got str"):
         TxHash("foo")
 

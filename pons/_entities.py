@@ -228,6 +228,9 @@ class TxHash:
     def __eq__(self, other):
         return self._tx_hash == other._tx_hash
 
+    def __repr__(self):
+        return f"TxHash(bytes.fromhex('{self._tx_hash.hex()}'))"
+
 
 class TxReceipt(NamedTuple):
     """
