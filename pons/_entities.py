@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
 from enum import Enum
-from typing import NamedTuple, Union, Optional
+from typing import NamedTuple, Union, Optional, Tuple, Type, TypeVar
 
 from eth_utils import to_checksum_address, to_canonical_address
 
@@ -12,6 +12,12 @@ class RPCDecodingError(Exception):
     """
     Raised on an error when decoding a value in an RPC response.
     """
+
+
+TypedDataLike = TypeVar("TypedDataLike", bound="TypedData")
+
+
+TypedQuantityLike = TypeVar("TypedQuantityLike", bound="TypedQuantity")
 
 
 class TypedData(ABC):
@@ -34,7 +40,7 @@ class TypedData(ABC):
         return encode_data(self._value)
 
     @classmethod
-    def decode(cls, val: str):
+    def decode(cls: Type[TypedDataLike], val: str) -> TypedDataLike:
         try:
             return cls(decode_data(val))
         except ValueError as exc:
@@ -72,7 +78,7 @@ class TypedQuantity:
         return encode_quantity(self._value)
 
     @classmethod
-    def decode(cls, val: str) -> "Amount":
+    def decode(cls: Type[TypedQuantityLike], val: str) -> TypedQuantityLike:
         # `decode_quantity` will raise RPCDecodingError on any error,
         # and if it succeeds, constructor won't raise anything -
         # the value is already guaranteed to be `int` and non-negative
@@ -226,6 +232,15 @@ class Block(Enum):
     """Currently pending block"""
 
 
+class BlockHash(TypedData):
+    """
+    A wrapper for the block hash.
+    """
+
+    def _length(self):
+        return 32
+
+
 class TxHash(TypedData):
     """
     A wrapper for the transaction hash.
@@ -233,6 +248,159 @@ class TxHash(TypedData):
 
     def _length(self):
         return 32
+
+
+class TxInfo(NamedTuple):
+    """
+    Transaction info.
+    """
+
+    # TODO: make an enum?
+    type: int
+    """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
+
+    hash: TxHash
+    """Transaction hash."""
+
+    block_hash: BlockHash
+    """The hash of the block this transaction belongs to."""
+
+    block_number: int
+    """The number of the block this transaction belongs to."""
+
+    transaction_index: int
+    """Transaction index."""
+
+    from_: Address
+    """Transaction sender."""
+
+    to: Address
+    """Transaction recipient."""
+
+    value: Amount
+    """Associated funds."""
+
+    nonce: int
+    """Transaction nonce."""
+
+    gas: int
+    """Gas used by the transaction."""
+
+    gas_price: Amount
+    """Gas price used by the transaction."""
+
+    # TODO: we may want to have a separate derived class for EIP1559 transactions,
+    # but for now this will do.
+
+    max_fee_per_gas: Optional[Amount]
+    """``maxFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
+
+    max_priority_fee_per_gas: Optional[Amount]
+    """``maxPriorityFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
+
+    @classmethod
+    def decode(cls, val: ResponseDict) -> "TxInfo":
+        max_fee_per_gas = Amount.decode(val["maxFeePerGas"]) if "maxFeePerGas" in val else None
+        max_priority_fee_per_gas = (
+            Amount.decode(val["maxPriorityFeePerGas"]) if "maxPriorityFeePerGas" in val else None
+        )
+        return cls(
+            type=decode_quantity(val["type"]),
+            hash=TxHash.decode(val["hash"]),
+            block_hash=BlockHash.decode(val["blockHash"]),
+            block_number=decode_quantity(val["blockNumber"]),
+            transaction_index=decode_quantity(val["transactionIndex"]),
+            from_=Address.decode(val["from"]),
+            to=Address.decode(val["to"]),
+            value=Amount.decode(val["value"]),
+            nonce=decode_quantity(val["nonce"]),
+            max_fee_per_gas=max_fee_per_gas,
+            max_priority_fee_per_gas=max_priority_fee_per_gas,
+            gas=decode_quantity(val["gas"]),
+            gas_price=Amount.decode(val["gasPrice"]),
+        )
+
+
+class BlockInfo(NamedTuple):
+    """
+    Block info.
+    """
+
+    number: int
+    """Block number."""
+
+    hash: BlockHash
+    """Block hash."""
+
+    parent_hash: BlockHash
+    """Parent block's hash."""
+
+    nonce: int
+    """Block's nonce."""
+
+    miner: Address
+    """Block's miner."""
+
+    difficulty: int
+    """Block's difficulty."""
+
+    total_difficulty: int
+    """Block's totat difficulty."""
+
+    size: int
+    """Block size."""
+
+    gas_limit: int
+    """Block's gas limit."""
+
+    gas_used: int
+    """Gas used for the block."""
+
+    base_fee_per_gas: Amount
+    """Base fee per gas in this block."""
+
+    timestamp: int
+    """Block's timestamp."""
+
+    transaction_hashes: Tuple[TxHash, ...]
+    """A list of transaction hashes in this block."""
+
+    transactions: Optional[Tuple[TxInfo, ...]]
+    """
+    A list of details of transactions in this block.
+    Only present if it was requested.
+    """
+
+    @classmethod
+    def decode(cls, val: ResponseDict) -> "BlockInfo":
+        transactions: Optional[Tuple[TxInfo, ...]]
+        transaction_hashes: Tuple[TxHash, ...]
+        if len(val["transactions"]) == 0:
+            transactions = ()
+            transaction_hashes = ()
+        elif isinstance(val["transactions"][0], str):
+            transactions = None
+            transaction_hashes = tuple(TxHash.decode(tx_hash) for tx_hash in val["transactions"])
+        else:
+            transactions = tuple(TxInfo.decode(tx_info) for tx_info in val["transactions"])
+            transaction_hashes = tuple(tx.hash for tx in transactions)
+
+        return cls(
+            number=decode_quantity(val["number"]),
+            hash=BlockHash.decode(val["hash"]),
+            parent_hash=BlockHash.decode(val["parentHash"]),
+            nonce=decode_quantity(val["nonce"]),
+            difficulty=decode_quantity(val["difficulty"]),
+            total_difficulty=decode_quantity(val["totalDifficulty"]),
+            size=decode_quantity(val["size"]),
+            gas_limit=decode_quantity(val["gasLimit"]),
+            gas_used=decode_quantity(val["gasUsed"]),
+            base_fee_per_gas=Amount.decode(val["baseFeePerGas"]),
+            timestamp=decode_quantity(val["timestamp"]),
+            miner=Address.decode(val["miner"]),
+            transactions=transactions,
+            transaction_hashes=transaction_hashes,
+        )
 
 
 class TxReceipt(NamedTuple):
@@ -297,3 +465,13 @@ def decode_data(val: str) -> bytes:
         return bytes.fromhex(val[2:])
     except ValueError as exc:
         raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
+
+
+def decode_block(val: str) -> Union[int, Block]:
+    try:
+        Block(val)  # check if it's one of the enum's values
+        return val
+    except ValueError:
+        pass
+
+    return decode_quantity(val)

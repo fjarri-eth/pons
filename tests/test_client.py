@@ -17,6 +17,7 @@ from pons import (
     DeployedContract,
     ReadMethod,
     TxHash,
+    BlockHash,
 )
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
 
@@ -354,3 +355,26 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
     # Not enough gas
     with pytest.raises(TransactionFailed, match="Transact failed"):
         await session.transact(root_signer, deployed_contract.write.faultySetState(0), gas=300000)
+
+
+async def test_get_block(test_provider, session, root_signer, another_signer):
+    to_transfer = Amount.ether(10)
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    block_info = await session.eth_get_block_by_number(1, with_transactions=True)
+    assert block_info.transactions is not None
+
+    block_info2 = await session.eth_get_block_by_hash(block_info.hash, with_transactions=True)
+    assert block_info2 == block_info
+
+    # no transactions
+    block_info = await session.eth_get_block_by_number(1)
+    assert block_info.transactions is None
+
+    # non-existent block
+    block_info = await session.eth_get_block_by_number(100, with_transactions=True)
+    assert block_info is None
+    block_info = await session.eth_get_block_by_hash(
+        BlockHash(b"\x00" * 32), with_transactions=True
+    )
+    assert block_info is None

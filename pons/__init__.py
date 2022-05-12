@@ -10,6 +10,6 @@ from ._contract_abi import (
     Receive,
 )
 from ._contract import CompiledContract, DeployedContract
-from ._entities import Amount, Address, Block, TxHash, TxReceipt
+from ._entities import Amount, Address, Block, TxHash, TxReceipt, BlockHash, BlockInfo, TxInfo
 from ._provider import HTTPProvider, Unreachable
 from ._signer import Signer, AccountSigner

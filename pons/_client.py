@@ -23,6 +23,8 @@ from ._entities import (
     Amount,
     Block,
     TxHash,
+    BlockHash,
+    BlockInfo,
     TxReceipt,
     encode_quantity,
     encode_data,
@@ -278,6 +280,34 @@ class ClientSession:
         """
         result = await self._provider_session.rpc("eth_gasPrice")
         return Amount.decode(result)
+
+    @rpc_call("eth_getBlockByHash")
+    async def eth_get_block_by_hash(
+        self, block_hash: BlockHash, with_transactions: bool = False
+    ) -> Optional[BlockInfo]:
+        """
+        Calls the ``eth_getBlockByHash`` RPC method.
+        """
+        result = await self._provider_session.rpc_dict(
+            "eth_getBlockByHash", block_hash.encode(), with_transactions
+        )
+        if result is None:
+            return None
+        return BlockInfo.decode(result)
+
+    @rpc_call("eth_getBlockByNumber")
+    async def eth_get_block_by_number(
+        self, block: Union[int, Block] = Block.LATEST, with_transactions: bool = False
+    ) -> Optional[BlockInfo]:
+        """
+        Calls the ``eth_getBlockByNumber`` RPC method.
+        """
+        result = await self._provider_session.rpc_dict(
+            "eth_getBlockByNumber", encode_block(block), with_transactions
+        )
+        if result is None:
+            return None
+        return BlockInfo.decode(result)
 
     async def broadcast_transfer(
         self,

@@ -7,12 +7,19 @@ from typing import Union, List
 
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
-from eth_tester.exceptions import TransactionNotFound, TransactionFailed
+from eth_tester.exceptions import TransactionNotFound, TransactionFailed, BlockNotFound
 from eth.exceptions import Revert
 from eth_utils.exceptions import ValidationError
 
 from pons._provider import Provider, ProviderSession, RPCError, RPCErrorCode
-from pons._entities import Amount, Address, encode_quantity, decode_quantity, encode_data
+from pons._entities import (
+    Amount,
+    Address,
+    encode_quantity,
+    decode_quantity,
+    encode_data,
+    decode_block,
+)
 
 
 @contextmanager
@@ -37,6 +44,26 @@ def pyevm_errors_into_rpc_errors():
             )  # pragma: no cover
     except ValidationError as exc:
         raise RPCError(RPCErrorCode.SERVER_ERROR.value, exc.args[0])
+
+
+def make_camel_case(key):
+    # The RPC standard uses camelCase dictionary keys,
+    # EthereumTester does not, for whatever reason.
+    parts = key.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+
+
+def normalize_return_value(value):
+    if isinstance(value, int):
+        return encode_quantity(value)
+    elif isinstance(value, bytes):
+        return encode_data(value)
+    elif isinstance(value, dict):
+        return {make_camel_case(key): normalize_return_value(item) for key, item in value.items()}
+    elif isinstance(value, (list, tuple)):
+        return [normalize_return_value(item) for item in value]
+    else:
+        return value
 
 
 class EthereumTesterProvider(Provider):
@@ -66,6 +93,8 @@ class EthereumTesterProvider(Provider):
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
             eth_gasPrice=self.eth_gas_price,
+            eth_getBlockByHash=self.eth_get_block_by_hash,
+            eth_getBlockByNumber=self.eth_get_block_by_number,
         )
         return dispatch[method](*args)
 
@@ -96,14 +125,7 @@ class EthereumTesterProvider(Provider):
             result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
         except TransactionNotFound:
             return None
-
-        # TODO: rename/encode the remaining fields. For now that's all we need.
-        result = dict(
-            contractAddress=result["contract_address"],
-            status=encode_quantity(result["status"]),
-            gasUsed=encode_quantity(result["gas_used"]),
-        )
-        return result
+        return normalize_return_value(result)
 
     def eth_estimate_gas(self, tx: dict, block: str) -> str:
         if "from" not in tx:
@@ -122,6 +144,24 @@ class EthereumTesterProvider(Provider):
 
         # Base fee plus 1 GWei
         return encode_quantity(block_info["base_fee_per_gas"] + 10**9)
+
+    def eth_get_block_by_hash(self, block_hash: str, with_transactions: bool):
+        try:
+            result = self._ethereum_tester.get_block_by_hash(
+                block_hash, full_transactions=with_transactions
+            )
+        except BlockNotFound:
+            return None
+        return normalize_return_value(result)
+
+    def eth_get_block_by_number(self, block: str, with_transactions: bool):
+        try:
+            result = self._ethereum_tester.get_block_by_number(
+                decode_block(block), full_transactions=with_transactions
+            )
+        except BlockNotFound:
+            return None
+        return normalize_return_value(result)
 
     @asynccontextmanager
     async def session(self):

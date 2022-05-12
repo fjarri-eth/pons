@@ -148,10 +148,19 @@ Entities
 .. autoclass:: Block()
    :members:
 
-.. autoclass:: TxHash()
+.. autoclass:: TxHash
+   :members:
+
+.. autoclass:: BlockHash
    :members:
 
 .. autoclass:: TxReceipt()
+   :members:
+
+.. autoclass:: BlockInfo()
+   :members:
+
+.. autoclass:: TxInfo()
    :members:
 
 
