@@ -430,6 +430,3 @@ def test_contract_abi_errors():
         ValueError, match="JSON ABI contains more than one receive method declarations"
     ):
         abi = ContractABI.from_json([receive_abi, receive_abi])
-
-    with pytest.raises(ValueError, match="Unknown ABI entry type: event"):
-        abi = ContractABI.from_json([dict(type="event")])

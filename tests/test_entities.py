@@ -12,6 +12,7 @@ from pons._entities import (
     decode_block,
     RPCDecodingError,
     BlockHash,
+    LogTopic,
 )
 
 
@@ -137,7 +138,7 @@ def test_typed_data_lengths():
     # Everything else is in the base class which is tested elsewhere
     TxHash(os.urandom(32))
     BlockHash(os.urandom(32))
-    Topic(os.urandom(32))
+    LogTopic(os.urandom(32))
 
 
 def test_tx_receipt():
@@ -275,5 +276,5 @@ def test_decode_block_info():
     # Parse output without any transactions
     json_result["transactions"] = []
     block_info = BlockInfo.decode(json_result)
-    assert block_info.transactions == []
-    assert block_info.transaction_hashes == []
+    assert block_info.transactions == ()
+    assert block_info.transaction_hashes == ()
