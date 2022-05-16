@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from pons import Amount, Address, TxHash, Block, TxReceipt, BlockHash, BlockInfo
+from pons import Amount, Address, TxHash, Block, TxReceipt, BlockHash, BlockInfo, LogTopic
 from pons._entities import (
     encode_quantity,
     encode_data,
@@ -11,6 +11,7 @@ from pons._entities import (
     decode_data,
     decode_block,
     RPCDecodingError,
+    BlockHash,
 )
 
 
@@ -136,6 +137,7 @@ def test_typed_data_lengths():
     # Everything else is in the base class which is tested elsewhere
     TxHash(os.urandom(32))
     BlockHash(os.urandom(32))
+    Topic(os.urandom(32))
 
 
 def test_tx_receipt():

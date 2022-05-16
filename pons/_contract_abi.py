@@ -3,6 +3,7 @@ from functools import cached_property
 import inspect
 from typing import (
     Any,
+    AbstractSet,
     Iterable,
     List,
     Dict,
@@ -20,6 +21,7 @@ from eth_abi import encode_single, decode_single
 from eth_abi.exceptions import DecodingError as BackendDecodingError
 
 from ._abi_types import Type, dispatch_types, dispatch_type
+from ._entities import LogTopic
 
 
 class ABIDecodingError(Exception):
@@ -327,6 +329,49 @@ class WriteMethod(Method):
         return f"function {self.name}{self.inputs} " + ("payable" if self.payable else "nonpayable")
 
 
+class Event(Method):
+    @classmethod
+    def from_json(cls, event_entry: Dict[str, Any]) -> "Event":
+        """
+        Creates this object from a JSON ABI method entry.
+        """
+        if event_entry["type"] != "event":
+            raise ValueError("Event object must be created from a JSON entry with type='event'")
+
+        name = event_entry["name"]
+        inputs = dispatch_types(event_entry["inputs"])
+        indexed = {input_["name"] for input_ in event_entry["inputs"] if input_["indexed"]}
+
+        return cls(name=name, inputs=inputs, indexed=indexed, anonymous=event_entry["anonymous"])
+
+    def __init__(
+        self,
+        name: str,
+        inputs: Union[Mapping[str, Type], Sequence[Type]],
+        indexed: AbstractSet[str],
+        anonymous: bool = False,
+    ):
+        self._name = name
+        self._inputs = Signature(inputs)
+        self.anonymous = anonymous
+        self.indexed = set(indexed)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def inputs(self) -> Signature:
+        return self._inputs
+
+    @cached_property
+    def topic(self) -> LogTopic:
+        """
+        The topic representing this event's signature.
+        """
+        return LogTopic(keccak(self.name.encode() + self.inputs.canonical_form.encode()))
+
+
 class Fallback:
     """
     A fallback method.
@@ -490,6 +535,7 @@ class ContractABI:
         read = []
         write = []
         methods = set()
+        events = {}
 
         for entry in json_abi:
 
@@ -522,6 +568,13 @@ class ContractABI:
                     raise ValueError("JSON ABI contains more than one receive method declarations")
                 receive = Receive.from_json(entry)
 
+            elif entry["type"] == "event":
+                if entry["name"] in events:
+                    raise ValueError(
+                        f"JSON ABI contains more than one declarations of `{entry['name']}`"
+                    )
+                events[entry["name"]] = Event.from_json(entry)
+
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
@@ -531,6 +584,7 @@ class ContractABI:
             receive=receive,
             read=read,
             write=write,
+            events=events.values(),
         )
 
     def __init__(
@@ -540,6 +594,7 @@ class ContractABI:
         receive: Optional[Receive] = None,
         read: Optional[Iterable[ReadMethod]] = None,
         write: Optional[Iterable[WriteMethod]] = None,
+        events: Optional[Iterable[Event]] = None,
     ):
 
         if constructor is None:
@@ -550,6 +605,7 @@ class ContractABI:
         self.constructor = constructor
         self.read = Methods({method.name: method for method in (read or [])})
         self.write = Methods({method.name: method for method in (write or [])})
+        self.event = Methods({event.name: event for event in (events or [])})
 
     def __str__(self):
         all_methods = (

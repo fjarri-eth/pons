@@ -18,6 +18,8 @@ from pons import (
     ReadMethod,
     TxHash,
     BlockHash,
+    Block,
+    LogTopic,
 )
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
 
@@ -378,3 +380,72 @@ async def test_get_block(test_provider, session, root_signer, another_signer):
         BlockHash(b"\x00" * 32), with_transactions=True
     )
     assert block_info is None
+
+
+async def test_block_filter(test_provider, session, root_signer, another_signer):
+
+    to_transfer = Amount.ether(1)
+
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    block_filter = await session.eth_new_block_filter()
+
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    last_block = await session.eth_get_block_by_number(Block.LATEST)
+    prev_block = await session.eth_get_block_by_number(last_block.number - 1)
+
+    block_hashes = await session.eth_get_filter_changes(block_filter)
+    assert block_hashes == [prev_block.hash, last_block.hash]
+
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    block_hashes = await session.eth_get_filter_changes(block_filter)
+    last_block = await session.eth_get_block_by_number(Block.LATEST)
+    assert block_hashes == [last_block.hash]
+
+    block_hashes = await session.eth_get_filter_changes(block_filter)
+    assert len(block_hashes) == 0
+
+
+async def test_pending_transaction_filter(test_provider, session, root_signer, another_signer):
+    transaction_filter = await session.eth_new_pending_transaction_filter()
+
+    to_transfer = Amount.ether(1)
+
+    test_provider.disable_auto_mine_transactions()
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
+    tx_hashes = await session.eth_get_filter_changes(transaction_filter)
+    assert tx_hashes == [tx_hash]
+
+
+async def test_log_filter(test_provider, session, compiled_contracts, root_signer, another_signer):
+
+    basic_contract = compiled_contracts["BasicContract"]
+
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    filter1 = await session.eth_new_filter()
+
+    await session.transact(root_signer, contract1.write.deposit(b"1234"))
+    await session.transact(another_signer, contract2.write.deposit(b"4567"))
+
+    # All events
+    entries = await session.eth_get_filter_changes(filter1)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[1].address == contract2.address
+    assert entries[0].topics == (
+        contract1.abi.event.Deposit.topic,
+        LogTopic(b"\x00" * 12 + bytes(root_signer.address)),
+        LogTopic(b"1234" + b"\x00" * 28),
+    )
+    assert entries[1].topics == (
+        contract2.abi.event.Deposit.topic,
+        LogTopic(b"\x00" * 12 + bytes(another_signer.address)),
+        LogTopic(b"4567" + b"\x00" * 28),
+    )

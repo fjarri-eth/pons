@@ -232,6 +232,33 @@ class Block(Enum):
     """Currently pending block"""
 
 
+class BlockFilter(TypedQuantity):
+    """
+    A block filter identifier (returned by ``eth_newBlockFilter``).
+    """
+
+
+class PendingTransactionFilter(TypedQuantity):
+    """
+    A pending transaction filter identifier (returned by ``eth_newPendingTransactionFilter``).
+    """
+
+
+class LogFilter(TypedQuantity):
+    """
+    A log filter identifier (returned by ``eth_newFilter``).
+    """
+
+
+class LogTopic(TypedData):
+    """
+    A log topic for log filtering, a length-32 bytestring.
+    """
+
+    def _length(self):
+        return 32
+
+
 class BlockHash(TypedData):
     """
     A wrapper for the block hash.
@@ -430,6 +457,38 @@ class TxReceipt(NamedTuple):
         )
 
 
+class LogEntry(NamedTuple):
+
+    removed: bool
+    address: Address
+    data: bytes
+    topics: Tuple[LogTopic, ...]
+
+    # In the docs of major providers (Infura, Alchemy, Quicknode) it is claimed
+    # that the following fields can be null if "it is a pending log".
+    # I could not reproduce such behavior, so for now they're staying non-nullable.
+
+    log_index: int
+    transaction_index: int
+    transaction_hash: TxHash
+    block_hash: BlockHash
+    block_number: int
+
+    @classmethod
+    def decode(cls, val: dict) -> "LogEntry":
+        return cls(
+            removed=val["removed"],
+            log_index=decode_quantity(val["logIndex"]),
+            transaction_index=decode_quantity(val["transactionIndex"]),
+            transaction_hash=TxHash.decode(val["transactionHash"]),
+            block_hash=BlockHash.decode(val["blockHash"]),
+            block_number=decode_quantity(val["blockNumber"]),
+            address=Address.decode(val["address"]),
+            data=decode_data(val["data"]),
+            topics=tuple(LogTopic.decode(topic) for topic in val["topics"]),
+        )
+
+
 def encode_quantity(val: int) -> str:
     return hex(val)
 
@@ -467,7 +526,7 @@ def decode_data(val: str) -> bytes:
         raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
 
 
-def decode_block(val: str) -> Union[int, Block]:
+def decode_block(val: str) -> Union[int, str]:
     try:
         Block(val)  # check if it's one of the enum's values
         return val

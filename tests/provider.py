@@ -95,6 +95,10 @@ class EthereumTesterProvider(Provider):
             eth_gasPrice=self.eth_gas_price,
             eth_getBlockByHash=self.eth_get_block_by_hash,
             eth_getBlockByNumber=self.eth_get_block_by_number,
+            eth_newBlockFilter=self.eth_new_block_filter,
+            eth_newPendingTransactionFilter=self.eth_new_pending_transaction_filter,
+            eth_newFilter=self.eth_new_filter,
+            eth_getFilterChanges=self.eth_get_filter_changes,
         )
         return dispatch[method](*args)
 
@@ -162,6 +166,38 @@ class EthereumTesterProvider(Provider):
         except BlockNotFound:
             return None
         return normalize_return_value(result)
+
+    def eth_new_block_filter(self):
+        filter_id = self._ethereum_tester.create_block_filter()
+        return encode_quantity(filter_id)
+
+    def eth_new_pending_transaction_filter(self):
+        filter_id = self._ethereum_tester.create_pending_transaction_filter()
+        return encode_quantity(filter_id)
+
+    def eth_new_filter(self, params: dict):
+        address = params.get("address", None)
+        topics = params.get("topics", None)
+        filter_id = self._ethereum_tester.create_log_filter(
+            from_block=params["fromBlock"],
+            to_block=params["toBlock"],
+            address=address,
+            topics=topics,
+        )
+        return encode_quantity(filter_id)
+
+    def eth_get_filter_changes(self, filter_id: str):
+        results = self._ethereum_tester.get_only_filter_changes(decode_quantity(filter_id))
+        results = normalize_return_value(results)
+        # There's no public way to detect they type of the filter,
+        # and we need to apply this transformation only for log filters.
+        # Hence the hack.
+        if results and isinstance(results[0], dict):
+            for result in results:
+                result[
+                    "removed"
+                ] = False  # returned by regular RPC providers, but not by EthereumTester
+        return results
 
     @asynccontextmanager
     async def session(self):

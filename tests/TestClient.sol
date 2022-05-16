@@ -26,6 +26,16 @@ contract BasicContract {
     function getState(uint256 _x) public view returns (uint256) {
         return state + _x;
     }
+
+    event Deposit(
+        address indexed from,
+        bytes4 indexed id,
+        uint value
+    );
+
+    function deposit(bytes4 id) public payable {
+        emit Deposit(msg.sender, id, msg.value);
+    }
 }
 
 
