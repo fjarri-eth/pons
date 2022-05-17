@@ -10,8 +10,6 @@ def test_signature_from_dict():
     assert str(sig) == "(uint8 a, bool b)"
     assert sig.decode(sig.encode(1, True)) == [1, True]
     assert sig.decode(sig.encode(b=True, a=1)) == [1, True]
-    assert sig.decode(sig.encode_single(dict(b=True, a=1))) == [1, True]
-    assert sig.decode(sig.encode_single([1, True])) == [1, True]
 
 
 def test_signature_from_list():
@@ -19,12 +17,6 @@ def test_signature_from_list():
     assert str(sig) == "(uint8, bool)"
     assert sig.canonical_form == "(uint8,bool)"
     assert sig.decode(sig.encode(1, True)) == [1, True]
-    assert sig.decode(sig.encode_single([1, True])) == [1, True]
-
-
-def test_encode_non_iterable():
-    sig = Signature(dict(a=abi.uint(8)))
-    assert sig.decode(sig.encode_single(1)) == [1]
 
 
 def test_constructor_from_json():

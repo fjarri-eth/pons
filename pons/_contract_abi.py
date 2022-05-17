@@ -72,31 +72,6 @@ class Signature:
         normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
         return encode_single(self.canonical_form, normalized_values)
 
-    def encode_separate(self, *args, **kwargs) -> List[bytes]:
-        bound_args = self._signature.bind(*args, **kwargs)
-        normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
-        return {
-            param_name: encode_single(tp.canonical_form, value)
-            for (param_name, tp, value) in zip(bound_args.arguments, self._types, normalized_values)
-        }
-
-    def encode_single(self, value) -> bytes:
-        """
-        Encodes a single value into the bytestring according to the ABI format.
-
-        If the signature has named parameters, the value is treated
-        as a dictionary of keyword arguments.
-        If the signature has anonymous parameters, and the value is an iterable,
-        it is treated as alist of positional arguments;
-        if it is not iterable, it is treated as a single positional argument.
-        """
-        if isinstance(value, Mapping):
-            return self.encode(**value)
-        elif isinstance(value, Iterable):
-            return self.encode(*value)
-        else:
-            return self.encode(value)
-
     def decode(self, value_bytes: bytes) -> List[Any]:
         """
         Decodes the packed bytestring into a list of values.
