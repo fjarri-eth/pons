@@ -287,6 +287,14 @@ class ClientSession:
         result = await self._provider_session.rpc("eth_gasPrice")
         return Amount.decode(result)
 
+    @rpc_call("eth_blockNumber")
+    async def eth_block_number(self) -> int:
+        """
+        Calls the ``eth_blockNumber`` RPC method.
+        """
+        result = await self._provider_session.rpc("eth_blockNumber")
+        return decode_quantity(result)
+
     @rpc_call("eth_getBlockByHash")
     async def eth_get_block_by_hash(
         self, block_hash: BlockHash, with_transactions: bool = False

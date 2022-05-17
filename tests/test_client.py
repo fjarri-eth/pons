@@ -242,6 +242,18 @@ async def test_eth_gas_price(test_provider, session):
     assert isinstance(gas_price, Amount)
 
 
+async def test_eth_block_number(session, root_signer, another_signer):
+
+    to_transfer = Amount.ether(10)
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    await session.transfer(root_signer, another_signer.address, Amount.ether(2))
+    await session.transfer(root_signer, another_signer.address, Amount.ether(3))
+    block_num = await session.eth_block_number()
+
+    block_info = await session.eth_get_block_by_number(block_num - 1, with_transactions=True)
+    assert block_info.transactions[0].value == Amount.ether(2)
+
+
 async def test_transfer(test_provider, session, root_signer, another_signer):
 
     # Regular transfer

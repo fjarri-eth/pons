@@ -93,6 +93,7 @@ class EthereumTesterProvider(Provider):
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
             eth_gasPrice=self.eth_gas_price,
+            eth_blockNumber=self.eth_block_number,
             eth_getBlockByHash=self.eth_get_block_by_hash,
             eth_getBlockByNumber=self.eth_get_block_by_number,
             eth_newBlockFilter=self.eth_new_block_filter,
@@ -148,6 +149,10 @@ class EthereumTesterProvider(Provider):
 
         # Base fee plus 1 GWei
         return encode_quantity(block_info["base_fee_per_gas"] + 10**9)
+
+    def eth_block_number(self):
+        result = self._ethereum_tester.get_block_by_number("latest")["number"]
+        return encode_quantity(result)
 
     def eth_get_block_by_hash(self, block_hash: str, with_transactions: bool):
         try:
