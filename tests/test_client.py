@@ -432,32 +432,134 @@ async def test_pending_transaction_filter(test_provider, session, root_signer, a
     assert tx_hashes == [tx_hash]
 
 
-async def test_log_filter(test_provider, session, compiled_contracts, root_signer, another_signer):
+async def test_log_filter_all(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
 
     basic_contract = compiled_contracts["BasicContract"]
-
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
-
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
     contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
 
-    filter1 = await session.eth_new_filter()
-
+    log_filter = await session.eth_new_filter()
     await session.transact(root_signer, contract1.write.deposit(b"1234"))
-    await session.transact(another_signer, contract2.write.deposit(b"4567"))
+    await session.transact(another_signer, contract2.write.deposit2(b"4567"))
 
-    # All events
-    entries = await session.eth_get_filter_changes(filter1)
+    entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
     assert entries[0].address == contract1.address
     assert entries[1].address == contract2.address
-    assert entries[0].topics == (
-        contract1.abi.event.Deposit.topic,
-        LogTopic(b"\x00" * 12 + bytes(root_signer.address)),
-        LogTopic(b"1234" + b"\x00" * 28),
+    assert entries[0].topics == contract1.abi.event.Deposit.topics(root_signer.address, b"1234")
+    assert entries[1].topics == contract2.abi.event.Deposit2.topics(another_signer.address, b"4567")
+
+
+async def test_log_filter_by_address(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    # Filter by a single address
+
+    log_filter = await session.eth_new_filter(source=contract2.address)
+    await session.transact(root_signer, contract1.write.deposit(b"1234"))
+    await session.transact(root_signer, contract2.write.deposit2(b"4567"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 1
+    assert entries[0].address == contract2.address
+    assert entries[0].topics == contract2.abi.event.Deposit2.topics(root_signer.address, b"4567")
+
+    # Filter by several addresses
+
+    contract3 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    log_filter = await session.eth_new_filter(source=[contract1.address, contract3.address])
+    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    await session.transact(root_signer, contract2.write.deposit(b"2222"))
+    await session.transact(root_signer, contract3.write.deposit(b"3333"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[0].topics == contract1.abi.event.Deposit.topics(root_signer.address, b"1111")
+    assert entries[1].address == contract3.address
+    assert entries[1].topics == contract3.abi.event.Deposit.topics(root_signer.address, b"3333")
+
+
+async def test_log_filter_by_topic(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    # Filter by a specific topic or None at each position
+
+    log_filter = await session.eth_new_filter(
+        topics=contract2.abi.event.Deposit2.topics(id=b"4567")
     )
-    assert entries[1].topics == (
-        contract2.abi.event.Deposit.topic,
-        LogTopic(b"\x00" * 12 + bytes(another_signer.address)),
-        LogTopic(b"4567" + b"\x00" * 28),
-    )
+    # filtered out, wrong event type
+    await session.transact(root_signer, contract1.write.deposit(b"4567"))
+    # matches the filter
+    await session.transact(root_signer, contract1.write.deposit2(b"4567"))
+    # filtered out, wrong value
+    await session.transact(another_signer, contract2.write.deposit2(b"7890"))
+    # matches the filter
+    await session.transact(another_signer, contract2.write.deposit2(b"4567"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[0].topics == contract1.abi.event.Deposit2.topics(root_signer.address, b"4567")
+    assert entries[1].address == contract2.address
+    assert entries[1].topics == contract2.abi.event.Deposit2.topics(another_signer.address, b"4567")
+
+    # Filter by a list of topics
+
+    topics = contract1.abi.event.Deposit.topics(id=[b"1111", b"3333"])
+    log_filter = await session.eth_new_filter(topics=topics)
+    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    await session.transact(root_signer, contract1.write.deposit2(b"1111"))  # filtered out
+    await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filtered out
+    await session.transact(another_signer, contract2.write.deposit(b"3333"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[0].topics == contract1.abi.event.Deposit.topics(root_signer.address, b"1111")
+    assert entries[1].address == contract2.address
+    assert entries[1].topics == contract2.abi.event.Deposit.topics(another_signer.address, b"3333")
+
+
+async def test_log_filter_by_block_num(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    block_num = await session.eth_block_number()
+    await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filter will start here
+    await session.transact(root_signer, contract1.write.deposit(b"3333"))
+    await session.transact(root_signer, contract1.write.deposit(b"4444"))  # filter will stop here
+    await session.transact(root_signer, contract1.write.deposit(b"5555"))
+
+    log_filter = await session.eth_new_filter(from_block=block_num + 1, to_block=block_num + 3)
+    entries = await session.eth_get_filter_changes(log_filter)
+
+    # The range in the filter is inclusive
+    assert [entry.block_number for entry in entries] == list(range(block_num + 1, block_num + 4))
+    assert [entry.topics for entry in entries] == [
+        contract1.abi.event.Deposit.topics(root_signer.address, b"2222"),
+        contract1.abi.event.Deposit.topics(root_signer.address, b"3333"),
+        contract1.abi.event.Deposit.topics(root_signer.address, b"4444"),
+    ]

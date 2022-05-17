@@ -184,8 +184,8 @@ class EthereumTesterProvider(Provider):
         address = params.get("address", None)
         topics = params.get("topics", None)
         filter_id = self._ethereum_tester.create_log_filter(
-            from_block=params["fromBlock"],
-            to_block=params["toBlock"],
+            from_block=decode_block(params["fromBlock"]),
+            to_block=decode_block(params["toBlock"]),
             address=address,
             topics=topics,
         )

@@ -14,6 +14,7 @@ from typing import (
     Generic,
     Iterator,
     Sequence,
+    Tuple,
 )
 
 from eth_utils import keccak
@@ -71,6 +72,14 @@ class Signature:
         normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
         return encode_single(self.canonical_form, normalized_values)
 
+    def encode_separate(self, *args, **kwargs) -> List[bytes]:
+        bound_args = self._signature.bind(*args, **kwargs)
+        normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
+        return {
+            param_name: encode_single(tp.canonical_form, value)
+            for (param_name, tp, value) in zip(bound_args.arguments, self._types, normalized_values)
+        }
+
     def encode_single(self, value) -> bytes:
         """
         Encodes a single value into the bytestring according to the ABI format.
@@ -113,6 +122,60 @@ class Signature:
         else:
             params = ", ".join(f"{tp.canonical_form}" for tp in self._types)
         return f"({params})"
+
+
+class EventSignature:
+    def __init__(self, parameters: Mapping[str, Type], indexed: AbstractSet[str]):
+        self._signature = inspect.Signature(
+            parameters=[
+                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                for name, tp in parameters.items()
+            ]
+        )
+        self._types = parameters
+        self._indexed_set = indexed
+        self._indexed_ordered = [
+            param_name for param_name in self._signature.parameters if param_name in indexed
+        ]
+
+    def encode_filters(self, *args, **kwargs) -> List[bytes]:
+        bound_args = self._signature.bind_partial(*args, **kwargs)
+
+        bound_non_indexed = bound_args.arguments.keys() - self._indexed_set
+        if bound_non_indexed:
+            param_names = ", ".join(f"`{name}`" for name in bound_non_indexed)
+            raise TypeError(f"Not indexed and cannot be used in a filter: {param_names}")
+
+        encoded_topics = []
+        for param_name in self._indexed_ordered:
+            if param_name not in bound_args.arguments:
+                encoded_topics.append(None)
+                continue
+
+            bound_val = bound_args.arguments[param_name]
+            tp = self._types[param_name]
+            # cannot use Iterable here since the value may be `bytes`
+            if isinstance(bound_val, (list, tuple)):
+                encoded_val = [
+                    encode_single(tp.canonical_form, tp.normalize(elem)) for elem in bound_val
+                ]
+            else:
+                encoded_val = encode_single(tp.canonical_form, tp.normalize(bound_val))
+
+            encoded_topics.append(encoded_val)
+
+        # remove trailing `None`s - they are redundant
+        while encoded_topics and encoded_topics[-1] is None:
+            encoded_topics.pop()
+
+        return encoded_topics
+
+    @cached_property
+    def canonical_form(self) -> str:
+        """
+        Returns the signature serialized in the canonical form as a string.
+        """
+        return "(" + ",".join(tp.canonical_form for tp in self._types.values()) + ")"
 
 
 class Method(ABC):
@@ -352,9 +415,12 @@ class Event(Method):
         anonymous: bool = False,
     ):
         self._name = name
-        self._inputs = Signature(inputs)
         self.anonymous = anonymous
         self.indexed = set(indexed)
+        self._signature = EventSignature(inputs, self.indexed)
+
+        # TODO: check that indexed types are the simple types
+        # TODO: check that there are no more than 4 indexed parameters
 
     @property
     def name(self) -> str:
@@ -362,7 +428,7 @@ class Event(Method):
 
     @property
     def inputs(self) -> Signature:
-        return self._inputs
+        return self._signature
 
     @cached_property
     def topic(self) -> LogTopic:
@@ -370,6 +436,23 @@ class Event(Method):
         The topic representing this event's signature.
         """
         return LogTopic(keccak(self.name.encode() + self.inputs.canonical_form.encode()))
+
+    # def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+
+    def topics(self, *args, **kwargs) -> Tuple[LogTopic]:
+        encoded_topics = self._signature.encode_filters(*args, **kwargs)
+
+        log_topics = []
+        if not self.anonymous:
+            log_topics.append(self.topic)
+        for topic in encoded_topics:
+            if isinstance(topic, list):
+                log_topics.append([LogTopic(elem) for elem in topic])
+            elif topic is None:
+                log_topics.append(topic)
+            else:
+                log_topics.append(LogTopic(topic))
+        return tuple(log_topics)
 
 
 class Fallback:
