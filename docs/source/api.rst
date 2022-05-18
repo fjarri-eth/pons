@@ -63,6 +63,9 @@ Contract ABI
    :members:
    :special-members: __call__
 
+.. autoclass:: Event
+   :members:
+
 .. autoclass:: Fallback
    :members:
 
@@ -162,6 +165,14 @@ Entities
 
 .. autoclass:: TxInfo()
    :members:
+
+.. autoclass:: BlockFilter
+
+.. autoclass:: PendingTransactionFilter
+
+.. autoclass:: LogFilter
+
+.. autoclass:: LogTopic
 
 
 Solidity types

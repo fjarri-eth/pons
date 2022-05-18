@@ -6,6 +6,7 @@ from ._contract_abi import (
     Constructor,
     ReadMethod,
     WriteMethod,
+    Event,
     Fallback,
     Receive,
 )
