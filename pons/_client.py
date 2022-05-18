@@ -32,6 +32,7 @@ from ._entities import (
     BlockHash,
     BlockInfo,
     TxReceipt,
+    TxInfo,
     encode_quantity,
     encode_data,
     encode_block,
@@ -173,6 +174,16 @@ class ClientSession:
             "eth_getBalance", address.encode(), encode_block(block)
         )
         return Amount.decode(result)
+
+    @rpc_call("eth_getTransactionByHash")
+    async def eth_get_transaction_by_hash(self, tx_hash: TxHash) -> Optional[TxInfo]:
+        """
+        Calls the ``eth_getTransactionByHash`` RPC method.
+        """
+        result = await self._provider_session.rpc_dict("eth_getTransactionByHash", tx_hash.encode())
+        if not result:
+            return None
+        return TxInfo.decode(result)
 
     @rpc_call("eth_getTransactionReceipt")
     async def eth_get_transaction_receipt(self, tx_hash: TxHash) -> Optional[TxReceipt]:

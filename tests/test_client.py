@@ -394,6 +394,18 @@ async def test_get_block(test_provider, session, root_signer, another_signer):
     assert block_info is None
 
 
+async def test_eth_get_transaction_by_hash(test_provider, session, root_signer, another_signer):
+    to_transfer = Amount.ether(1)
+
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
+    tx_info = await session.eth_get_transaction_by_hash(tx_hash)
+    assert tx_info.value == to_transfer
+
+    non_existent = TxHash(b"abcd" * 8)
+    tx_info = await session.eth_get_transaction_by_hash(non_existent)
+    assert tx_info is None
+
+
 async def test_block_filter(test_provider, session, root_signer, another_signer):
 
     to_transfer = Amount.ether(1)

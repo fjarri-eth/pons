@@ -94,6 +94,7 @@ class EthereumTesterProvider(Provider):
             eth_estimateGas=self.eth_estimate_gas,
             eth_gasPrice=self.eth_gas_price,
             eth_blockNumber=self.eth_block_number,
+            eth_getTransactionByHash=self.eth_get_transaction_by_hash,
             eth_getBlockByHash=self.eth_get_block_by_hash,
             eth_getBlockByNumber=self.eth_get_block_by_number,
             eth_newBlockFilter=self.eth_new_block_filter,
@@ -125,9 +126,9 @@ class EthereumTesterProvider(Provider):
         tx["from"] = self._default_address.encode()
         return self._ethereum_tester.call(tx, block)
 
-    def eth_get_transaction_receipt(self, tx_hash_hex):
+    def eth_get_transaction_receipt(self, tx_hash: str):
         try:
-            result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
+            result = self._ethereum_tester.get_transaction_receipt(tx_hash)
         except TransactionNotFound:
             return None
         return normalize_return_value(result)
@@ -153,6 +154,15 @@ class EthereumTesterProvider(Provider):
     def eth_block_number(self):
         result = self._ethereum_tester.get_block_by_number("latest")["number"]
         return encode_quantity(result)
+
+    def eth_get_transaction_by_hash(self, tx_hash: str):
+        try:
+            result = self._ethereum_tester.get_transaction_by_hash(
+                tx_hash,
+            )
+        except TransactionNotFound:
+            return None
+        return normalize_return_value(result)
 
     def eth_get_block_by_hash(self, block_hash: str, with_transactions: bool):
         try:
