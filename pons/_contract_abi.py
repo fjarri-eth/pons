@@ -113,7 +113,7 @@ class EventSignature:
             param_name for param_name in self._signature.parameters if param_name in indexed
         ]
 
-    def encode_filters(self, *args, **kwargs) -> List[bytes]:
+    def encode_filters(self, *args, **kwargs) -> List[Optional[Union[bytes, List[bytes]]]]:
         bound_args = self._signature.bind_partial(*args, **kwargs)
 
         bound_non_indexed = bound_args.arguments.keys() - self._indexed_set
@@ -121,7 +121,7 @@ class EventSignature:
             param_names = ", ".join(f"`{name}`" for name in bound_non_indexed)
             raise TypeError(f"Not indexed and cannot be used in a filter: {param_names}")
 
-        encoded_topics = []
+        encoded_topics: List[Optional[Union[bytes, List[bytes]]]] = []
         for param_name in self._indexed_ordered:
             if param_name not in bound_args.arguments:
                 encoded_topics.append(None)
@@ -129,7 +129,9 @@ class EventSignature:
 
             bound_val = bound_args.arguments[param_name]
             tp = self._types[param_name]
-            # cannot use Iterable here since the value may be `bytes`
+
+            encoded_val: Union[bytes, List[bytes]]
+            # cannot use Iterable here since `bound_val` may be `bytes`
             if isinstance(bound_val, (list, tuple)):
                 encoded_val = [
                     encode_single(tp.canonical_form, tp.normalize(elem)) for elem in bound_val
@@ -367,7 +369,7 @@ class WriteMethod(Method):
         return f"function {self.name}{self.inputs} " + ("payable" if self.payable else "nonpayable")
 
 
-class Event(Method):
+class Event:
     @classmethod
     def from_json(cls, event_entry: Dict[str, Any]) -> "Event":
         """
@@ -385,11 +387,11 @@ class Event(Method):
     def __init__(
         self,
         name: str,
-        inputs: Union[Mapping[str, Type], Sequence[Type]],
+        inputs: Mapping[str, Type],
         indexed: AbstractSet[str],
         anonymous: bool = False,
     ):
-        self._name = name
+        self.name = name
         self.anonymous = anonymous
         self.indexed = set(indexed)
         self._signature = EventSignature(inputs, self.indexed)
@@ -397,32 +399,26 @@ class Event(Method):
         # TODO: check that indexed types are the simple types
         # TODO: check that there are no more than 4 indexed parameters
 
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def inputs(self) -> Signature:
-        return self._signature
-
     @cached_property
     def topic(self) -> LogTopic:
         """
         The topic representing this event's signature.
         """
-        return LogTopic(keccak(self.name.encode() + self.inputs.canonical_form.encode()))
+        return LogTopic(keccak(self.name.encode() + self._signature.canonical_form.encode()))
 
     # def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
 
-    def topics(self, *args, **kwargs) -> Tuple[LogTopic]:
+    def topics(
+        self, *args, **kwargs
+    ) -> Tuple[Optional[Union[LogTopic, Tuple[LogTopic, ...]]], ...]:
         encoded_topics = self._signature.encode_filters(*args, **kwargs)
 
-        log_topics = []
+        log_topics: List[Optional[Union[LogTopic, Tuple[LogTopic, ...]]]] = []
         if not self.anonymous:
             log_topics.append(self.topic)
         for topic in encoded_topics:
             if isinstance(topic, list):
-                log_topics.append([LogTopic(elem) for elem in topic])
+                log_topics.append(tuple(LogTopic(elem) for elem in topic))
             elif topic is None:
                 log_topics.append(topic)
             else:
