@@ -301,8 +301,11 @@ class TxInfo(NamedTuple):
     from_: Address
     """Transaction sender."""
 
-    to: Address
-    """Transaction recipient."""
+    to: Optional[Address]
+    """
+    Transaction recipient.
+    ``None`` when it's a contract creation transaction.
+    """
 
     value: Amount
     """Associated funds."""
@@ -338,7 +341,7 @@ class TxInfo(NamedTuple):
             block_number=decode_quantity(val["blockNumber"]),
             transaction_index=decode_quantity(val["transactionIndex"]),
             from_=Address.decode(val["from"]),
-            to=Address.decode(val["to"]),
+            to=Address.decode(val["to"]) if val["to"] else None,
             value=Amount.decode(val["value"]),
             nonce=decode_quantity(val["nonce"]),
             max_fee_per_gas=max_fee_per_gas,
