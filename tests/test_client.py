@@ -575,3 +575,61 @@ async def test_log_filter_by_block_num(
         contract1.abi.event.Deposit.topics(root_signer.address, b"3333"),
         contract1.abi.event.Deposit.topics(root_signer.address, b"4444"),
     ]
+
+
+async def test_block_filter_high_level(
+    autojump_clock, test_provider, session, root_signer, another_signer
+):
+
+    block_hashes = []
+
+    async def observer():
+        async for block_hash in session.iter_blocks(poll_interval=1):
+            block_hashes.append(block_hash)
+            if len(block_hashes) == 3:
+                break
+
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(observer)
+        await trio.sleep(2)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(2))
+        await session.transfer(root_signer, another_signer.address, Amount.ether(3))
+        await trio.sleep(3)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(4))
+        await trio.sleep(1)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(5))
+
+    for i, block_hash in enumerate(block_hashes):
+        block_info = await session.eth_get_block_by_hash(block_hash, with_transactions=True)
+        assert block_info.transactions[0].value == Amount.ether(i + 2)
+
+
+async def test_pending_transaction_filter_high_level(
+    autojump_clock, test_provider, session, root_signer, another_signer
+):
+
+    tx_hashes = []
+
+    async def observer():
+        async for tx_hash in session.iter_pending_transactions(poll_interval=1):
+            tx_hashes.append(tx_hash)
+            if len(tx_hashes) == 3:
+                break
+
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(observer)
+        await trio.sleep(2)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(2))
+        await session.transfer(root_signer, another_signer.address, Amount.ether(3))
+        await trio.sleep(3)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(4))
+        await trio.sleep(1)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(5))
+
+    for i, tx_hash in enumerate(tx_hashes):
+        tx_info = await session.eth_get_transaction_by_hash(tx_hash)
+        assert tx_info.value == Amount.ether(i + 2)

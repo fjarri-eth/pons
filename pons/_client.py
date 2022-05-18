@@ -543,3 +543,25 @@ class ClientSession:
             return [TxHash.decode(elem) for elem in result]
         else:
             return [LogEntry.decode(elem) for elem in result]
+
+    async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
+        """
+        Yields hashes of new blocks being mined.
+        """
+        block_filter = await self.eth_new_block_filter()
+        while True:
+            block_hashes = await self.eth_get_filter_changes(block_filter)
+            for block_hash in block_hashes:
+                yield block_hash
+            await anyio.sleep(poll_interval)
+
+    async def iter_pending_transactions(self, poll_interval: int = 1) -> AsyncIterator[TxHash]:
+        """
+        Yields hashes of new transactions being submitted.
+        """
+        tx_filter = await self.eth_new_pending_transaction_filter()
+        while True:
+            tx_hashes = await self.eth_get_filter_changes(tx_filter)
+            for tx_hash in tx_hashes:
+                yield tx_hash
+            await anyio.sleep(poll_interval)
