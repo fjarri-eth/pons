@@ -17,6 +17,7 @@ from ._provider import (
     UnexpectedResponse,
     RPCError,
     RPCErrorCode,
+    ResponseDict,
 )
 from ._signer import Signer
 from ._entities import (
@@ -536,14 +537,14 @@ class ClientSession:
         """
         Calls the ``eth_getFilterChangers`` RPC method.
         """
-        result = await self._provider_session.rpc("eth_getFilterChanges", filter_.encode())
+        results = await self._provider_session.rpc("eth_getFilterChanges", filter_.encode())
 
         if isinstance(filter_, BlockFilter):
-            return [BlockHash.decode(elem) for elem in result]
+            return [BlockHash.decode(elem) for elem in results]
         elif isinstance(filter_, PendingTransactionFilter):
-            return [TxHash.decode(elem) for elem in result]
+            return [TxHash.decode(elem) for elem in results]
         else:
-            return [LogEntry.decode(elem) for elem in result]
+            return [LogEntry.decode(ResponseDict(elem)) for elem in results]
 
     async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
         """

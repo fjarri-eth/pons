@@ -518,7 +518,7 @@ class LogEntry(NamedTuple):
     block_number: int
 
     @classmethod
-    def decode(cls, val: dict) -> "LogEntry":
+    def decode(cls, val: ResponseDict) -> "LogEntry":
         return cls(
             removed=val["removed"],
             log_index=decode_quantity(val["logIndex"]),
