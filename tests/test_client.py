@@ -633,3 +633,45 @@ async def test_pending_transaction_filter_high_level(
     for i, tx_hash in enumerate(tx_hashes):
         tx_info = await session.eth_get_transaction_by_hash(tx_hash)
         assert tx_info.value == Amount.ether(i + 2)
+
+
+async def test_event_filter_high_level(
+    autojump_clock, test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    events = []
+
+    async def observer():
+        event_filter = contract2.event.Deposit2(id=b"1111")
+        async for event in session.iter_events(event_filter, poll_interval=1):
+            events.append(event)
+            if len(events) == 3:
+                break
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(observer)
+        await trio.sleep(2)
+
+        # filtered out, wrong event type
+        await session.transact(root_signer, contract1.write.deposit(b"1111"))
+        # filtered out, wrong contract address
+        await session.transact(root_signer, contract1.write.deposit2(b"1111"))
+        # filtered out, wrong value
+        await session.transact(another_signer, contract2.write.deposit2(b"7890"))
+        # matches the filter
+        await session.transact(root_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(1))
+        await session.transact(
+            another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(2)
+        )
+        await session.transact(
+            another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(3)
+        )
+
+    assert events[0] == {"from": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
+    assert events[1] == {"from": another_signer.address, "id": b"1111", "value": 2, "value2": 3}
+    assert events[2] == {"from": another_signer.address, "id": b"1111", "value": 3, "value2": 4}

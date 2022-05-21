@@ -9,6 +9,7 @@ from ._contract import (
     BoundConstructorCall,
     BoundReadCall,
     BoundWriteCall,
+    BoundEventFilter,
 )
 from ._provider import (
     Provider,
@@ -564,4 +565,23 @@ class ClientSession:
             tx_hashes = await self.eth_get_filter_changes(tx_filter)
             for tx_hash in tx_hashes:
                 yield tx_hash
+            await anyio.sleep(poll_interval)
+
+    async def iter_events(
+        self,
+        event_filter: BoundEventFilter,
+        poll_interval: int = 1,
+        from_block: Union[int, Block] = Block.LATEST,
+        to_block: Union[int, Block] = Block.LATEST,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        log_filter = await self.eth_new_filter(
+            source=event_filter.contract_address,
+            topics=event_filter.topics,
+            from_block=from_block,
+            to_block=to_block,
+        )
+        while True:
+            log_entries = await self.eth_get_filter_changes(log_filter)
+            for log_entry in log_entries:
+                yield event_filter.decode_log_entry(log_entry)
             await anyio.sleep(poll_interval)

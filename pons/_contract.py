@@ -1,7 +1,7 @@
-from typing import Any
+from typing import Any, Dict
 
-from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod
-from ._entities import Address
+from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod, Event, EventFilter
+from ._entities import Address, LogEntry
 
 
 class BoundConstructor:
@@ -120,6 +120,27 @@ class BoundWriteCall:
         self.data_bytes = data_bytes
 
 
+class BoundEvent:
+    def __init__(self, contract_address: Address, event: Event):
+        self.contract_address = contract_address
+        self.event = event
+
+    def __call__(self, *args, **kwargs) -> "BoundEventFilter":
+        return BoundEventFilter(self.contract_address, self.event(*args, **kwargs))
+
+
+class BoundEventFilter:
+    def __init__(self, contract_address: Address, event_filter: EventFilter):
+        self.contract_address = contract_address
+        self.topics = event_filter.topics
+        self._event_filter = event_filter
+
+    def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+        if log_entry.address != self.contract_address:
+            raise ValueError("Log entry originates from a different contract")
+        return self._event_filter.decode_log_entry(log_entry)
+
+
 class CompiledContract:
     """
     A compiled contract (ABI and bytecode).
@@ -177,4 +198,7 @@ class DeployedContract:
         )
         self.write = Methods(
             {method.name: BoundWriteMethod(self.address, method) for method in self.abi.write}
+        )
+        self.event = Methods(
+            {event.name: BoundEvent(self.address, event) for event in self.abi.event}
         )

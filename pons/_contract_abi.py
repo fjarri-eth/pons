@@ -22,7 +22,7 @@ from eth_abi import encode_single, decode_single
 from eth_abi.exceptions import DecodingError as BackendDecodingError
 
 from ._abi_types import Type, dispatch_types, dispatch_type
-from ._entities import LogTopic
+from ._entities import LogTopic, LogEntry
 
 
 class ABIDecodingError(Exception):
@@ -108,6 +108,9 @@ class EventSignature:
             ]
         )
         self._types = parameters
+        self._types_nonindexed = {
+            name: tp for name, tp in parameters.items() if name not in indexed
+        }
         self._indexed_set = indexed
         self._indexed_ordered = [
             param_name for param_name in self._signature.parameters if param_name in indexed
@@ -147,12 +150,43 @@ class EventSignature:
 
         return encoded_topics
 
+    def decode_log_entry(self, topics: Sequence[LogTopic], data: bytes) -> Dict[str, Any]:
+        if len(topics) != len(self._indexed_set):
+            raise ValueError(
+                "The number of topics in the log entry does not match "
+                "the number of indexed fields in the event"
+            )
+
+        decoded_topics = {
+            name: decode_single(self._types[name].canonical_form, bytes(topic))
+            for name, topic in zip(self._indexed_ordered, topics)
+        }
+
+        decoded_data = decode_single(self.canonical_form_nonindexed, data)
+        decoded_data = {name: value for name, value in zip(self._types_nonindexed, decoded_data)}
+
+        result = {}
+        for name in self._types:
+            if name in decoded_topics:
+                result[name] = decoded_topics[name]
+            else:
+                result[name] = decoded_data[name]
+
+        return {name: self._types[name].denormalize(value) for name, value in result.items()}
+
     @cached_property
     def canonical_form(self) -> str:
         """
         Returns the signature serialized in the canonical form as a string.
         """
         return "(" + ",".join(tp.canonical_form for tp in self._types.values()) + ")"
+
+    @cached_property
+    def canonical_form_nonindexed(self) -> str:
+        """
+        Returns the signature serialized in the canonical form as a string.
+        """
+        return "(" + ",".join(tp.canonical_form for tp in self._types_nonindexed.values()) + ")"
 
 
 class Method(ABC):
@@ -406,7 +440,14 @@ class Event:
         """
         return LogTopic(keccak(self.name.encode() + self._signature.canonical_form.encode()))
 
-    # def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+    def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+        topics = log_entry.topics
+        if not self.anonymous:
+            if topics[0] != self.topic:
+                raise ValueError("This log entry belongs to a different event")
+            topics = topics[1:]
+
+        return self._signature.decode_log_entry(topics, log_entry.data)
 
     def topics(
         self, *args, **kwargs
@@ -424,6 +465,18 @@ class Event:
             else:
                 log_topics.append(LogTopic(topic))
         return tuple(log_topics)
+
+    def __call__(self, *args, **kwargs) -> "EventFilter":
+        return EventFilter(self, self.topics(*args, **kwargs))
+
+
+class EventFilter:
+    def __init__(self, event, topics):
+        self._event = event
+        self.topics = topics
+
+    def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+        return self._event.decode_log_entry(log_entry)
 
 
 class Fallback:
