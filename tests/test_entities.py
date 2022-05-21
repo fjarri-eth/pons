@@ -141,33 +141,39 @@ def test_typed_data_lengths():
     LogTopic(os.urandom(32))
 
 
-def test_tx_receipt():
+def test_decode_tx_receipt():
 
     address = Address(os.urandom(20))
 
-    tx_receipt = TxReceipt.decode(
-        {
-            "contractAddress": address.encode(),
-            "status": "0x1",
-            "gasUsed": "0x1234",
-        }
-    )
+    tx_receipt_json = {
+        "transactionHash": "0xf105e4ee72d1538a4e10ee9584581e2b6f13cd9be82acd14e8edd65d954483c5",
+        "blockHash": "0x3f62ac76f9551dbf878c334657ce19a86881734cbf53f8ecd9c3afb9a22d5bee",
+        "blockNumber": "0xa38696",
+        "contractAddress": address.encode(),
+        "cumulativeGasUsed": "0x43641c",
+        "effectiveGasPrice": "0x45463c1c",
+        "from": "0x8d75f6db12c444e290db995f2650a68159364e25",
+        "gasUsed": "0x55f0",
+        "status": "0x1",
+        "to": None,
+        "transactionIndex": "0x18",
+        "type": "0x0",
+    }
+
+    tx_receipt = TxReceipt.decode(tx_receipt_json)
 
     assert tx_receipt.succeeded
     assert tx_receipt.contract_address == address
-    assert tx_receipt.gas_used == 0x1234
 
-    tx_receipt = TxReceipt.decode(
-        {
-            "contractAddress": None,
-            "status": "0x0",
-            "gasUsed": "0x1234",
-        }
-    )
+    tx_receipt_json["contractAddress"] = None
+    tx_receipt_json["to"] = address.encode()
+    tx_receipt_json["status"] = "0x0"
+
+    tx_receipt = TxReceipt.decode(tx_receipt_json)
 
     assert not tx_receipt.succeeded
     assert tx_receipt.contract_address is None
-    assert tx_receipt.gas_used == 0x1234
+    assert tx_receipt.to == address
 
 
 def test_encode_decode_quantity():
