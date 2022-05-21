@@ -13,6 +13,7 @@ from pons._entities import (
     RPCDecodingError,
     BlockHash,
     LogTopic,
+    LogEntry,
 )
 
 
@@ -284,3 +285,24 @@ def test_decode_block_info():
     block_info = BlockInfo.decode(json_result)
     assert block_info.transactions == ()
     assert block_info.transaction_hashes == ()
+
+
+def test_decode_log_entry():
+    log_entry_json = {
+        "address": "0x6ef0f6ca7a8f01e02593df24f7097889a249c31e",
+        "topics": [
+            "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x000000000000000000000000e2b8651bf50913057ff47fc4f02a8e12146083b8",
+        ],
+        "data": "0x",
+        "blockNumber": "0xa386df",
+        "transactionHash": "0x7c0301cec59c65dce24fe7bd007dd4ab1dbe6c7c0f029deb76f4fb2d4c004379",
+        "transactionIndex": "0x0",
+        "blockHash": "0x14fb839d874ee80c020e7f087f8e57d4c6a94d6af1e6c7c9544d1ef219b0873b",
+        "logIndex": "0x0",
+        "removed": False,
+    }
+
+    log_entry = LogEntry.decode(log_entry_json)
+    assert log_entry.data == b""
