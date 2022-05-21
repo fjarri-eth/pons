@@ -438,8 +438,11 @@ class TxReceipt(NamedTuple):
     Transaction receipt.
     """
 
-    succeeded: bool
-    """Whether the transaction was successful."""
+    block_hash: BlockHash
+    """Hash of the block including this transaction."""
+
+    block_number: int
+    """Block number including this transaction."""
 
     contract_address: Optional[Address]
     """
@@ -447,16 +450,53 @@ class TxReceipt(NamedTuple):
     contains the address of the deployed contract.
     """
 
+    cumulative_gas_used: int
+    """The total amount of gas used when this transaction was executed in the block."""
+
+    effective_gas_price: Amount
+    """The actual value per gas deducted from the sender's account."""
+
+    from_: Address
+    """Address of the sender."""
+
     gas_used: int
     """The amount of gas used by the transaction."""
+
+    to: Optional[Address]
+    """
+    Address of the receiver.
+    ``None`` when the transaction is a contract creation transaction.
+    """
+
+    transaction_hash: TxHash
+    """Hash of the transaction."""
+
+    transaction_index: int
+    """Integer of the transaction's index position in the block."""
+
+    # TODO: make an enum?
+    type: int
+    """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
+
+    succeeded: bool
+    """Whether the transaction was successful."""
 
     @classmethod
     def decode(cls, val: ResponseDict) -> "TxReceipt":
         contract_address = val["contractAddress"]
         return cls(
-            succeeded=(decode_quantity(val["status"]) == 1),
+            block_hash=BlockHash.decode(val["blockHash"]),
+            block_number=decode_quantity(val["blockNumber"]),
             contract_address=Address.decode(contract_address) if contract_address else None,
+            cumulative_gas_used=decode_quantity(val["cumulativeGasUsed"]),
+            effective_gas_price=Amount.decode(val["effectiveGasPrice"]),
+            from_=Address.decode(val["from"]),
             gas_used=decode_quantity(val["gasUsed"]),
+            to=Address.decode(val["to"]) if val["to"] else None,
+            transaction_hash=TxHash.decode(val["transactionHash"]),
+            transaction_index=decode_quantity(val["transactionIndex"]),
+            type=decode_quantity(val["type"]),
+            succeeded=(decode_quantity(val["status"]) == 1),
         )
 
 
