@@ -1,12 +1,28 @@
+from collections import namedtuple
+import re
+
+from eth_abi import encode_single
+from eth_utils import keccak
 import pytest
 
-from pons import abi, Constructor, ReadMethod, WriteMethod, Fallback, Receive, ContractABI
-from pons._contract_abi import Signature, ABIDecodingError
+from pons import (
+    abi,
+    Constructor,
+    ReadMethod,
+    WriteMethod,
+    Fallback,
+    Receive,
+    ContractABI,
+    Event,
+    Either,
+    LogTopic,
+)
+from pons._contract_abi import Signature, EventSignature, ABIDecodingError
 
 
 def test_signature_from_dict():
     sig = Signature(dict(a=abi.uint(8), b=abi.bool))
-    assert sig.canonical_form == ("(uint8,bool)")
+    assert sig.canonical_form == "(uint8,bool)"
     assert str(sig) == "(uint8 a, bool b)"
     assert sig.decode(sig.encode(1, True)) == [1, True]
     assert sig.decode(sig.encode(b=True, a=1)) == [1, True]
@@ -17,6 +33,55 @@ def test_signature_from_list():
     assert str(sig) == "(uint8, bool)"
     assert sig.canonical_form == "(uint8,bool)"
     assert sig.decode(sig.encode(1, True)) == [1, True]
+
+
+def test_event_signature():
+    sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
+    assert str(sig) == "(uint8 indexed a, bool indexed b, bytes4 c)"
+    assert sig.canonical_form == "(uint8,bool,bytes4)"
+    assert sig.canonical_form_nonindexed == "(bytes4)"
+
+
+def test_event_signature_encode():
+
+    sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
+
+    # All indexed parameters provided
+    encoded = sig.encode_to_topics(1, True)
+    assert encoded == ((encode_single("uint8", 1),), (encode_single("bool", True),))
+
+    # One indexed parameter not provided
+    encoded = sig.encode_to_topics(b=True)
+    assert encoded == (None, (encode_single("bool", True),))
+
+    # An indexed parameter at the end not provided - the trailing Nones are trimmed
+    encoded = sig.encode_to_topics(a=1)
+    assert encoded == ((encode_single("uint8", 1),),)
+
+    # Using Either to encode several possible values for a parameter
+    encoded = sig.encode_to_topics(a=Either(1, 2), b=True)
+    assert encoded == (
+        (encode_single("uint8", 1), encode_single("uint8", 2)),
+        (encode_single("bool", True),),
+    )
+
+
+def test_event_signature_decode():
+
+    sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
+
+    decoded = sig.decode_log_entry(
+        [encode_single("uint8", 1), encode_single("bool", True)],
+        encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+    )
+    assert decoded == dict(a=1, b=True, c=b"1234", d=b"bytestring")
+
+    message = re.escape(
+        "The number of topics in the log entry (3) does not match "
+        "the number of indexed fields in the event (2)"
+    )
+    with pytest.raises(ValueError, match=message):
+        sig.decode_log_entry([b"1", b"2", b"3"], b"zzz")
 
 
 def test_constructor_from_json():
@@ -339,10 +404,23 @@ def test_contract_abi_json():
         ],
     )
 
+    event_abi = dict(
+        type="event",
+        name="Deposit",
+        anonymous=True,
+        inputs=[
+            dict(indexed=True, internalType="address", name="from", type="address"),
+            dict(indexed=True, internalType="bytes", name="foo", type="bytes"),
+            dict(indexed=False, internalType="uint8", name="bar", type="uint8"),
+        ],
+    )
+
     fallback_abi = dict(type="fallback", stateMutability="payable")
     receive_abi = dict(type="receive", stateMutability="payable")
 
-    cabi = ContractABI.from_json([constructor_abi, read_abi, write_abi, fallback_abi, receive_abi])
+    cabi = ContractABI.from_json(
+        [constructor_abi, read_abi, write_abi, fallback_abi, receive_abi, event_abi]
+    )
     assert str(cabi) == (
         "{\n"
         "    constructor(uint8 a, bool b) payable\n"
@@ -350,6 +428,7 @@ def test_contract_abi_json():
         "    receive() payable\n"
         "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
+        "    event Deposit(address indexed from, bytes indexed foo, uint8 bar) anonymous\n"
         "}"
     )
 
@@ -422,3 +501,147 @@ def test_contract_abi_errors():
         ValueError, match="JSON ABI contains more than one receive method declarations"
     ):
         abi = ContractABI.from_json([receive_abi, receive_abi])
+
+    event_abi = dict(type="event", name="Foo", inputs=[], anonymous=False)
+    with pytest.raises(ValueError, match="JSON ABI contains more than one declarations of `Foo`"):
+        abi = ContractABI.from_json([event_abi, event_abi])
+
+    with pytest.raises(ValueError, match="Unknown ABI entry type: foobar"):
+        abi = ContractABI.from_json([dict(type="foobar")])
+
+
+def test_event_from_json():
+    event = Event.from_json(
+        dict(
+            anonymous=True,
+            inputs=[
+                dict(indexed=True, internalType="address", name="from", type="address"),
+                dict(indexed=True, internalType="bytes", name="foo", type="bytes"),
+                dict(indexed=False, internalType="uint8", name="bar", type="uint8"),
+            ],
+            name="Foo",
+            type="event",
+        )
+    )
+    assert event.anonymous
+    assert event.name == "Foo"
+    assert event.indexed == {"from", "foo"}
+    assert str(event.fields) == "(address indexed from, bytes indexed foo, uint8 bar)"
+
+
+def test_event_init():
+    event = Event(
+        "Foo",
+        dict(from_=abi.address, foo=abi.bytes(), bar=abi.uint(8)),
+        indexed={"from_", "foo"},
+        anonymous=True,
+    )
+    assert event.anonymous
+    assert event.name == "Foo"
+    assert event.indexed == {"from_", "foo"}
+    assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
+
+
+def test_event_encode():
+
+    event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4)), {"a", "b"})
+    event_filter = event(b=Either(1, 2))
+    assert event_filter.topics == (
+        (LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),),
+        None,
+        (LogTopic(encode_single("uint8", 1)), LogTopic(encode_single("uint8", 2))),
+    )
+
+    # Anonymous event filter does not include the selector
+    event = Event(
+        "Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4)), {"a", "b"}, anonymous=True
+    )
+    event_filter = event(b=Either(1, 2))
+    assert event_filter.topics == (
+        None,
+        (LogTopic(encode_single("uint8", 1)), LogTopic(encode_single("uint8", 2))),
+    )
+
+
+def test_event_decode():
+
+    # We only need a couple of fields
+    fake_log_entry = namedtuple("fake_log_entry", ["topics", "data"])
+
+    event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
+
+    decoded = event.decode_log_entry(
+        fake_log_entry(
+            [
+                LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),
+                LogTopic(encode_single("bool", True)),
+                LogTopic(encode_single("uint8", 2)),
+            ],
+            encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+        )
+    )
+    assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
+
+    # Wrong selector
+    with pytest.raises(ValueError, match="This log entry belongs to a different event"):
+        decoded = event.decode_log_entry(
+            fake_log_entry(
+                [
+                    LogTopic(keccak(b"NotFoo" + event.fields.canonical_form.encode())),
+                    LogTopic(encode_single("bool", True)),
+                    LogTopic(encode_single("uint8", 2)),
+                ],
+                encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+            )
+        )
+
+    # Anonymous event
+
+    event = Event(
+        "Foo",
+        dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()),
+        {"a", "b"},
+        anonymous=True,
+    )
+
+    decoded = event.decode_log_entry(
+        fake_log_entry(
+            [LogTopic(encode_single("bool", True)), LogTopic(encode_single("uint8", 2))],
+            encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+        )
+    )
+    assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
+
+
+def test_event_errors():
+    with pytest.raises(
+        ValueError,
+        match="Event object must be created from a JSON entry with type='event'",
+    ):
+        ctr = Event.from_json(dict(type="constructor"))
+
+    uint8 = abi.uint(8)
+
+    with pytest.raises(ValueError, match="Anonymous events can have at most 4 indexed fields"):
+        Event(
+            "Foo",
+            dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8),
+            indexed={"a", "b", "c", "d", "e"},
+            anonymous=True,
+        )
+
+    # This works
+    Event(
+        "Foo",
+        dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8),
+        indexed={"a", "b", "c", "d"},
+        anonymous=True,
+    )
+
+    with pytest.raises(ValueError, match="Non-anonymous events can have at most 3 indexed fields"):
+        Event(
+            "Foo", dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8), indexed={"a", "b", "c", "d"}
+        )
+
+    # This works
+    Event("Foo", dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8), indexed={"a", "b", "c"})

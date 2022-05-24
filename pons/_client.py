@@ -11,6 +11,7 @@ from ._contract import (
     BoundWriteCall,
     BoundEventFilter,
 )
+from ._contract_abi import EventFilter
 from ._provider import (
     Provider,
     ProviderSession,
@@ -503,7 +504,7 @@ class ClientSession:
     async def eth_new_filter(
         self,
         source: Optional[Union[Address, Iterable[Address]]] = None,
-        topics: Optional[Iterable[Optional[Union[LogTopic, Iterable[LogTopic]]]]] = None,
+        event_filter: Optional[EventFilter] = None,
         from_block: Union[int, Block] = Block.LATEST,
         to_block: Union[int, Block] = Block.LATEST,
     ) -> LogFilter:
@@ -518,13 +519,11 @@ class ClientSession:
             params["address"] = source.encode()
         elif source:
             params["address"] = [address.encode() for address in source]
-        if topics:
-            encoded_topics: List[Optional[Union[str, List[str]]]] = []
-            for topic in topics:
+        if event_filter:
+            encoded_topics: List[Optional[List[str]]] = []
+            for topic in event_filter.topics:
                 if topic is None:
                     encoded_topics.append(None)
-                elif isinstance(topic, LogTopic):
-                    encoded_topics.append(topic.encode())
                 else:
                     encoded_topics.append([elem.encode() for elem in topic])
             params["topics"] = encoded_topics
@@ -577,7 +576,7 @@ class ClientSession:
     ) -> AsyncIterator[Dict[str, Any]]:
         log_filter = await self.eth_new_filter(
             source=event_filter.contract_address,
-            topics=event_filter.topics,
+            event_filter=EventFilter(event_filter.topics),
             from_block=from_block,
             to_block=to_block,
         )

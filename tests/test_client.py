@@ -20,6 +20,7 @@ from pons import (
     BlockHash,
     Block,
     LogTopic,
+    Either,
 )
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
 
@@ -58,6 +59,15 @@ def monkeypatched(obj, attr, patch):
     setattr(obj, attr, patch)
     yield obj
     setattr(obj, attr, original_value)
+
+
+def normalize_topics(topics):
+    """
+    Reduces visual noise in assertions by bringing the log topics in a log entry
+    (a tuple of single elements) to the format used in EventFilter
+    (where even single elements are 1-tuples).
+    """
+    return tuple((elem,) for elem in topics)
 
 
 async def test_net_version(test_provider, session):
@@ -461,8 +471,15 @@ async def test_log_filter_all(
     assert len(entries) == 2
     assert entries[0].address == contract1.address
     assert entries[1].address == contract2.address
-    assert entries[0].topics == contract1.abi.event.Deposit.topics(root_signer.address, b"1234")
-    assert entries[1].topics == contract2.abi.event.Deposit2.topics(another_signer.address, b"4567")
+
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1234").topics
+    )
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
 
 
 async def test_log_filter_by_address(
@@ -483,7 +500,10 @@ async def test_log_filter_by_address(
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 1
     assert entries[0].address == contract2.address
-    assert entries[0].topics == contract2.abi.event.Deposit2.topics(root_signer.address, b"4567")
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract2.abi.event.Deposit2(root_signer.address, b"4567").topics
+    )
 
     # Filter by several addresses
 
@@ -497,9 +517,15 @@ async def test_log_filter_by_address(
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
     assert entries[0].address == contract1.address
-    assert entries[0].topics == contract1.abi.event.Deposit.topics(root_signer.address, b"1111")
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1111").topics
+    )
     assert entries[1].address == contract3.address
-    assert entries[1].topics == contract3.abi.event.Deposit.topics(root_signer.address, b"3333")
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract3.abi.event.Deposit(root_signer.address, b"3333").topics
+    )
 
 
 async def test_log_filter_by_topic(
@@ -513,9 +539,7 @@ async def test_log_filter_by_topic(
 
     # Filter by a specific topic or None at each position
 
-    log_filter = await session.eth_new_filter(
-        topics=contract2.abi.event.Deposit2.topics(id=b"4567")
-    )
+    log_filter = await session.eth_new_filter(event_filter=contract2.abi.event.Deposit2(id=b"4567"))
     # filtered out, wrong event type
     await session.transact(root_signer, contract1.write.deposit(b"4567"))
     # matches the filter
@@ -528,14 +552,20 @@ async def test_log_filter_by_topic(
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
     assert entries[0].address == contract1.address
-    assert entries[0].topics == contract1.abi.event.Deposit2.topics(root_signer.address, b"4567")
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit2(root_signer.address, b"4567").topics
+    )
     assert entries[1].address == contract2.address
-    assert entries[1].topics == contract2.abi.event.Deposit2.topics(another_signer.address, b"4567")
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
 
     # Filter by a list of topics
 
-    topics = contract1.abi.event.Deposit.topics(id=[b"1111", b"3333"])
-    log_filter = await session.eth_new_filter(topics=topics)
+    event_filter = contract1.abi.event.Deposit(id=Either(b"1111", b"3333"))
+    log_filter = await session.eth_new_filter(event_filter=event_filter)
     await session.transact(root_signer, contract1.write.deposit(b"1111"))
     await session.transact(root_signer, contract1.write.deposit2(b"1111"))  # filtered out
     await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filtered out
@@ -544,9 +574,15 @@ async def test_log_filter_by_topic(
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
     assert entries[0].address == contract1.address
-    assert entries[0].topics == contract1.abi.event.Deposit.topics(root_signer.address, b"1111")
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1111").topics
+    )
     assert entries[1].address == contract2.address
-    assert entries[1].topics == contract2.abi.event.Deposit.topics(another_signer.address, b"3333")
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit(another_signer.address, b"3333").topics
+    )
 
 
 async def test_log_filter_by_block_num(
@@ -570,10 +606,10 @@ async def test_log_filter_by_block_num(
 
     # The range in the filter is inclusive
     assert [entry.block_number for entry in entries] == list(range(block_num + 1, block_num + 4))
-    assert [entry.topics for entry in entries] == [
-        contract1.abi.event.Deposit.topics(root_signer.address, b"2222"),
-        contract1.abi.event.Deposit.topics(root_signer.address, b"3333"),
-        contract1.abi.event.Deposit.topics(root_signer.address, b"4444"),
+    assert [normalize_topics(entry.topics) for entry in entries] == [
+        contract1.abi.event.Deposit(root_signer.address, b"2222").topics,
+        contract1.abi.event.Deposit(root_signer.address, b"3333").topics,
+        contract1.abi.event.Deposit(root_signer.address, b"4444").topics,
     ]
 
 

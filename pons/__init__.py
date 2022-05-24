@@ -9,6 +9,7 @@ from ._contract_abi import (
     Event,
     Fallback,
     Receive,
+    Either,
 )
 from ._contract import CompiledContract, DeployedContract
 from ._entities import (

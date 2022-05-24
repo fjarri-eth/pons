@@ -126,19 +126,19 @@ class BoundEvent:
         self.event = event
 
     def __call__(self, *args, **kwargs) -> "BoundEventFilter":
-        return BoundEventFilter(self.contract_address, self.event(*args, **kwargs))
+        return BoundEventFilter(self.contract_address, self.event, self.event(*args, **kwargs))
 
 
 class BoundEventFilter:
-    def __init__(self, contract_address: Address, event_filter: EventFilter):
+    def __init__(self, contract_address: Address, event: Event, event_filter: EventFilter):
         self.contract_address = contract_address
         self.topics = event_filter.topics
-        self._event_filter = event_filter
+        self._event = event
 
     def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
         if log_entry.address != self.contract_address:
             raise ValueError("Log entry originates from a different contract")
-        return self._event_filter.decode_log_entry(log_entry)
+        return self._event.decode_log_entry(log_entry)
 
 
 class CompiledContract:

@@ -1,5 +1,8 @@
+from collections import namedtuple
 from pathlib import Path
 
+from eth_abi import encode_single
+from eth_utils import keccak
 import pytest
 
 from pons import abi
@@ -12,6 +15,8 @@ from pons import (
     WriteMethod,
     Fallback,
     Receive,
+    Event,
+    LogTopic,
 )
 from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod, BoundConstructor
 
@@ -64,6 +69,11 @@ def test_abi_declaration(compiled_contracts):
     assert str(cabi.write.setState.inputs) == "(uint256 _v1)"
     assert cabi.write.setState.payable
 
+    assert isinstance(cabi.event.Foo, Event)
+    assert str(cabi.event.Foo.fields) == "(uint256 indexed x, bytes indexed y, bytes4 u, bytes v)"
+    assert cabi.event.Foo.anonymous
+    assert cabi.event.Foo.indexed == {"x", "y"}
+
 
 def test_api_binding(compiled_contracts):
     """
@@ -102,3 +112,26 @@ def test_api_binding(compiled_contracts):
     assert write_call.data_bytes == (
         compiled_contract.abi.write.setState.selector + b"\x00" * 31 + b"\x05"
     )
+
+    event_filter = deployed_contract.event.Foo(1, b"1234")
+    assert event_filter.contract_address == address
+    assert event_filter.topics == (
+        (LogTopic(encode_single("uint", 1)),),
+        (LogTopic(keccak(b"1234")),),
+    )
+
+    # We only need a couple of fields
+    fake_log_entry = namedtuple("fake_log_entry", ["topics", "data", "address"])
+    decoded = event_filter.decode_log_entry(
+        fake_log_entry(
+            address=address,
+            topics=[LogTopic(encode_single("uint", 1)), LogTopic(keccak(b"1234"))],
+            data=encode_single("(bytes4,bytes)", [b"4567", b"bytestring"]),
+        )
+    )
+    assert decoded == dict(x=1, y=None, u=b"4567", v=b"bytestring")
+
+    with pytest.raises(ValueError, match="Log entry originates from a different contract"):
+        decoded = event_filter.decode_log_entry(
+            fake_log_entry(address=Address(b"\xba" * 20), topics=[], data=b"")
+        )
