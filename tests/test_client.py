@@ -620,7 +620,8 @@ async def test_block_filter_high_level(
     block_hashes = []
 
     async def observer():
-        async for block_hash in session.iter_blocks(poll_interval=1):
+        # This loop always exits via break
+        async for block_hash in session.iter_blocks(poll_interval=1):  # pragma: no branch
             block_hashes.append(block_hash)
             if len(block_hashes) == 3:
                 break
@@ -649,7 +650,10 @@ async def test_pending_transaction_filter_high_level(
     tx_hashes = []
 
     async def observer():
-        async for tx_hash in session.iter_pending_transactions(poll_interval=1):
+        # This loop always exits via break
+        async for tx_hash in session.iter_pending_transactions(
+            poll_interval=1
+        ):  # pragma: no branch
             tx_hashes.append(tx_hash)
             if len(tx_hashes) == 3:
                 break
@@ -684,7 +688,8 @@ async def test_event_filter_high_level(
 
     async def observer():
         event_filter = contract2.event.Deposit2(id=b"1111")
-        async for event in session.iter_events(event_filter, poll_interval=1):
+        # This loop always exits via break
+        async for event in session.iter_events(event_filter, poll_interval=1):  # pragma: no branch
             events.append(event)
             if len(events) == 3:
                 break
