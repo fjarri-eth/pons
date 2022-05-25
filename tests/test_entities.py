@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from pons import Amount, Address, TxHash, Block, TxReceipt, BlockHash, BlockInfo, LogTopic
+from pons import Amount, Address, TxHash, Block, BlockHash
 from pons._entities import (
     encode_quantity,
     encode_data,
@@ -14,6 +14,8 @@ from pons._entities import (
     BlockHash,
     LogTopic,
     LogEntry,
+    TxReceipt,
+    BlockInfo,
 )
 
 

@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Any
+from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Any, Tuple
 
 import anyio
 
@@ -532,18 +532,21 @@ class ClientSession:
         return LogFilter.decode(result)
 
     @rpc_call("eth_getFilterChangers")
-    async def eth_get_filter_changes(self, filter_):
+    async def eth_get_filter_changes(
+        self, filter_: Union[BlockFilter, PendingTransactionFilter, LogFilter]
+    ) -> Union[Tuple[BlockHash, ...], Tuple[TxHash, ...], Tuple[LogEntry, ...]]:
         """
         Calls the ``eth_getFilterChangers`` RPC method.
+        Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
         results = await self._provider_session.rpc("eth_getFilterChanges", filter_.encode())
 
         if isinstance(filter_, BlockFilter):
-            return [BlockHash.decode(elem) for elem in results]
+            return tuple(BlockHash.decode(elem) for elem in results)
         elif isinstance(filter_, PendingTransactionFilter):
-            return [TxHash.decode(elem) for elem in results]
+            return tuple(TxHash.decode(elem) for elem in results)
         else:
-            return [LogEntry.decode(ResponseDict(elem)) for elem in results]
+            return tuple(LogEntry.decode(ResponseDict(elem)) for elem in results)
 
     async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
         """
@@ -574,6 +577,11 @@ class ClientSession:
         from_block: Union[int, Block] = Block.LATEST,
         to_block: Union[int, Block] = Block.LATEST,
     ) -> AsyncIterator[Dict[str, Any]]:
+        """
+        Yields decoded log entries produced by the filter.
+        The fields that were hashed when converted to topics (that is, fields of reference types)
+        are set to ``None``.
+        """
         log_filter = await self.eth_new_filter(
             source=event_filter.contract_address,
             event_filter=EventFilter(event_filter.topics),

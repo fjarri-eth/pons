@@ -15,9 +15,9 @@ from pons import (
     ContractABI,
     Event,
     Either,
-    LogTopic,
 )
 from pons._contract_abi import Signature, EventSignature, ABIDecodingError
+from pons._entities import LogTopic
 
 
 def test_signature_from_dict():

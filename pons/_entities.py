@@ -252,7 +252,7 @@ class LogFilter(TypedQuantity):
 
 class LogTopic(TypedData):
     """
-    A log topic for log filtering, a length-32 bytestring.
+    A log topic for log filtering.
     """
 
     def _length(self):
@@ -501,21 +501,48 @@ class TxReceipt(NamedTuple):
 
 
 class LogEntry(NamedTuple):
+    """
+    Log entry metadata.
+    """
 
     removed: bool
+    """
+    ``True`` if log was removed, due to a chain reorganization.
+    ``False`` if it is a valid log.
+    """
+
     address: Address
+    """
+    The contract address from which this log originated.
+    """
+
     data: bytes
+    """ABI-packed non-indexed arguments of the event."""
+
     topics: Tuple[LogTopic, ...]
+    """
+    Values of indexed event fields.
+    For a named event, the first topic is the event's selector.
+    """
 
     # In the docs of major providers (Infura, Alchemy, Quicknode) it is claimed
     # that the following fields can be null if "it is a pending log".
     # I could not reproduce such behavior, so for now they're staying non-nullable.
 
     log_index: int
+    """Log's position in the block."""
+
     transaction_index: int
+    """Transaction's position in the block."""
+
     transaction_hash: TxHash
+    """Hash of the transactions this log was created from."""
+
     block_hash: BlockHash
+    """Hash of the block where this log was in."""
+
     block_number: int
+    """The block number where this log was."""
 
     @classmethod
     def decode(cls, val: ResponseDict) -> "LogEntry":

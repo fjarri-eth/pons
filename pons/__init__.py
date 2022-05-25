@@ -17,15 +17,7 @@ from ._entities import (
     Address,
     Block,
     TxHash,
-    TxReceipt,
-    TxReceipt,
     BlockHash,
-    BlockInfo,
-    TxInfo,
-    LogTopic,
-    BlockFilter,
-    PendingTransactionFilter,
-    LogFilter,
 )
 from ._provider import HTTPProvider, Unreachable
 from ._signer import Signer, AccountSigner

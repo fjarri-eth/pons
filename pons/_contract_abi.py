@@ -676,6 +676,9 @@ class ContractABI:
     write: Methods[WriteMethod]
     """Contract's mutating methods."""
 
+    event: Methods[Event]
+    """Contract's events."""
+
     @classmethod
     def from_json(cls, json_abi: list) -> "ContractABI":
         constructor = None

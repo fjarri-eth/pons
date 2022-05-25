@@ -19,10 +19,10 @@ from pons import (
     TxHash,
     BlockHash,
     Block,
-    LogTopic,
     Either,
 )
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
+from pons._entities import LogTopic
 
 from .compile import compile_file
 
@@ -411,13 +411,13 @@ async def test_block_filter(test_provider, session, root_signer, another_signer)
     prev_block = await session.eth_get_block_by_number(last_block.number - 1)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
-    assert block_hashes == [prev_block.hash, last_block.hash]
+    assert block_hashes == (prev_block.hash, last_block.hash)
 
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
     last_block = await session.eth_get_block_by_number(Block.LATEST)
-    assert block_hashes == [last_block.hash]
+    assert block_hashes == (last_block.hash,)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
     assert len(block_hashes) == 0
@@ -431,7 +431,7 @@ async def test_pending_transaction_filter(test_provider, session, root_signer, a
     test_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
     tx_hashes = await session.eth_get_filter_changes(transaction_filter)
-    assert tx_hashes == [tx_hash]
+    assert tx_hashes == (tx_hash,)
 
 
 async def test_log_filter_all(

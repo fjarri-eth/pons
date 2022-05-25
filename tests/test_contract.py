@@ -16,9 +16,9 @@ from pons import (
     Fallback,
     Receive,
     Event,
-    LogTopic,
 )
 from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod, BoundConstructor
+from pons._entities import LogTopic
 
 from .compile import compile_file
 

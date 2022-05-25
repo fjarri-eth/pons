@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, Optional
 
 from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod, Event, EventFilter
-from ._entities import Address, LogEntry
+from ._entities import Address, LogEntry, LogTopic
 
 
 class BoundConstructor:
@@ -89,15 +89,15 @@ class BoundWriteMethod:
     """
 
     def __init__(self, contract_address: Address, method: WriteMethod):
-        self.contract_address = contract_address
-        self.method = method
+        self._contract_address = contract_address
+        self._method = method
 
     def __call__(self, *args, **kwargs) -> "BoundWriteCall":
         """
         Returns a contract call with encoded arguments bound to a specific address.
         """
-        call = self.method(*args, **kwargs)
-        return BoundWriteCall(self.contract_address, call.data_bytes, self.method.payable)
+        call = self._method(*args, **kwargs)
+        return BoundWriteCall(self._contract_address, call.data_bytes, self._method.payable)
 
 
 class BoundWriteCall:
@@ -121,15 +121,32 @@ class BoundWriteCall:
 
 
 class BoundEvent:
+    """
+    An event creation call with encoded topics bound to a specific contract address.
+    """
+
     def __init__(self, contract_address: Address, event: Event):
         self.contract_address = contract_address
         self.event = event
 
     def __call__(self, *args, **kwargs) -> "BoundEventFilter":
+        """
+        Returns an event filter with encoded arguments bound to a specific address.
+        """
         return BoundEventFilter(self.contract_address, self.event, self.event(*args, **kwargs))
 
 
 class BoundEventFilter:
+    """
+    An event filter bound to a specific contract address.
+    """
+
+    contract_address: Address
+    """The contract address."""
+
+    topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]
+    """Encoded topics for filtering."""
+
     def __init__(self, contract_address: Address, event: Event, event_filter: EventFilter):
         self.contract_address = contract_address
         self.topics = event_filter.topics
@@ -188,6 +205,9 @@ class DeployedContract:
 
     write: Methods[BoundWriteMethod]
     """Contract's mutating methods bound to the address."""
+
+    event: Methods[BoundEvent]
+    """Contract's events bound to the address."""
 
     def __init__(self, abi: ContractABI, address: Address):
         self.abi = abi

@@ -85,6 +85,37 @@ Secondary classes
 .. autoclass:: pons._contract_abi.WriteCall
    :members:
 
+.. autoclass:: pons._contract_abi.EventFilter
+   :members:
+
+.. autoclass:: pons._contract.BoundConstructor
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundConstructorCall
+   :members:
+
+.. autoclass:: pons._contract.BoundReadMethod
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundReadCall
+   :members:
+
+.. autoclass:: pons._contract.BoundWriteMethod
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundWriteCall
+   :members:
+
+.. autoclass:: pons._contract.BoundEvent
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundEventFilter
+   :members:
+
 
 Utility classes
 ---------------
@@ -114,31 +145,6 @@ Compiled and deployed contracts
    :members:
 
 
-Secondary classes
------------------
-
-.. autoclass:: pons._contract.BoundConstructor
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundConstructorCall
-   :members:
-
-.. autoclass:: pons._contract.BoundReadMethod
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundReadCall
-   :members:
-
-.. autoclass:: pons._contract.BoundWriteMethod
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundWriteCall
-   :members:
-
-
 Entities
 --------
 
@@ -157,22 +163,25 @@ Entities
 .. autoclass:: BlockHash
    :members:
 
-.. autoclass:: TxReceipt()
+.. autoclass:: pons._entities.TxReceipt()
    :members:
 
-.. autoclass:: BlockInfo()
+.. autoclass:: pons._entities.BlockInfo()
    :members:
 
-.. autoclass:: TxInfo()
+.. autoclass:: pons._entities.TxInfo()
    :members:
 
-.. autoclass:: BlockFilter
+.. autoclass:: pons._entities.BlockFilter()
 
-.. autoclass:: PendingTransactionFilter
+.. autoclass:: pons._entities.PendingTransactionFilter()
 
-.. autoclass:: LogFilter
+.. autoclass:: pons._entities.LogFilter()
 
-.. autoclass:: LogTopic
+.. autoclass:: pons._entities.LogTopic()
+
+.. autoclass:: pons._entities.LogEntry()
+   :members:
 
 
 Solidity types
