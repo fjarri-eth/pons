@@ -127,7 +127,7 @@ class EventSignature:
         }
         self._indexed = indexed
 
-    def encode_to_topics(self, *args, **kwargs) -> Tuple[Optional[Tuple[bytes, ...]]]:
+    def encode_to_topics(self, *args, **kwargs) -> Tuple[Optional[Tuple[bytes, ...]], ...]:
         """
         Binds given arguments to event's indexed parameters
         and encodes them as log topics.
@@ -158,7 +158,7 @@ class EventSignature:
 
         return tuple(encoded_topics)
 
-    def decode_log_entry(self, topics: Sequence[LogTopic], data: bytes) -> Dict[str, Any]:
+    def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> Dict[str, Any]:
         """
         Decodes the event fields from the given log entry data.
         """
@@ -515,9 +515,9 @@ class EventFilter:
     A filter for events coming from any contract address.
     """
 
-    topics: Tuple[Optional[Tuple[LogTopic, ...]]]
+    topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]
 
-    def __init__(self, topics: Tuple[Optional[Tuple[LogTopic, ...]]]):
+    def __init__(self, topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]):
         self.topics = topics
 
 
