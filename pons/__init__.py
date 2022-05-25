@@ -6,10 +6,18 @@ from ._contract_abi import (
     Constructor,
     ReadMethod,
     WriteMethod,
+    Event,
     Fallback,
     Receive,
+    Either,
 )
 from ._contract import CompiledContract, DeployedContract
-from ._entities import Amount, Address, Block, TxHash, TxReceipt
+from ._entities import (
+    Amount,
+    Address,
+    Block,
+    TxHash,
+    BlockHash,
+)
 from ._provider import HTTPProvider, Unreachable
 from ._signer import Signer, AccountSigner

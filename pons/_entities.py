@@ -1,8 +1,11 @@
+from abc import ABC, abstractmethod
 from functools import cached_property
 from enum import Enum
-from typing import NamedTuple, Union, Optional
+from typing import NamedTuple, Union, Optional, Tuple, Type, TypeVar
 
 from eth_utils import to_checksum_address, to_canonical_address
+
+from ._provider import ResponseDict
 
 
 class RPCDecodingError(Exception):
@@ -11,7 +14,92 @@ class RPCDecodingError(Exception):
     """
 
 
-class Amount:
+TypedDataLike = TypeVar("TypedDataLike", bound="TypedData")
+
+
+TypedQuantityLike = TypeVar("TypedQuantityLike", bound="TypedQuantity")
+
+
+class TypedData(ABC):
+    def __init__(self, value: bytes):
+        if not isinstance(value, bytes):
+            raise TypeError(
+                f"{self.__class__.__name__} must be a bytestring, got {type(value).__name__}"
+            )
+        if len(value) != self._length():
+            raise ValueError(
+                f"{self.__class__.__name__} must be {self._length()} bytes long, got {len(value)}"
+            )
+        self._value = value
+
+    @abstractmethod
+    def _length(self) -> int:
+        ...
+
+    def encode(self) -> str:
+        return encode_data(self._value)
+
+    @classmethod
+    def decode(cls: Type[TypedDataLike], val: str) -> TypedDataLike:
+        try:
+            return cls(decode_data(val))
+        except ValueError as exc:
+            raise RPCDecodingError(str(exc)) from exc
+
+    def __bytes__(self):
+        return self._value
+
+    def __hash__(self):
+        return hash(self._value)
+
+    def _check_type(self, other):
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+
+    def __eq__(self, other):
+        self._check_type(other)
+        return self._value == other._value
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(bytes.fromhex("{self._value.hex()}"))'
+
+
+class TypedQuantity:
+    def __init__(self, value: int):
+        if not isinstance(value, int):
+            raise TypeError(
+                f"{self.__class__.__name__} must be an integer, got {type(value).__name__}"
+            )
+        if value < 0:
+            raise ValueError(f"{self.__class__.__name__} must be non-negative, got {value}")
+        self._value = value
+
+    def encode(self) -> str:
+        return encode_quantity(self._value)
+
+    @classmethod
+    def decode(cls: Type[TypedQuantityLike], val: str) -> TypedQuantityLike:
+        # `decode_quantity` will raise RPCDecodingError on any error,
+        # and if it succeeds, constructor won't raise anything -
+        # the value is already guaranteed to be `int` and non-negative
+        return cls(decode_quantity(val))
+
+    def __hash__(self):
+        return hash(self._value)
+
+    def _check_type(self, other):
+        if type(self) != type(other):
+            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+
+    def __eq__(self, other):
+        self._check_type(other)
+        return self._value == other._value
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._value})"
+
+
+class Amount(TypedQuantity):
     """
     Represents a sum in the chain's native currency.
 
@@ -41,94 +129,66 @@ class Amount:
         """
         return cls(int(10**18 * value))
 
-    def __init__(self, wei: int):
-        if not isinstance(wei, int):
-            raise TypeError(f"The amount must be an integer, got {type(wei).__name__}")
-        if wei < 0:
-            raise ValueError(f"The amount must be non-negative, got {wei}")
-        self._wei = wei
-
     def as_wei(self) -> int:
         """
         Returns the amount in wei.
         """
-        return self._wei
+        return self._value
 
     def as_gwei(self) -> float:
         """
         Returns the amount in gwei.
         """
-        return self._wei / 10**9
+        return self._value / 10**9
 
     def as_ether(self) -> float:
         """
         Returns the amount in the main currency unit.
         """
-        return self._wei / 10**18
-
-    def encode(self) -> str:
-        return encode_quantity(self.as_wei())
-
-    @classmethod
-    def decode(cls, val: str) -> "Amount":
-        # `decode_data` will raise RPCDecodingError on any error,
-        # and if it succeeds, constructor won't raise anything -
-        # the value is already guaranteed to be `int` and non-negative
-        return cls(decode_quantity(val))
-
-    def _check_type(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
-
-    def __hash__(self):
-        return hash(self._wei)
-
-    def __eq__(self, other):
-        self._check_type(other)
-        return self._wei == other._wei
+        return self._value / 10**18
 
     def __add__(self, other):
         self._check_type(other)
-        return self.wei(self._wei + other._wei)
+        return self.wei(self._value + other._value)
 
     def __sub__(self, other):
         self._check_type(other)
-        return self.wei(self._wei - other._wei)
+        return self.wei(self._value - other._value)
 
     def __mul__(self, other: int):
         if not isinstance(other, int):
             raise TypeError(f"Expected an integer, got {type(other).__name__}")
-        return self.wei(self._wei * other)
+        return self.wei(self._value * other)
 
     def __floordiv__(self, other: int):
         if not isinstance(other, int):
             raise TypeError(f"Expected an integer, got {type(other).__name__}")
-        return self.wei(self._wei // other)
+        return self.wei(self._value // other)
 
     def __gt__(self, other):
         self._check_type(other)
-        return self._wei > other._wei
+        return self._value > other._value
 
     def __ge__(self, other):
         self._check_type(other)
-        return self._wei >= other._wei
+        return self._value >= other._value
 
     def __lt__(self, other):
         self._check_type(other)
-        return self._wei < other._wei
+        return self._value < other._value
 
     def __le__(self, other):
         self._check_type(other)
-        return self._wei <= other._wei
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self._wei})"
+        return self._value <= other._value
 
 
-class Address:
+class Address(TypedData):
     """
     Represents an Ethereum address.
     """
+
+    def _length(self):
+        return 20
 
     @classmethod
     def from_hex(cls, address_str: str) -> "Address":
@@ -138,46 +198,23 @@ class Address:
         """
         return cls(to_canonical_address(address_str))
 
-    def __init__(self, address_bytes: bytes):
-        if not isinstance(address_bytes, bytes):
-            raise TypeError(f"Address must be a bytestring, got {type(address_bytes).__name__}")
-        if len(address_bytes) != 20:
-            raise ValueError(f"Address must be 20 bytes long, got {len(address_bytes)}")
-        self._address_bytes = address_bytes
-
-    def __bytes__(self):
-        return self._address_bytes
-
     @cached_property
     def checksum(self) -> str:
         """
         Retunrs the checksummed hex representation of the address.
         """
-        return to_checksum_address(self._address_bytes)
+        return to_checksum_address(self._value)
 
     def encode(self) -> str:
+        # Overriding the base class method to encode into a checksummed address -
+        # some providers require it.
         return self.checksum
-
-    @classmethod
-    def decode(cls, val: str) -> "Address":
-        try:
-            return cls(decode_data(val))
-        except ValueError as exc:
-            raise RPCDecodingError(str(exc)) from exc
 
     def __str__(self):
         return self.checksum
 
     def __repr__(self):
-        return f"{self.__class__.__name__}.from_hex({self})"
-
-    def __hash__(self):
-        return hash(self._address_bytes)
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
-        return self._address_bytes == other._address_bytes
+        return f"{self.__class__.__name__}.from_hex({self.checksum})"
 
 
 class Block(Enum):
@@ -195,36 +232,205 @@ class Block(Enum):
     """Currently pending block"""
 
 
-class TxHash:
+class BlockFilter(TypedQuantity):
+    """
+    A block filter identifier (returned by ``eth_newBlockFilter``).
+    """
+
+
+class PendingTransactionFilter(TypedQuantity):
+    """
+    A pending transaction filter identifier (returned by ``eth_newPendingTransactionFilter``).
+    """
+
+
+class LogFilter(TypedQuantity):
+    """
+    A log filter identifier (returned by ``eth_newFilter``).
+    """
+
+
+class LogTopic(TypedData):
+    """
+    A log topic for log filtering.
+    """
+
+    def _length(self):
+        return 32
+
+
+class BlockHash(TypedData):
+    """
+    A wrapper for the block hash.
+    """
+
+    def _length(self):
+        return 32
+
+
+class TxHash(TypedData):
     """
     A wrapper for the transaction hash.
     """
 
-    def __init__(self, tx_hash: bytes):
-        if not isinstance(tx_hash, bytes):
-            raise TypeError(f"Transaction hash must be a bytestring, got {type(tx_hash).__name__}")
-        if len(tx_hash) != 32:
-            raise ValueError(f"Transaction hash must be 32 bytes long, got {len(tx_hash)}")
-        self._tx_hash = tx_hash
+    def _length(self):
+        return 32
 
-    def encode(self) -> str:
-        return encode_data(bytes(self))
+
+class TxInfo(NamedTuple):
+    """
+    Transaction info.
+    """
+
+    # TODO: make an enum?
+    type: int
+    """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
+
+    hash: TxHash
+    """Transaction hash."""
+
+    block_hash: BlockHash
+    """The hash of the block this transaction belongs to."""
+
+    block_number: int
+    """The number of the block this transaction belongs to."""
+
+    transaction_index: int
+    """Transaction index."""
+
+    from_: Address
+    """Transaction sender."""
+
+    to: Optional[Address]
+    """
+    Transaction recipient.
+    ``None`` when it's a contract creation transaction.
+    """
+
+    value: Amount
+    """Associated funds."""
+
+    nonce: int
+    """Transaction nonce."""
+
+    gas: int
+    """Gas used by the transaction."""
+
+    gas_price: Amount
+    """Gas price used by the transaction."""
+
+    # TODO: we may want to have a separate derived class for EIP1559 transactions,
+    # but for now this will do.
+
+    max_fee_per_gas: Optional[Amount]
+    """``maxFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
+
+    max_priority_fee_per_gas: Optional[Amount]
+    """``maxPriorityFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
 
     @classmethod
-    def decode(cls, val: str) -> "TxHash":
-        try:
-            return TxHash(decode_data(val))
-        except ValueError as exc:
-            raise RPCDecodingError(str(exc)) from exc
+    def decode(cls, val: ResponseDict) -> "TxInfo":
+        max_fee_per_gas = Amount.decode(val["maxFeePerGas"]) if "maxFeePerGas" in val else None
+        max_priority_fee_per_gas = (
+            Amount.decode(val["maxPriorityFeePerGas"]) if "maxPriorityFeePerGas" in val else None
+        )
+        return cls(
+            type=decode_quantity(val["type"]),
+            hash=TxHash.decode(val["hash"]),
+            block_hash=BlockHash.decode(val["blockHash"]),
+            block_number=decode_quantity(val["blockNumber"]),
+            transaction_index=decode_quantity(val["transactionIndex"]),
+            from_=Address.decode(val["from"]),
+            to=Address.decode(val["to"]) if val["to"] else None,
+            value=Amount.decode(val["value"]),
+            nonce=decode_quantity(val["nonce"]),
+            max_fee_per_gas=max_fee_per_gas,
+            max_priority_fee_per_gas=max_priority_fee_per_gas,
+            gas=decode_quantity(val["gas"]),
+            gas_price=Amount.decode(val["gasPrice"]),
+        )
 
-    def __bytes__(self):
-        return self._tx_hash
 
-    def __hash__(self):
-        return hash(self._tx_hash)
+class BlockInfo(NamedTuple):
+    """
+    Block info.
+    """
 
-    def __eq__(self, other):
-        return self._tx_hash == other._tx_hash
+    number: int
+    """Block number."""
+
+    hash: BlockHash
+    """Block hash."""
+
+    parent_hash: BlockHash
+    """Parent block's hash."""
+
+    nonce: int
+    """Block's nonce."""
+
+    miner: Address
+    """Block's miner."""
+
+    difficulty: int
+    """Block's difficulty."""
+
+    total_difficulty: int
+    """Block's totat difficulty."""
+
+    size: int
+    """Block size."""
+
+    gas_limit: int
+    """Block's gas limit."""
+
+    gas_used: int
+    """Gas used for the block."""
+
+    base_fee_per_gas: Amount
+    """Base fee per gas in this block."""
+
+    timestamp: int
+    """Block's timestamp."""
+
+    transaction_hashes: Tuple[TxHash, ...]
+    """A list of transaction hashes in this block."""
+
+    transactions: Optional[Tuple[TxInfo, ...]]
+    """
+    A list of details of transactions in this block.
+    Only present if it was requested.
+    """
+
+    @classmethod
+    def decode(cls, val: ResponseDict) -> "BlockInfo":
+        transactions: Optional[Tuple[TxInfo, ...]]
+        transaction_hashes: Tuple[TxHash, ...]
+        if len(val["transactions"]) == 0:
+            transactions = ()
+            transaction_hashes = ()
+        elif isinstance(val["transactions"][0], str):
+            transactions = None
+            transaction_hashes = tuple(TxHash.decode(tx_hash) for tx_hash in val["transactions"])
+        else:
+            transactions = tuple(TxInfo.decode(tx_info) for tx_info in val["transactions"])
+            transaction_hashes = tuple(tx.hash for tx in transactions)
+
+        return cls(
+            number=decode_quantity(val["number"]),
+            hash=BlockHash.decode(val["hash"]),
+            parent_hash=BlockHash.decode(val["parentHash"]),
+            nonce=decode_quantity(val["nonce"]),
+            difficulty=decode_quantity(val["difficulty"]),
+            total_difficulty=decode_quantity(val["totalDifficulty"]),
+            size=decode_quantity(val["size"]),
+            gas_limit=decode_quantity(val["gasLimit"]),
+            gas_used=decode_quantity(val["gasUsed"]),
+            base_fee_per_gas=Amount.decode(val["baseFeePerGas"]),
+            timestamp=decode_quantity(val["timestamp"]),
+            miner=Address.decode(val["miner"]),
+            transactions=transactions,
+            transaction_hashes=transaction_hashes,
+        )
 
 
 class TxReceipt(NamedTuple):
@@ -232,8 +438,11 @@ class TxReceipt(NamedTuple):
     Transaction receipt.
     """
 
-    succeeded: bool
-    """Whether the transaction was successful."""
+    block_hash: BlockHash
+    """Hash of the block including this transaction."""
+
+    block_number: int
+    """Block number including this transaction."""
 
     contract_address: Optional[Address]
     """
@@ -241,8 +450,113 @@ class TxReceipt(NamedTuple):
     contains the address of the deployed contract.
     """
 
+    cumulative_gas_used: int
+    """The total amount of gas used when this transaction was executed in the block."""
+
+    effective_gas_price: Amount
+    """The actual value per gas deducted from the sender's account."""
+
+    from_: Address
+    """Address of the sender."""
+
     gas_used: int
     """The amount of gas used by the transaction."""
+
+    to: Optional[Address]
+    """
+    Address of the receiver.
+    ``None`` when the transaction is a contract creation transaction.
+    """
+
+    transaction_hash: TxHash
+    """Hash of the transaction."""
+
+    transaction_index: int
+    """Integer of the transaction's index position in the block."""
+
+    # TODO: make an enum?
+    type: int
+    """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
+
+    succeeded: bool
+    """Whether the transaction was successful."""
+
+    @classmethod
+    def decode(cls, val: ResponseDict) -> "TxReceipt":
+        contract_address = val["contractAddress"]
+        return cls(
+            block_hash=BlockHash.decode(val["blockHash"]),
+            block_number=decode_quantity(val["blockNumber"]),
+            contract_address=Address.decode(contract_address) if contract_address else None,
+            cumulative_gas_used=decode_quantity(val["cumulativeGasUsed"]),
+            effective_gas_price=Amount.decode(val["effectiveGasPrice"]),
+            from_=Address.decode(val["from"]),
+            gas_used=decode_quantity(val["gasUsed"]),
+            to=Address.decode(val["to"]) if val["to"] else None,
+            transaction_hash=TxHash.decode(val["transactionHash"]),
+            transaction_index=decode_quantity(val["transactionIndex"]),
+            type=decode_quantity(val["type"]),
+            succeeded=(decode_quantity(val["status"]) == 1),
+        )
+
+
+class LogEntry(NamedTuple):
+    """
+    Log entry metadata.
+    """
+
+    removed: bool
+    """
+    ``True`` if log was removed, due to a chain reorganization.
+    ``False`` if it is a valid log.
+    """
+
+    address: Address
+    """
+    The contract address from which this log originated.
+    """
+
+    data: bytes
+    """ABI-packed non-indexed arguments of the event."""
+
+    topics: Tuple[LogTopic, ...]
+    """
+    Values of indexed event fields.
+    For a named event, the first topic is the event's selector.
+    """
+
+    # In the docs of major providers (Infura, Alchemy, Quicknode) it is claimed
+    # that the following fields can be null if "it is a pending log".
+    # I could not reproduce such behavior, so for now they're staying non-nullable.
+
+    log_index: int
+    """Log's position in the block."""
+
+    transaction_index: int
+    """Transaction's position in the block."""
+
+    transaction_hash: TxHash
+    """Hash of the transactions this log was created from."""
+
+    block_hash: BlockHash
+    """Hash of the block where this log was in."""
+
+    block_number: int
+    """The block number where this log was."""
+
+    @classmethod
+    def decode(cls, val: ResponseDict) -> "LogEntry":
+        return cls(
+            removed=val["removed"],
+            log_index=decode_quantity(val["logIndex"]),
+            transaction_index=decode_quantity(val["transactionIndex"]),
+            transaction_hash=TxHash.decode(val["transactionHash"]),
+            block_hash=BlockHash.decode(val["blockHash"]),
+            block_number=decode_quantity(val["blockNumber"]),
+            address=Address.decode(val["address"]),
+            data=decode_data(val["data"]),
+            topics=tuple(LogTopic.decode(topic) for topic in val["topics"]),
+        )
 
 
 def encode_quantity(val: int) -> str:
@@ -280,3 +594,13 @@ def decode_data(val: str) -> bytes:
         return bytes.fromhex(val[2:])
     except ValueError as exc:
         raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
+
+
+def decode_block(val: str) -> Union[int, str]:
+    try:
+        Block(val)  # check if it's one of the enum's values
+        return val
+    except ValueError:
+        pass
+
+    return decode_quantity(val)

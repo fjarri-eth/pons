@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Union, Any, Optional, AsyncIterator
+from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Any, Tuple
 
 import anyio
 
@@ -9,21 +9,33 @@ from ._contract import (
     BoundConstructorCall,
     BoundReadCall,
     BoundWriteCall,
+    BoundEventFilter,
 )
+from ._contract_abi import EventFilter
 from ._provider import (
     Provider,
     ProviderSession,
     UnexpectedResponse,
     RPCError,
     RPCErrorCode,
+    ResponseDict,
 )
 from ._signer import Signer
 from ._entities import (
     Address,
     Amount,
     Block,
+    BlockFilter,
+    PendingTransactionFilter,
+    LogFilter,
+    LogTopic,
+    LogEntry,
+    BlockHash,
     TxHash,
+    BlockHash,
+    BlockInfo,
     TxReceipt,
+    TxInfo,
     encode_quantity,
     encode_data,
     encode_block,
@@ -166,6 +178,16 @@ class ClientSession:
         )
         return Amount.decode(result)
 
+    @rpc_call("eth_getTransactionByHash")
+    async def eth_get_transaction_by_hash(self, tx_hash: TxHash) -> Optional[TxInfo]:
+        """
+        Calls the ``eth_getTransactionByHash`` RPC method.
+        """
+        result = await self._provider_session.rpc_dict("eth_getTransactionByHash", tx_hash.encode())
+        if not result:
+            return None
+        return TxInfo.decode(result)
+
     @rpc_call("eth_getTransactionReceipt")
     async def eth_get_transaction_receipt(self, tx_hash: TxHash) -> Optional[TxReceipt]:
         """
@@ -176,14 +198,7 @@ class ClientSession:
         )
         if not result:
             return None
-
-        contract_address = result["contractAddress"]
-
-        return TxReceipt(
-            succeeded=(decode_quantity(result["status"]) == 1),
-            contract_address=Address.decode(contract_address) if contract_address else None,
-            gas_used=decode_quantity(result["gasUsed"]),
-        )
+        return TxReceipt.decode(result)
 
     @rpc_call("eth_getTransactionCount")
     async def eth_get_transaction_count(
@@ -286,6 +301,42 @@ class ClientSession:
         result = await self._provider_session.rpc("eth_gasPrice")
         return Amount.decode(result)
 
+    @rpc_call("eth_blockNumber")
+    async def eth_block_number(self) -> int:
+        """
+        Calls the ``eth_blockNumber`` RPC method.
+        """
+        result = await self._provider_session.rpc("eth_blockNumber")
+        return decode_quantity(result)
+
+    @rpc_call("eth_getBlockByHash")
+    async def eth_get_block_by_hash(
+        self, block_hash: BlockHash, with_transactions: bool = False
+    ) -> Optional[BlockInfo]:
+        """
+        Calls the ``eth_getBlockByHash`` RPC method.
+        """
+        result = await self._provider_session.rpc_dict(
+            "eth_getBlockByHash", block_hash.encode(), with_transactions
+        )
+        if result is None:
+            return None
+        return BlockInfo.decode(result)
+
+    @rpc_call("eth_getBlockByNumber")
+    async def eth_get_block_by_number(
+        self, block: Union[int, Block] = Block.LATEST, with_transactions: bool = False
+    ) -> Optional[BlockInfo]:
+        """
+        Calls the ``eth_getBlockByNumber`` RPC method.
+        """
+        result = await self._provider_session.rpc_dict(
+            "eth_getBlockByNumber", encode_block(block), with_transactions
+        )
+        if result is None:
+            return None
+        return BlockInfo.decode(result)
+
     async def broadcast_transfer(
         self,
         signer: Signer,
@@ -384,19 +435,13 @@ class ClientSession:
 
         return DeployedContract(call.contract_abi, receipt.contract_address)
 
-    async def transact(
+    async def broadcast_transact(
         self,
         signer: Signer,
         call: BoundWriteCall,
         amount: Amount = Amount(0),
         gas: Optional[int] = None,
-    ):
-        """
-        Transacts with the contract using a prepared method call.
-        If ``gas`` is ``None``, the required amount of gas is estimated first,
-        otherwise the provided value is used.
-        Waits for the transaction to be confirmed.
-        """
+    ) -> TxHash:
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This method does not accept an associated payment")
 
@@ -419,8 +464,132 @@ class ClientSession:
             "data": encode_data(call.data_bytes),
         }
         signed_tx = signer.sign_transaction(tx)
-        tx_hash = await self._eth_send_raw_transaction(signed_tx)
-        receipt = await self.wait_for_transaction_receipt(tx_hash)
+        return await self._eth_send_raw_transaction(signed_tx)
 
+    async def transact(
+        self,
+        signer: Signer,
+        call: BoundWriteCall,
+        amount: Amount = Amount(0),
+        gas: Optional[int] = None,
+    ):
+        """
+        Transacts with the contract using a prepared method call.
+        If ``gas`` is ``None``, the required amount of gas is estimated first,
+        otherwise the provided value is used.
+        Waits for the transaction to be confirmed.
+        """
+        tx_hash = await self.broadcast_transact(signer, call, amount=amount, gas=gas)
+        receipt = await self.wait_for_transaction_receipt(tx_hash)
         if not receipt.succeeded:
             raise TransactionFailed(f"Transact failed (receipt: {receipt})")
+
+    @rpc_call("eth_newBlockFilter")
+    async def eth_new_block_filter(self) -> BlockFilter:
+        """
+        Calls the ``eth_newBlockFilter`` RPC method.
+        """
+        result = await self._provider_session.rpc("eth_newBlockFilter")
+        return BlockFilter.decode(result)
+
+    @rpc_call("eth_newPendingTransactionFilter")
+    async def eth_new_pending_transaction_filter(self) -> PendingTransactionFilter:
+        """
+        Calls the ``eth_newPendingTransactionFilter`` RPC method.
+        """
+        result = await self._provider_session.rpc("eth_newPendingTransactionFilter")
+        return PendingTransactionFilter.decode(result)
+
+    @rpc_call("eth_newFilter")
+    async def eth_new_filter(
+        self,
+        source: Optional[Union[Address, Iterable[Address]]] = None,
+        event_filter: Optional[EventFilter] = None,
+        from_block: Union[int, Block] = Block.LATEST,
+        to_block: Union[int, Block] = Block.LATEST,
+    ) -> LogFilter:
+        """
+        Calls the ``eth_newFilter`` RPC method.
+        """
+        params: Dict[str, Any] = {
+            "fromBlock": encode_block(from_block),
+            "toBlock": encode_block(to_block),
+        }
+        if isinstance(source, Address):
+            params["address"] = source.encode()
+        elif source:
+            params["address"] = [address.encode() for address in source]
+        if event_filter:
+            encoded_topics: List[Optional[List[str]]] = []
+            for topic in event_filter.topics:
+                if topic is None:
+                    encoded_topics.append(None)
+                else:
+                    encoded_topics.append([elem.encode() for elem in topic])
+            params["topics"] = encoded_topics
+
+        result = await self._provider_session.rpc("eth_newFilter", params)
+        return LogFilter.decode(result)
+
+    @rpc_call("eth_getFilterChangers")
+    async def eth_get_filter_changes(
+        self, filter_: Union[BlockFilter, PendingTransactionFilter, LogFilter]
+    ) -> Union[Tuple[BlockHash, ...], Tuple[TxHash, ...], Tuple[LogEntry, ...]]:
+        """
+        Calls the ``eth_getFilterChangers`` RPC method.
+        Depending on what ``filter_`` was, returns a tuple of corresponding results.
+        """
+        results = await self._provider_session.rpc("eth_getFilterChanges", filter_.encode())
+
+        if isinstance(filter_, BlockFilter):
+            return tuple(BlockHash.decode(elem) for elem in results)
+        elif isinstance(filter_, PendingTransactionFilter):
+            return tuple(TxHash.decode(elem) for elem in results)
+        else:
+            return tuple(LogEntry.decode(ResponseDict(elem)) for elem in results)
+
+    async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
+        """
+        Yields hashes of new blocks being mined.
+        """
+        block_filter = await self.eth_new_block_filter()
+        while True:
+            block_hashes = await self.eth_get_filter_changes(block_filter)
+            for block_hash in block_hashes:
+                yield block_hash
+            await anyio.sleep(poll_interval)
+
+    async def iter_pending_transactions(self, poll_interval: int = 1) -> AsyncIterator[TxHash]:
+        """
+        Yields hashes of new transactions being submitted.
+        """
+        tx_filter = await self.eth_new_pending_transaction_filter()
+        while True:
+            tx_hashes = await self.eth_get_filter_changes(tx_filter)
+            for tx_hash in tx_hashes:
+                yield tx_hash
+            await anyio.sleep(poll_interval)
+
+    async def iter_events(
+        self,
+        event_filter: BoundEventFilter,
+        poll_interval: int = 1,
+        from_block: Union[int, Block] = Block.LATEST,
+        to_block: Union[int, Block] = Block.LATEST,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """
+        Yields decoded log entries produced by the filter.
+        The fields that were hashed when converted to topics (that is, fields of reference types)
+        are set to ``None``.
+        """
+        log_filter = await self.eth_new_filter(
+            source=event_filter.contract_address,
+            event_filter=EventFilter(event_filter.topics),
+            from_block=from_block,
+            to_block=to_block,
+        )
+        while True:
+            log_entries = await self.eth_get_filter_changes(log_filter)
+            for log_entry in log_entries:
+                yield event_filter.decode_log_entry(log_entry)
+            await anyio.sleep(poll_interval)

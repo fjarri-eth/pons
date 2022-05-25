@@ -3,6 +3,9 @@ from functools import cached_property
 import re
 from typing import Optional, Any, Union, Iterable, Mapping, Dict
 
+from eth_abi import encode_single, decode_single
+from eth_utils import keccak
+
 from ._entities import Address
 
 
@@ -32,6 +35,51 @@ class Type(ABC):
         and wraps it in a specific type, if applicable.
         """
         ...
+
+    def encode_to_topic(self, val) -> bytes:
+        """
+        Encodes the given value as an event topic.
+        """
+        # EVM uses a simpler encoding scheme for encoding values into event topics
+        # because objects of reference types are just hashed,
+        # and there is no need to unpack them later
+        # (basically, all values are just concatenated without any lentgh labels).
+        # Therefore we have to provide these methods
+        # and cannot just use the functions from ``eth_abi``.
+
+        # Before doing anything, normalize the value,
+        # this will check that ensure the constituent values are actually valid.
+        return self._encode_to_topic_outer(self.normalize(val))
+
+    def _encode_to_topic_outer(self, val) -> bytes:
+        """
+        Encodes a value of the outer indexed type.
+        """
+        # By default it's just the encoding of the value type.
+        # May be overridden.
+        return encode_single(self.canonical_form, val)
+
+    def _encode_to_topic_inner(self, val) -> bytes:
+        """
+        Encodes a value contained within an indexed array or struct.
+        """
+        # By default it's just the encoding of the value type.
+        # May be overridden.
+        return encode_single(self.canonical_form, val)
+
+    def decode_from_topic(self, val: bytes) -> Any:
+        """
+        Decodes an encoded topic.
+        Returns ``None`` if the decoding is impossible
+        (that is, the original value was hashed).
+        """
+        # This method does not have inner/outer division, since all reference types are hashed,
+        # and there's no need to go recursively into structs/arrays - we won't be able to recover
+        # the values anyway.
+
+        # By default it's just the decoding of the value type.
+        # May be overridden.
+        return self.denormalize(decode_single(self.canonical_form, val))
 
     def __str__(self):
         return self.canonical_form
@@ -160,6 +208,30 @@ class Bytes(Type):
         self._check_val(val)
         return val
 
+    def _encode_to_topic_outer(self, val):
+        if self._size is None:
+            # Dynamic `bytes` is a reference type and is therefore hashed.
+            return keccak(val)
+        else:
+            # Sized `bytes` is a value type, falls back to the base implementation.
+            return super()._encode_to_topic_outer(val)
+
+    def _encode_to_topic_inner(self, val):
+        if self._size is None:
+            # Dynamic `bytes` is padded to a multiple of 32 bytes.
+            padding_len = (32 - len(val)) % 32
+            return val + b"\x00" * padding_len
+        else:
+            # Sized `bytes` is a value type, falls back to the base implementation.
+            return super()._encode_to_topic_inner(val)
+
+    def decode_from_topic(self, val):
+        if self._size is None:
+            # Cannot recover a hashed value.
+            return None
+        else:
+            return super().decode_from_topic(val)
+
     def __eq__(self, other):
         return isinstance(other, Bytes) and self._size == other._size
 
@@ -211,6 +283,18 @@ class String(Type):
     def denormalize(self, val):
         self._check_val(val)
         return val
+
+    def _encode_to_topic_outer(self, val):
+        # `string` is encoded and treated as dynamic `bytes`
+        return Bytes()._encode_to_topic_outer(val.encode())
+
+    def _encode_to_topic_inner(self, val):
+        # `string` is encoded and treated as dynamic `bytes`
+        return Bytes()._encode_to_topic_inner(val.encode())
+
+    def decode_from_topic(self, val):
+        # Dynamic `bytes` is hashed, so the value cannot be recovered.
+        return None
 
     def __eq__(self, other):
         return isinstance(other, String)
@@ -272,6 +356,15 @@ class Array(Type):
         self._check_val(val)
         return [self._element_type.denormalize(item) for item in val]
 
+    def _encode_to_topic_outer(self, val):
+        return keccak(self._encode_to_topic_inner(val))
+
+    def _encode_to_topic_inner(self, val):
+        return b"".join(self._element_type._encode_to_topic_inner(elem) for elem in val)
+
+    def decode_from_topic(self, val):
+        return None
+
     def __eq__(self, other):
         return (
             isinstance(other, Array)
@@ -312,6 +405,17 @@ class Struct(Type):
     def denormalize(self, val):
         self._check_val(val)
         return {name: tp.denormalize(item) for item, (name, tp) in zip(val, self._fields.items())}
+
+    def _encode_to_topic_outer(self, val):
+        return keccak(self._encode_to_topic_inner(val))
+
+    def _encode_to_topic_inner(self, val):
+        return b"".join(
+            tp._encode_to_topic_inner(elem) for elem, tp in zip(val, self._fields.values())
+        )
+
+    def decode_from_topic(self, val):
+        return None
 
     def __str__(self):
         # Overriding  the `Type`'s implementation because we want to show the field names too

@@ -7,12 +7,19 @@ from typing import Union, List
 
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
-from eth_tester.exceptions import TransactionNotFound, TransactionFailed
+from eth_tester.exceptions import TransactionNotFound, TransactionFailed, BlockNotFound
 from eth.exceptions import Revert
 from eth_utils.exceptions import ValidationError
 
 from pons._provider import Provider, ProviderSession, RPCError, RPCErrorCode
-from pons._entities import Amount, Address, encode_quantity, decode_quantity, encode_data
+from pons._entities import (
+    Amount,
+    Address,
+    encode_quantity,
+    decode_quantity,
+    encode_data,
+    decode_block,
+)
 
 
 @contextmanager
@@ -37,6 +44,26 @@ def pyevm_errors_into_rpc_errors():
             )  # pragma: no cover
     except ValidationError as exc:
         raise RPCError(RPCErrorCode.SERVER_ERROR.value, exc.args[0])
+
+
+def make_camel_case(key):
+    # The RPC standard uses camelCase dictionary keys,
+    # EthereumTester does not, for whatever reason.
+    parts = key.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+
+
+def normalize_return_value(value):
+    if isinstance(value, int):
+        return encode_quantity(value)
+    elif isinstance(value, bytes):
+        return encode_data(value)
+    elif isinstance(value, dict):
+        return {make_camel_case(key): normalize_return_value(item) for key, item in value.items()}
+    elif isinstance(value, (list, tuple)):
+        return [normalize_return_value(item) for item in value]
+    else:
+        return value
 
 
 class EthereumTesterProvider(Provider):
@@ -66,6 +93,14 @@ class EthereumTesterProvider(Provider):
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
             eth_gasPrice=self.eth_gas_price,
+            eth_blockNumber=self.eth_block_number,
+            eth_getTransactionByHash=self.eth_get_transaction_by_hash,
+            eth_getBlockByHash=self.eth_get_block_by_hash,
+            eth_getBlockByNumber=self.eth_get_block_by_number,
+            eth_newBlockFilter=self.eth_new_block_filter,
+            eth_newPendingTransactionFilter=self.eth_new_pending_transaction_filter,
+            eth_newFilter=self.eth_new_filter,
+            eth_getFilterChanges=self.eth_get_filter_changes,
         )
         return dispatch[method](*args)
 
@@ -91,19 +126,12 @@ class EthereumTesterProvider(Provider):
         tx["from"] = self._default_address.encode()
         return self._ethereum_tester.call(tx, block)
 
-    def eth_get_transaction_receipt(self, tx_hash_hex):
+    def eth_get_transaction_receipt(self, tx_hash: str):
         try:
-            result = self._ethereum_tester.get_transaction_receipt(tx_hash_hex)
+            result = self._ethereum_tester.get_transaction_receipt(tx_hash)
         except TransactionNotFound:
             return None
-
-        # TODO: rename/encode the remaining fields. For now that's all we need.
-        result = dict(
-            contractAddress=result["contract_address"],
-            status=encode_quantity(result["status"]),
-            gasUsed=encode_quantity(result["gas_used"]),
-        )
-        return result
+        return normalize_return_value(result)
 
     def eth_estimate_gas(self, tx: dict, block: str) -> str:
         if "from" not in tx:
@@ -122,6 +150,69 @@ class EthereumTesterProvider(Provider):
 
         # Base fee plus 1 GWei
         return encode_quantity(block_info["base_fee_per_gas"] + 10**9)
+
+    def eth_block_number(self):
+        result = self._ethereum_tester.get_block_by_number("latest")["number"]
+        return encode_quantity(result)
+
+    def eth_get_transaction_by_hash(self, tx_hash: str):
+        try:
+            result = self._ethereum_tester.get_transaction_by_hash(
+                tx_hash,
+            )
+        except TransactionNotFound:
+            return None
+        return normalize_return_value(result)
+
+    def eth_get_block_by_hash(self, block_hash: str, with_transactions: bool):
+        try:
+            result = self._ethereum_tester.get_block_by_hash(
+                block_hash, full_transactions=with_transactions
+            )
+        except BlockNotFound:
+            return None
+        return normalize_return_value(result)
+
+    def eth_get_block_by_number(self, block: str, with_transactions: bool):
+        try:
+            result = self._ethereum_tester.get_block_by_number(
+                decode_block(block), full_transactions=with_transactions
+            )
+        except BlockNotFound:
+            return None
+        return normalize_return_value(result)
+
+    def eth_new_block_filter(self):
+        filter_id = self._ethereum_tester.create_block_filter()
+        return encode_quantity(filter_id)
+
+    def eth_new_pending_transaction_filter(self):
+        filter_id = self._ethereum_tester.create_pending_transaction_filter()
+        return encode_quantity(filter_id)
+
+    def eth_new_filter(self, params: dict):
+        address = params.get("address", None)
+        topics = params.get("topics", None)
+        filter_id = self._ethereum_tester.create_log_filter(
+            from_block=decode_block(params["fromBlock"]),
+            to_block=decode_block(params["toBlock"]),
+            address=address,
+            topics=topics,
+        )
+        return encode_quantity(filter_id)
+
+    def eth_get_filter_changes(self, filter_id: str):
+        results = self._ethereum_tester.get_only_filter_changes(decode_quantity(filter_id))
+        results = normalize_return_value(results)
+        # There's no public way to detect they type of the filter,
+        # and we need to apply this transformation only for log filters.
+        # Hence the hack.
+        if results and isinstance(results[0], dict):
+            for result in results:
+                result[
+                    "removed"
+                ] = False  # returned by regular RPC providers, but not by EthereumTester
+        return results
 
     @asynccontextmanager
     async def session(self):

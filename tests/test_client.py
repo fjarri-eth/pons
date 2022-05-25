@@ -17,30 +17,14 @@ from pons import (
     DeployedContract,
     ReadMethod,
     TxHash,
+    BlockHash,
+    Block,
+    Either,
 )
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
+from pons._entities import LogTopic
 
 from .compile import compile_file
-from .provider_server import ServerHandle
-from .provider import EthereumTesterProvider
-
-
-@pytest.fixture(params=["direct", "http"])
-async def provider(request, test_provider, nursery):
-    if request.param == "direct":
-        yield test_provider
-    else:
-        handle = ServerHandle(test_provider)
-        await nursery.start(handle)
-        yield handle.http_provider
-        handle.shutdown()
-
-
-@pytest.fixture
-async def session(provider):
-    client = Client(provider=provider)
-    async with client.session() as session:
-        yield session
 
 
 @pytest.fixture
@@ -55,6 +39,15 @@ def monkeypatched(obj, attr, patch):
     setattr(obj, attr, patch)
     yield obj
     setattr(obj, attr, original_value)
+
+
+def normalize_topics(topics):
+    """
+    Reduces visual noise in assertions by bringing the log topics in a log entry
+    (a tuple of single elements) to the format used in EventFilter
+    (where even single elements are 1-tuples).
+    """
+    return tuple((elem,) for elem in topics)
 
 
 async def test_net_version(test_provider, session):
@@ -239,6 +232,18 @@ async def test_eth_gas_price(test_provider, session):
     assert isinstance(gas_price, Amount)
 
 
+async def test_eth_block_number(session, root_signer, another_signer):
+
+    to_transfer = Amount.ether(10)
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    await session.transfer(root_signer, another_signer.address, Amount.ether(2))
+    await session.transfer(root_signer, another_signer.address, Amount.ether(3))
+    block_num = await session.eth_block_number()
+
+    block_info = await session.eth_get_block_by_number(block_num - 1, with_transactions=True)
+    assert block_info.transactions[0].value == Amount.ether(2)
+
+
 async def test_transfer(test_provider, session, root_signer, another_signer):
 
     # Regular transfer
@@ -354,3 +359,340 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
     # Not enough gas
     with pytest.raises(TransactionFailed, match="Transact failed"):
         await session.transact(root_signer, deployed_contract.write.faultySetState(0), gas=300000)
+
+
+async def test_get_block(test_provider, session, root_signer, another_signer):
+    to_transfer = Amount.ether(10)
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    block_info = await session.eth_get_block_by_number(1, with_transactions=True)
+    assert block_info.transactions is not None
+
+    block_info2 = await session.eth_get_block_by_hash(block_info.hash, with_transactions=True)
+    assert block_info2 == block_info
+
+    # no transactions
+    block_info = await session.eth_get_block_by_number(1)
+    assert block_info.transactions is None
+
+    # non-existent block
+    block_info = await session.eth_get_block_by_number(100, with_transactions=True)
+    assert block_info is None
+    block_info = await session.eth_get_block_by_hash(
+        BlockHash(b"\x00" * 32), with_transactions=True
+    )
+    assert block_info is None
+
+
+async def test_eth_get_transaction_by_hash(test_provider, session, root_signer, another_signer):
+    to_transfer = Amount.ether(1)
+
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
+    tx_info = await session.eth_get_transaction_by_hash(tx_hash)
+    assert tx_info.value == to_transfer
+
+    non_existent = TxHash(b"abcd" * 8)
+    tx_info = await session.eth_get_transaction_by_hash(non_existent)
+    assert tx_info is None
+
+
+async def test_block_filter(test_provider, session, root_signer, another_signer):
+
+    to_transfer = Amount.ether(1)
+
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    block_filter = await session.eth_new_block_filter()
+
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    last_block = await session.eth_get_block_by_number(Block.LATEST)
+    prev_block = await session.eth_get_block_by_number(last_block.number - 1)
+
+    block_hashes = await session.eth_get_filter_changes(block_filter)
+    assert block_hashes == (prev_block.hash, last_block.hash)
+
+    await session.transfer(root_signer, another_signer.address, to_transfer)
+
+    block_hashes = await session.eth_get_filter_changes(block_filter)
+    last_block = await session.eth_get_block_by_number(Block.LATEST)
+    assert block_hashes == (last_block.hash,)
+
+    block_hashes = await session.eth_get_filter_changes(block_filter)
+    assert len(block_hashes) == 0
+
+
+async def test_pending_transaction_filter(test_provider, session, root_signer, another_signer):
+    transaction_filter = await session.eth_new_pending_transaction_filter()
+
+    to_transfer = Amount.ether(1)
+
+    test_provider.disable_auto_mine_transactions()
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
+    tx_hashes = await session.eth_get_filter_changes(transaction_filter)
+    assert tx_hashes == (tx_hash,)
+
+
+async def test_log_filter_all(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    log_filter = await session.eth_new_filter()
+    await session.transact(root_signer, contract1.write.deposit(b"1234"))
+    await session.transact(another_signer, contract2.write.deposit2(b"4567"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[1].address == contract2.address
+
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1234").topics
+    )
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
+
+
+async def test_log_filter_by_address(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    # Filter by a single address
+
+    log_filter = await session.eth_new_filter(source=contract2.address)
+    await session.transact(root_signer, contract1.write.deposit(b"1234"))
+    await session.transact(root_signer, contract2.write.deposit2(b"4567"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 1
+    assert entries[0].address == contract2.address
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract2.abi.event.Deposit2(root_signer.address, b"4567").topics
+    )
+
+    # Filter by several addresses
+
+    contract3 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    log_filter = await session.eth_new_filter(source=[contract1.address, contract3.address])
+    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    await session.transact(root_signer, contract2.write.deposit(b"2222"))
+    await session.transact(root_signer, contract3.write.deposit(b"3333"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1111").topics
+    )
+    assert entries[1].address == contract3.address
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract3.abi.event.Deposit(root_signer.address, b"3333").topics
+    )
+
+
+async def test_log_filter_by_topic(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    # Filter by a specific topic or None at each position
+
+    log_filter = await session.eth_new_filter(event_filter=contract2.abi.event.Deposit2(id=b"4567"))
+    # filtered out, wrong event type
+    await session.transact(root_signer, contract1.write.deposit(b"4567"))
+    # matches the filter
+    await session.transact(root_signer, contract1.write.deposit2(b"4567"))
+    # filtered out, wrong value
+    await session.transact(another_signer, contract2.write.deposit2(b"7890"))
+    # matches the filter
+    await session.transact(another_signer, contract2.write.deposit2(b"4567"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit2(root_signer.address, b"4567").topics
+    )
+    assert entries[1].address == contract2.address
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
+
+    # Filter by a list of topics
+
+    event_filter = contract1.abi.event.Deposit(id=Either(b"1111", b"3333"))
+    log_filter = await session.eth_new_filter(event_filter=event_filter)
+    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    await session.transact(root_signer, contract1.write.deposit2(b"1111"))  # filtered out
+    await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filtered out
+    await session.transact(another_signer, contract2.write.deposit(b"3333"))
+
+    entries = await session.eth_get_filter_changes(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1111").topics
+    )
+    assert entries[1].address == contract2.address
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit(another_signer.address, b"3333").topics
+    )
+
+
+async def test_log_filter_by_block_num(
+    test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    block_num = await session.eth_block_number()
+    await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filter will start here
+    await session.transact(root_signer, contract1.write.deposit(b"3333"))
+    await session.transact(root_signer, contract1.write.deposit(b"4444"))  # filter will stop here
+    await session.transact(root_signer, contract1.write.deposit(b"5555"))
+
+    log_filter = await session.eth_new_filter(from_block=block_num + 1, to_block=block_num + 3)
+    entries = await session.eth_get_filter_changes(log_filter)
+
+    # The range in the filter is inclusive
+    assert [entry.block_number for entry in entries] == list(range(block_num + 1, block_num + 4))
+    assert [normalize_topics(entry.topics) for entry in entries] == [
+        contract1.abi.event.Deposit(root_signer.address, b"2222").topics,
+        contract1.abi.event.Deposit(root_signer.address, b"3333").topics,
+        contract1.abi.event.Deposit(root_signer.address, b"4444").topics,
+    ]
+
+
+async def test_block_filter_high_level(
+    autojump_clock, test_provider, session, root_signer, another_signer
+):
+
+    block_hashes = []
+
+    async def observer():
+        # This loop always exits via break
+        async for block_hash in session.iter_blocks(poll_interval=1):  # pragma: no branch
+            block_hashes.append(block_hash)
+            if len(block_hashes) == 3:
+                break
+
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(observer)
+        await trio.sleep(2)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(2))
+        await session.transfer(root_signer, another_signer.address, Amount.ether(3))
+        await trio.sleep(3)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(4))
+        await trio.sleep(1)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(5))
+
+    for i, block_hash in enumerate(block_hashes):
+        block_info = await session.eth_get_block_by_hash(block_hash, with_transactions=True)
+        assert block_info.transactions[0].value == Amount.ether(i + 2)
+
+
+async def test_pending_transaction_filter_high_level(
+    autojump_clock, test_provider, session, root_signer, another_signer
+):
+
+    tx_hashes = []
+
+    async def observer():
+        # This loop always exits via break
+        async for tx_hash in session.iter_pending_transactions(  # pragma: no branch
+            poll_interval=1
+        ):
+            tx_hashes.append(tx_hash)
+            if len(tx_hashes) == 3:
+                break
+
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(observer)
+        await trio.sleep(2)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(2))
+        await session.transfer(root_signer, another_signer.address, Amount.ether(3))
+        await trio.sleep(3)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(4))
+        await trio.sleep(1)
+        await session.transfer(root_signer, another_signer.address, Amount.ether(5))
+
+    for i, tx_hash in enumerate(tx_hashes):
+        tx_info = await session.eth_get_transaction_by_hash(tx_hash)
+        assert tx_info.value == Amount.ether(i + 2)
+
+
+async def test_event_filter_high_level(
+    autojump_clock, test_provider, session, compiled_contracts, root_signer, another_signer
+):
+
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    events = []
+
+    async def observer():
+        event_filter = contract2.event.Deposit2(id=b"1111")
+        # This loop always exits via break
+        async for event in session.iter_events(event_filter, poll_interval=1):  # pragma: no branch
+            events.append(event)
+            if len(events) == 3:
+                break
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(observer)
+        await trio.sleep(2)
+
+        # filtered out, wrong event type
+        await session.transact(root_signer, contract1.write.deposit(b"1111"))
+        # filtered out, wrong contract address
+        await session.transact(root_signer, contract1.write.deposit2(b"1111"))
+        # filtered out, wrong value
+        await session.transact(another_signer, contract2.write.deposit2(b"7890"))
+        # matches the filter
+        await session.transact(root_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(1))
+        await session.transact(
+            another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(2)
+        )
+        await session.transact(
+            another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(3)
+        )
+
+    assert events[0] == {"from": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
+    assert events[1] == {"from": another_signer.address, "id": b"1111", "value": 2, "value2": 3}
+    assert events[2] == {"from": another_signer.address, "id": b"1111", "value": 3, "value2": 4}

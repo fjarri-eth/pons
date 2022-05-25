@@ -63,6 +63,9 @@ Contract ABI
    :members:
    :special-members: __call__
 
+.. autoclass:: Event
+   :members:
+
 .. autoclass:: Fallback
    :members:
 
@@ -80,6 +83,37 @@ Secondary classes
    :members:
 
 .. autoclass:: pons._contract_abi.WriteCall
+   :members:
+
+.. autoclass:: pons._contract_abi.EventFilter
+   :members:
+
+.. autoclass:: pons._contract.BoundConstructor
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundConstructorCall
+   :members:
+
+.. autoclass:: pons._contract.BoundReadMethod
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundReadCall
+   :members:
+
+.. autoclass:: pons._contract.BoundWriteMethod
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundWriteCall
+   :members:
+
+.. autoclass:: pons._contract.BoundEvent
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundEventFilter
    :members:
 
 
@@ -111,31 +145,6 @@ Compiled and deployed contracts
    :members:
 
 
-Secondary classes
------------------
-
-.. autoclass:: pons._contract.BoundConstructor
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundConstructorCall
-   :members:
-
-.. autoclass:: pons._contract.BoundReadMethod
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundReadCall
-   :members:
-
-.. autoclass:: pons._contract.BoundWriteMethod
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundWriteCall
-   :members:
-
-
 Entities
 --------
 
@@ -148,10 +157,30 @@ Entities
 .. autoclass:: Block()
    :members:
 
-.. autoclass:: TxHash()
+.. autoclass:: TxHash
    :members:
 
-.. autoclass:: TxReceipt()
+.. autoclass:: BlockHash
+   :members:
+
+.. autoclass:: pons._entities.TxReceipt()
+   :members:
+
+.. autoclass:: pons._entities.BlockInfo()
+   :members:
+
+.. autoclass:: pons._entities.TxInfo()
+   :members:
+
+.. autoclass:: pons._entities.BlockFilter()
+
+.. autoclass:: pons._entities.PendingTransactionFilter()
+
+.. autoclass:: pons._entities.LogFilter()
+
+.. autoclass:: pons._entities.LogTopic()
+
+.. autoclass:: pons._entities.LogEntry()
    :members:
 
 

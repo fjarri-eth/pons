@@ -1,3 +1,6 @@
+import os
+
+from eth_utils import keccak
 import pytest
 
 from pons import abi, Address
@@ -237,3 +240,76 @@ def test_normalization_roundtrip():
 
     # denormalize() should recover struct field names
     assert struct.denormalize(expected_normalized) == value
+
+
+def check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=True):
+    assert tp.encode_to_topic(val) == encoded_val
+    if can_be_decoded:
+        assert tp.decode_from_topic(encoded_val) == val
+    else:
+        assert tp.decode_from_topic(encoded_val) is None
+
+
+def test_encode_to_topic():
+
+    # Simple types
+
+    check_topic_encode_decode(
+        abi.uint(32), 0x12345678, b"\x00" * 28 + (0x12345678).to_bytes(4, "big")
+    )
+    check_topic_encode_decode(
+        abi.int(32), 0x12345678, b"\x00" * 28 + (0x12345678).to_bytes(4, "big")
+    )
+    check_topic_encode_decode(abi.bool, True, b"\x00" * 31 + b"\x01")
+
+    address = Address(os.urandom(20))
+    check_topic_encode_decode(abi.address, address, b"\x00" * 12 + bytes(address))
+
+    # Corner cases
+    check_topic_encode_decode(abi.bytes(), b"", keccak(b""), can_be_decoded=False)
+    eth_word = os.urandom(32)
+    check_topic_encode_decode(abi.bytes(32), eth_word, eth_word)
+    check_topic_encode_decode(abi.bytes(), eth_word, keccak(eth_word), can_be_decoded=False)
+
+    small_bytes = os.urandom(5)
+    check_topic_encode_decode(abi.bytes(5), small_bytes, small_bytes + b"\x00" * 27)
+    check_topic_encode_decode(abi.bytes(), small_bytes, keccak(small_bytes), can_be_decoded=False)
+
+    big_bytes = os.urandom(33)
+    check_topic_encode_decode(abi.bytes(), big_bytes, keccak(big_bytes), can_be_decoded=False)
+
+    string = "\u1234abcd"  # using Unicode here to check that encoding is happening
+    check_topic_encode_decode(abi.string, string, keccak(string.encode()), can_be_decoded=False)
+
+    # Arrays
+
+    tp = abi.bytes()[2]
+    small_bytes = os.urandom(5)
+    big_bytes = os.urandom(33)
+    val = [small_bytes, big_bytes]
+    # Values in the array are padded to multiples of 32 bytes
+    encoded_val = keccak(small_bytes + b"\x00" * 27 + big_bytes + b"\x00" * 31)
+    check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=False)
+
+    # Structs
+
+    tp = abi.struct(
+        field1=abi.bytes()[2],
+        field2=abi.bool,
+        field3=abi.struct(inner1=abi.bytes(5), inner2=abi.string),
+    )
+    small_bytes = os.urandom(5)
+    big_bytes = os.urandom(33)
+    string = "abcdefghijklmnopqrstuvwxyz0123456789"
+    val = [[small_bytes, big_bytes], True, [small_bytes, string]]
+    # Values in the struct and nested arrays/structs are padded to multiples of 32 bytes
+    padded_small = small_bytes + b"\x00" * 27
+    padded_big = big_bytes + b"\x00" * 31
+    encoded_val = keccak(
+        (small_bytes + b"\x00" * 27)
+        + (big_bytes + b"\x00" * 31)
+        + (b"\x00" * 31 + b"\x01")
+        + (small_bytes + b"\x00" * 27)
+        + (string.encode() + b"\x00" * 28)
+    )
+    check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=False)

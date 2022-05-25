@@ -37,4 +37,11 @@ contract JsonAbiTest {
         inner_out = inner_in;
         outer_out = outer_in;
     }
+
+    event Foo(
+        uint indexed x,
+        bytes indexed y,
+        bytes4 u,
+        bytes v
+    ) anonymous;
 }

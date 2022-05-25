@@ -3,6 +3,7 @@ from functools import cached_property
 import inspect
 from typing import (
     Any,
+    AbstractSet,
     Iterable,
     List,
     Dict,
@@ -13,13 +14,15 @@ from typing import (
     Generic,
     Iterator,
     Sequence,
+    Tuple,
 )
 
 from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 from eth_abi.exceptions import DecodingError as BackendDecodingError
 
-from ._abi_types import Type, dispatch_types, dispatch_type
+from ._abi_types import Type, dispatch_types, dispatch_type, String, Bytes, Array, Struct
+from ._entities import LogTopic, LogEntry
 
 
 class ABIDecodingError(Exception):
@@ -30,7 +33,7 @@ class ABIDecodingError(Exception):
 
 class Signature:
     """
-    Generalized signature of either inputs or outputs.
+    Generalized signature of either inputs or outputs of a method.
     """
 
     def __init__(self, parameters: Union[Mapping[str, Type], Sequence[Type]]):
@@ -69,23 +72,6 @@ class Signature:
         normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
         return encode_single(self.canonical_form, normalized_values)
 
-    def encode_single(self, value) -> bytes:
-        """
-        Encodes a single value into the bytestring according to the ABI format.
-
-        If the signature has named parameters, the value is treated
-        as a dictionary of keyword arguments.
-        If the signature has anonymous parameters, and the value is an iterable,
-        it is treated as alist of positional arguments;
-        if it is not iterable, it is treated as a single positional argument.
-        """
-        if isinstance(value, Mapping):
-            return self.encode(**value)
-        elif isinstance(value, Iterable):
-            return self.encode(*value)
-        else:
-            return self.encode(value)
-
     def decode(self, value_bytes: bytes) -> List[Any]:
         """
         Decodes the packed bytestring into a list of values.
@@ -111,6 +97,117 @@ class Signature:
         else:
             params = ", ".join(f"{tp.canonical_form}" for tp in self._types)
         return f"({params})"
+
+
+class Either:
+    """
+    Denotes an `OR` operation when filtering events.
+    """
+
+    def __init__(self, *items: Any):
+        self.items = items
+
+
+class EventSignature:
+    """
+    A signature representing the constructor of an event (that is, its fields).
+    """
+
+    def __init__(self, parameters: Mapping[str, Type], indexed: AbstractSet[str]):
+        self._signature = inspect.Signature(
+            parameters=[
+                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                for name, tp in parameters.items()
+                if name in indexed
+            ]
+        )
+        self._types = parameters
+        self._types_nonindexed = {
+            name: self._types[name] for name in parameters if name not in indexed
+        }
+        self._indexed = indexed
+
+    def encode_to_topics(self, *args, **kwargs) -> Tuple[Optional[Tuple[bytes, ...]], ...]:
+        """
+        Binds given arguments to event's indexed parameters
+        and encodes them as log topics.
+        """
+
+        bound_args = self._signature.bind_partial(*args, **kwargs)
+
+        encoded_topics: List[Optional[Tuple[bytes, ...]]] = []
+        for param_name in self._signature.parameters:
+            if param_name not in bound_args.arguments:
+                encoded_topics.append(None)
+                continue
+
+            bound_val = bound_args.arguments[param_name]
+            tp = self._types[param_name]
+
+            if isinstance(bound_val, Either):
+                encoded_val = tuple(tp.encode_to_topic(elem) for elem in bound_val.items)
+            else:
+                # Make it a one-element tuple to simplify type signatures.
+                encoded_val = (tp.encode_to_topic(bound_val),)
+
+            encoded_topics.append(encoded_val)
+
+        # remove trailing `None`s - they are redundant
+        while encoded_topics and encoded_topics[-1] is None:
+            encoded_topics.pop()
+
+        return tuple(encoded_topics)
+
+    def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> Dict[str, Any]:
+        """
+        Decodes the event fields from the given log entry data.
+        """
+        if len(topics) != len(self._indexed):
+            raise ValueError(
+                f"The number of topics in the log entry ({len(topics)}) does not match "
+                f"the number of indexed fields in the event ({len(self._indexed)})"
+            )
+
+        decoded_topics = {
+            name: self._types[name].decode_from_topic(topic)
+            for name, topic in zip(self._signature.parameters, topics)
+        }
+
+        decoded_data = decode_single(self.canonical_form_nonindexed, data)
+        decoded_data = {
+            name: self._types[name].denormalize(value)
+            for name, value in zip(self._types_nonindexed, decoded_data)
+        }
+
+        result = {}
+        for name in self._types:
+            if name in decoded_topics:
+                result[name] = decoded_topics[name]
+            else:
+                result[name] = decoded_data[name]
+
+        return result
+
+    @cached_property
+    def canonical_form(self) -> str:
+        """
+        Returns the signature serialized in the canonical form as a string.
+        """
+        return "(" + ",".join(tp.canonical_form for tp in self._types.values()) + ")"
+
+    @cached_property
+    def canonical_form_nonindexed(self) -> str:
+        """
+        Returns the signature serialized in the canonical form as a string.
+        """
+        return "(" + ",".join(tp.canonical_form for tp in self._types_nonindexed.values()) + ")"
+
+    def __str__(self):
+        params = []
+        for name, tp in self._types.items():
+            indexed = "indexed " if name in self._indexed else ""
+            params.append(f"{tp.canonical_form} {indexed}{name}")
+        return "(" + ", ".join(params) + ")"
 
 
 class Method(ABC):
@@ -197,6 +294,9 @@ class ReadMethod(Method):
     """
     A non-mutating contract method.
     """
+
+    outputs: Signature
+    """Method's output signature."""
 
     @classmethod
     def from_json(cls, method_entry: Dict[str, Any]) -> "ReadMethod":
@@ -325,6 +425,100 @@ class WriteMethod(Method):
 
     def __str__(self):
         return f"function {self.name}{self.inputs} " + ("payable" if self.payable else "nonpayable")
+
+
+class Event:
+    """
+    A contract event.
+    """
+
+    @classmethod
+    def from_json(cls, event_entry: Dict[str, Any]) -> "Event":
+        """
+        Creates this object from a JSON ABI method entry.
+        """
+        if event_entry["type"] != "event":
+            raise ValueError("Event object must be created from a JSON entry with type='event'")
+
+        name = event_entry["name"]
+        fields = dispatch_types(event_entry["inputs"])
+        indexed = {input_["name"] for input_ in event_entry["inputs"] if input_["indexed"]}
+
+        return cls(name=name, fields=fields, indexed=indexed, anonymous=event_entry["anonymous"])
+
+    def __init__(
+        self,
+        name: str,
+        fields: Mapping[str, Type],
+        indexed: AbstractSet[str],
+        anonymous: bool = False,
+    ):
+        if anonymous and len(indexed) > 4:
+            raise ValueError("Anonymous events can have at most 4 indexed fields")
+        elif not anonymous and len(indexed) > 3:
+            raise ValueError("Non-anonymous events can have at most 3 indexed fields")
+
+        self.name = name
+        self.indexed = indexed
+        self.fields = EventSignature(fields, indexed)
+        self.anonymous = anonymous
+
+    @cached_property
+    def _topic(self) -> LogTopic:
+        """
+        The topic representing this event's signature.
+        """
+        return LogTopic(keccak(self.name.encode() + self.fields.canonical_form.encode()))
+
+    def __call__(self, *args, **kwargs) -> "EventFilter":
+        """
+        Creates an event filter from provided values for indexed parameters.
+        Some arguments can be omitted, which will mean that the filter
+        will match events with any value of that parameter.
+        :py:class:`Either` can be used to denote an OR operation and match
+        either of several values of a parameter.
+        """
+
+        encoded_topics = self.fields.encode_to_topics(*args, **kwargs)
+
+        log_topics: List[Optional[Tuple[LogTopic, ...]]] = []
+        if not self.anonymous:
+            log_topics.append((self._topic,))
+        for topic in encoded_topics:
+            if topic is None:
+                log_topics.append(None)
+            else:
+                log_topics.append(tuple(LogTopic(elem) for elem in topic))
+
+        return EventFilter(tuple(log_topics))
+
+    def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+        """
+        Decodes the event fields from the given log entry.
+        Fields that cannot be decoded (indexed reference types,
+        which are hashed before saving them to the log) are set to ``None``.
+        """
+        topics = log_entry.topics
+        if not self.anonymous:
+            if topics[0] != self._topic:
+                raise ValueError("This log entry belongs to a different event")
+            topics = topics[1:]
+
+        return self.fields.decode_log_entry([bytes(topic) for topic in topics], log_entry.data)
+
+    def __str__(self):
+        return f"event {self.name}{self.fields}" + (" anonymous" if self.anonymous else "")
+
+
+class EventFilter:
+    """
+    A filter for events coming from any contract address.
+    """
+
+    topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]
+
+    def __init__(self, topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]):
+        self.topics = topics
 
 
 class Fallback:
@@ -482,6 +676,9 @@ class ContractABI:
     write: Methods[WriteMethod]
     """Contract's mutating methods."""
 
+    event: Methods[Event]
+    """Contract's events."""
+
     @classmethod
     def from_json(cls, json_abi: list) -> "ContractABI":
         constructor = None
@@ -490,6 +687,7 @@ class ContractABI:
         read = []
         write = []
         methods = set()
+        events = {}
 
         for entry in json_abi:
 
@@ -522,6 +720,13 @@ class ContractABI:
                     raise ValueError("JSON ABI contains more than one receive method declarations")
                 receive = Receive.from_json(entry)
 
+            elif entry["type"] == "event":
+                if entry["name"] in events:
+                    raise ValueError(
+                        f"JSON ABI contains more than one declarations of `{entry['name']}`"
+                    )
+                events[entry["name"]] = Event.from_json(entry)
+
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
@@ -531,6 +736,7 @@ class ContractABI:
             receive=receive,
             read=read,
             write=write,
+            events=events.values(),
         )
 
     def __init__(
@@ -540,6 +746,7 @@ class ContractABI:
         receive: Optional[Receive] = None,
         read: Optional[Iterable[ReadMethod]] = None,
         write: Optional[Iterable[WriteMethod]] = None,
+        events: Optional[Iterable[Event]] = None,
     ):
 
         if constructor is None:
@@ -550,6 +757,7 @@ class ContractABI:
         self.constructor = constructor
         self.read = Methods({method.name: method for method in (read or [])})
         self.write = Methods({method.name: method for method in (write or [])})
+        self.event = Methods({event.name: event for event in (events or [])})
 
     def __str__(self):
         all_methods = (
@@ -558,6 +766,7 @@ class ContractABI:
             + ([self.receive] if self.receive else [])
             + list(self.read)
             + list(self.write)
+            + list(self.event)
         )
         method_list = ["    " + str(method) for method in all_methods]
         return "{\n" + "\n".join(method_list) + "\n}"
