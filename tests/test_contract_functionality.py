@@ -146,3 +146,36 @@ async def test_abi_declaration(test_provider, compiled_contracts):
         outer = dict(inner=inner, outer1=3)
         result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
         assert result == [inner, outer]
+
+
+async def test_complicated_event(test_provider, compiled_contracts, root_signer, another_signer):
+    # Smoke test for topic encoding, emitting an event with non-trivial topic structure.
+    # The details of the encoding should be covered in ABI tests,
+    # here we're just checking we got them right.
+
+    basic_contract = compiled_contracts["Test"]
+
+    bytestring33len1 = b"012345678901234567890123456789012"
+    bytestring33len2 = b"-12345678901234567890123456789012"
+    inner1 = [b"0123", bytestring33len1]
+    inner2 = [b"-123", bytestring33len2]
+    foo = [b"4567", [b"aa", b"bb"], bytestring33len1, "\u1234\u1212", inner1]
+    event_filter = basic_contract.abi.event.Complicated(
+        b"aaaa", bytestring33len2, foo, [inner1, inner2]
+    )
+
+    client = Client(provider=test_provider)
+
+    async with client.session() as session:
+
+        await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+        contract = await session.deploy(root_signer, basic_contract.constructor(123, 456))
+
+        log_filter1 = await session.eth_new_filter(event_filter=event_filter)  # filter by topics
+        log_filter2 = await session.eth_new_filter()  # collect everything
+        await session.transact(root_signer, contract.write.emitComplicated())
+        entries_filtered = await session.eth_get_filter_changes(log_filter1)
+        entries_all = await session.eth_get_filter_changes(log_filter2)
+
+    assert len(entries_all) == 1
+    assert entries_filtered == entries_all
