@@ -25,26 +25,6 @@ from pons import (
 from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
 
 from .compile import compile_file
-from .provider_server import ServerHandle
-from .provider import EthereumTesterProvider
-
-
-@pytest.fixture(params=["direct", "http"])
-async def provider(request, test_provider, nursery):
-    if request.param == "direct":
-        yield test_provider
-    else:
-        handle = ServerHandle(test_provider)
-        await nursery.start(handle)
-        yield handle.http_provider
-        handle.shutdown()
-
-
-@pytest.fixture
-async def session(provider):
-    client = Client(provider=provider)
-    async with client.session() as session:
-        yield session
 
 
 @pytest.fixture
@@ -651,9 +631,9 @@ async def test_pending_transaction_filter_high_level(
 
     async def observer():
         # This loop always exits via break
-        async for tx_hash in session.iter_pending_transactions(
+        async for tx_hash in session.iter_pending_transactions(  # pragma: no branch
             poll_interval=1
-        ):  # pragma: no branch
+        ):
             tx_hashes.append(tx_hash)
             if len(tx_hashes) == 3:
                 break

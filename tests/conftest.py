@@ -3,7 +3,7 @@ from pathlib import Path
 from eth_account import Account
 import pytest
 
-from pons import AccountSigner
+from pons import AccountSigner, Client
 
 from .provider import EthereumTesterProvider
 
@@ -11,6 +11,13 @@ from .provider import EthereumTesterProvider
 @pytest.fixture
 def test_provider():
     yield EthereumTesterProvider()
+
+
+@pytest.fixture
+async def session(test_provider):
+    client = Client(provider=test_provider)
+    async with client.session() as session:
+        yield session
 
 
 @pytest.fixture

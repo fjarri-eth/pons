@@ -26,7 +26,7 @@ def compiled_contracts():
     yield compile_file(path)
 
 
-async def test_empty_constructor(test_provider, compiled_contracts):
+async def test_empty_constructor(session, root_signer, compiled_contracts):
     """
     Checks that an empty constructor is created automatically if none is provided,
     and it can be used to deploy the contract.
@@ -34,85 +34,58 @@ async def test_empty_constructor(test_provider, compiled_contracts):
 
     compiled_contract = compiled_contracts["NoConstructor"]
 
-    client = Client(provider=test_provider)
-
-    root_account = test_provider.root_account
-    root_signer = AccountSigner(root_account)
-    root_address = Address.from_hex(root_account.address)
-
-    async with client.session() as session:
-        deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
-        call = deployed_contract.read.getState(123)
-        result = await session.eth_call(call)
-        assert result == [1 + 123]
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
+    call = deployed_contract.read.getState(123)
+    result = await session.eth_call(call)
+    assert result == [1 + 123]
 
 
-async def test_basics(test_provider, compiled_contracts):
+async def test_basics(session, root_signer, another_signer, compiled_contracts):
 
     compiled_contract = compiled_contracts["Test"]
 
-    client = Client(provider=test_provider)
+    root_address = root_signer.address
+    acc1_address = another_signer.address
 
-    root_account = test_provider.root_account
-    root_signer = AccountSigner(root_account)
+    # Fund the deployer account
+    await session.transfer(root_signer, acc1_address, Amount.ether(10))
 
-    acc1 = Account.create()
-    acc1_signer = AccountSigner(acc1)
+    # Deploy the contract
+    call = compiled_contract.constructor(12345, 56789)
+    deployed_contract = await session.deploy(another_signer, call)
 
-    root_address = Address.from_hex(root_account.address)
-    acc1_address = Address.from_hex(acc1.address)
+    # Check the state
+    assert await session.eth_call(deployed_contract.read.v1()) == [12345]
+    assert await session.eth_call(deployed_contract.read.v2()) == [56789]
 
-    async with client.session() as session:
+    # Transact with the contract
+    await session.transact(another_signer, deployed_contract.write.setState(111))
+    assert await session.eth_call(deployed_contract.read.v1()) == [111]
 
-        # Fund the deployer account
-        await session.transfer(root_signer, acc1_address, Amount.ether(10))
+    # Call the contract
 
-        # Deploy the contract
-        call = compiled_contract.constructor(12345, 56789)
-        deployed_contract = await session.deploy(acc1_signer, call)
+    result = await session.eth_call(deployed_contract.read.getState(123))
+    assert result == [111 + 123]
 
-        # Check the state
-        assert await session.eth_call(deployed_contract.read.v1()) == [12345]
-        assert await session.eth_call(deployed_contract.read.v2()) == [56789]
-
-        # Transact with the contract
-        await session.transact(acc1_signer, deployed_contract.write.setState(111))
-        assert await session.eth_call(deployed_contract.read.v1()) == [111]
-
-        # Call the contract
-
-        result = await session.eth_call(deployed_contract.read.getState(123))
-        assert result == [111 + 123]
-
-        inner = dict(inner1=1, inner2=2)
-        outer = dict(inner=inner, outer1=3)
-        result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
-        assert result == [inner, outer]
+    inner = dict(inner1=1, inner2=2)
+    outer = dict(inner=inner, outer1=3)
+    result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
+    assert result == [inner, outer]
 
 
-async def test_abi_declaration(test_provider, compiled_contracts):
+async def test_abi_declaration(session, root_signer, another_signer, compiled_contracts):
 
     compiled_contract = compiled_contracts["Test"]
 
-    client = Client(provider=test_provider)
+    root_address = root_signer.address
+    acc1_address = another_signer.address
 
-    root_account = test_provider.root_account
-    root_signer = AccountSigner(root_account)
+    # Fund the deployer account
+    await session.transfer(root_signer, acc1_address, Amount.ether(10))
 
-    acc1 = Account.create()
-    acc1_signer = AccountSigner(acc1)
-
-    root_address = Address.from_hex(root_account.address)
-    acc1_address = Address.from_hex(acc1.address)
-
-    async with client.session() as session:
-
-        # Fund the deployer account
-        await session.transfer(root_signer, acc1_address, Amount.ether(10))
-
-        # Deploy the contract
-        call = compiled_contract.constructor(12345, 56789)
-        previously_deployed_contract = await session.deploy(acc1_signer, call)
+    # Deploy the contract
+    call = compiled_contract.constructor(12345, 56789)
+    previously_deployed_contract = await session.deploy(another_signer, call)
 
     # The contract was deployed earlier, now all we have is this
     inner_struct = abi.struct(inner1=abi.uint(256), inner2=abi.uint(256))
@@ -132,23 +105,21 @@ async def test_abi_declaration(test_provider, compiled_contracts):
 
     deployed_contract = DeployedContract(declared_abi, previously_deployed_contract.address)
 
-    async with client.session() as session:
+    # Transact with the contract
+    await session.transact(another_signer, deployed_contract.write.setState(111))
 
-        # Transact with the contract
-        await session.transact(acc1_signer, deployed_contract.write.setState(111))
+    # Call the contract
 
-        # Call the contract
+    result = await session.eth_call(deployed_contract.read.getState(123))
+    assert result == 111 + 123  # Note the lack of `[]` - we declared outputs as a single value
 
-        result = await session.eth_call(deployed_contract.read.getState(123))
-        assert result == 111 + 123  # Note the lack of `[]` - we declared outputs as a single value
-
-        inner = dict(inner1=1, inner2=2)
-        outer = dict(inner=inner, outer1=3)
-        result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
-        assert result == [inner, outer]
+    inner = dict(inner1=1, inner2=2)
+    outer = dict(inner=inner, outer1=3)
+    result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
+    assert result == [inner, outer]
 
 
-async def test_complicated_event(test_provider, compiled_contracts, root_signer, another_signer):
+async def test_complicated_event(session, root_signer, another_signer, compiled_contracts):
     # Smoke test for topic encoding, emitting an event with non-trivial topic structure.
     # The details of the encoding should be covered in ABI tests,
     # here we're just checking we got them right.
@@ -164,18 +135,14 @@ async def test_complicated_event(test_provider, compiled_contracts, root_signer,
         b"aaaa", bytestring33len2, foo, [inner1, inner2]
     )
 
-    client = Client(provider=test_provider)
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract = await session.deploy(root_signer, basic_contract.constructor(123, 456))
 
-    async with client.session() as session:
-
-        await session.transfer(root_signer, another_signer.address, Amount.ether(1))
-        contract = await session.deploy(root_signer, basic_contract.constructor(123, 456))
-
-        log_filter1 = await session.eth_new_filter(event_filter=event_filter)  # filter by topics
-        log_filter2 = await session.eth_new_filter()  # collect everything
-        await session.transact(root_signer, contract.write.emitComplicated())
-        entries_filtered = await session.eth_get_filter_changes(log_filter1)
-        entries_all = await session.eth_get_filter_changes(log_filter2)
+    log_filter1 = await session.eth_new_filter(event_filter=event_filter)  # filter by topics
+    log_filter2 = await session.eth_new_filter()  # collect everything
+    await session.transact(root_signer, contract.write.emitComplicated())
+    entries_filtered = await session.eth_get_filter_changes(log_filter1)
+    entries_all = await session.eth_get_filter_changes(log_filter2)
 
     assert len(entries_all) == 1
     assert entries_filtered == entries_all
