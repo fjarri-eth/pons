@@ -5,7 +5,23 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
-Under construction.
+Added
+^^^^^
+
+- ``__repr__``/``__eq__``/``__hash__`` implementations for multiple entities. (PR_32_)
+- ``eth_get_transaction_by_hash()``, ``eth_block_number()``, ``eth_get_block_by_hash()``, ``eth_get_block_by_number()`` and corresponding entities. (PR_32_)
+- ``eth_new_block_filter()``, ``eth_new_pending_transaction_filter()``, ``eth_new_filter()``, ``eth_get_filter_changes()`` for low-level event filtering support. (PR_32_)
+- ``iter_blocks()``, ``iter_pending_transactions()``, ``iter_events()`` for high-level event filtering support. (PR_32_)
+- More fields in ``TxReceipt``. (PR_32_)
+
+
+Fixed
+^^^^^
+
+- Removed ``TxReceipt`` export (making an exception here and not counting it as a breaking change, since nobody would have any use for creating one manually). (PR_32_)
+
+
+.. _PR_32: https://github.com/fjarri/pons/pull/32
 
 
 0.4.1 (01-05-2022)
