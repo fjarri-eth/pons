@@ -249,14 +249,13 @@ class EthereumTesterProvider(Provider):
     def eth_get_filter_changes(self, filter_id: str):
         results = self._ethereum_tester.get_only_filter_changes(decode_quantity(filter_id))
         results = normalize_return_value(results)
-        # There's no public way to detect they type of the filter,
+        # There's no public way to detect the type of the filter,
         # and we need to apply this transformation only for log filters.
         # Hence the hack.
         if results and isinstance(results[0], dict):
             for result in results:
-                result[
-                    "removed"
-                ] = False  # returned by regular RPC providers, but not by EthereumTester
+                # returned by regular RPC providers, but not by EthereumTester
+                result["removed"] = False
         return results
 
     @asynccontextmanager
