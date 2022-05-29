@@ -20,7 +20,7 @@ async def process_request(provider, data):
         async with provider.session() as session:
             result = await session.rpc(data["method"], *data["params"])
     except RPCError as e:
-        error = {"code": e.server_code, "message": e.message, "data": e.data}
+        error = {"code": e.code, "message": e.message, "data": e.data}
         return {"jsonrpc": "2.0", "id": request_id, "error": error}
 
     return {"jsonrpc": "2.0", "id": request_id, "result": result}

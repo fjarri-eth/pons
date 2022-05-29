@@ -21,7 +21,7 @@ from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 from eth_abi.exceptions import DecodingError as BackendDecodingError
 
-from ._abi_types import Type, dispatch_types, dispatch_type, String, Bytes, Array, Struct
+from ._abi_types import Type, dispatch_types, dispatch_type
 from ._entities import LogTopic, LogEntry
 
 
@@ -726,6 +726,9 @@ class ContractABI:
                         f"JSON ABI contains more than one declarations of `{entry['name']}`"
                     )
                 events[entry["name"]] = Event.from_json(entry)
+
+            elif entry["type"] == "error":
+                pass
 
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")

@@ -96,18 +96,6 @@ async def test_none_instead_of_dict(
     assert await session.eth_get_transaction_receipt(tx_hash) is None
 
 
-async def test_unknown_rpc_status_code(test_provider, session, monkeypatch):
-    def faulty_net_version():
-        # This is a known exception type, and it will be transferred through the network
-        # keeping the status code.
-        raise RPCError(666, "this method is possessed")
-
-    monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
-
-    with pytest.raises(ProviderError, match="666, 'this method is possessed'"):
-        await session.net_version()
-
-
 async def test_non_ok_http_status(test_provider, session, monkeypatch):
     def faulty_net_version():
         # A generic exception will generate a 500 status code
@@ -115,7 +103,9 @@ async def test_non_ok_http_status(test_provider, session, monkeypatch):
 
     monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
 
-    with pytest.raises(ProviderError, match="500, 'Something unexpected happened'"):
+    with pytest.raises(
+        ProviderError, match=r"Provider error \(500\): Something unexpected happened"
+    ):
         await session.net_version()
 
 

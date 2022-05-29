@@ -75,3 +75,53 @@ contract PayableConstructor {
         state = _state;
     }
 }
+
+
+contract TestErrors {
+    error CustomError(uint256 x);
+
+    uint256 state;
+
+    constructor(uint256 x) {
+        state = raiseError(x);
+    }
+
+    function raiseError(uint256 x) internal view returns (uint256) {
+        require(x != 0); // a `require` without an error message
+        require(x != 1, "require(string)");
+
+        if (x == 2) {
+            revert(); // empty revert (legacy syntax)
+        }
+        else if (x == 3) {
+            revert("revert(string)"); // revert with a message (legacy syntax)
+        }
+        else if (x == 4) {
+            revert CustomError(x);
+        }
+        return x;
+    }
+
+    function raisePanic(uint256 x) internal view returns (uint256) {
+        if (x == 0) {
+            assert(false); // panic 0x01
+        }
+        else if (x == 1) {
+            x = x - 2; // panic 0x11 (over/underflow)
+        }
+
+        return x;
+    }
+
+    function viewError(uint256 x) public view returns (uint256) {
+        return raiseError(x);
+    }
+
+    function transactError(uint256 x) public {
+        state = raiseError(x);
+    }
+
+    function viewPanic(uint256 x) public view returns (uint256) {
+        return raisePanic(x);
+    }
+}

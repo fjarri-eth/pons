@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
+from enum import Enum
 from functools import wraps
-from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Any, Tuple
+from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Tuple
 
 import anyio
 
@@ -17,7 +18,6 @@ from ._provider import (
     ProviderSession,
     UnexpectedResponse,
     RPCError,
-    RPCErrorCode,
     ResponseDict,
 )
 from ._signer import Signer
@@ -28,11 +28,9 @@ from ._entities import (
     BlockFilter,
     PendingTransactionFilter,
     LogFilter,
-    LogTopic,
     LogEntry,
     BlockHash,
     TxHash,
-    BlockHash,
     BlockInfo,
     TxReceipt,
     TxInfo,
@@ -87,24 +85,52 @@ class TransactionFailed(RemoteError):
     """
 
 
+class ProviderErrorCode(Enum):
+    """
+    Known RPC error codes returned by providers.
+    """
+
+    # This is our placeholder value, shouldn't be encountered in a remote server response
+    UNKNOWN_REASON = 0
+
+    SERVER_ERROR = -32000
+    """Reserved for implementation-defined server-errors. See the message for details."""
+
+    EXECUTION_ERROR = 3
+    """Contract transaction failed during execution. See the data for details."""
+
+    @classmethod
+    def from_int(cls, val: int) -> "ProviderErrorCode":
+        try:
+            return cls(val)
+        except ValueError:
+            return cls.UNKNOWN_REASON
+
+
 class ProviderError(RemoteError):
     """
     A general problem with fulfilling the request at the provider's side.
     """
 
+    @classmethod
+    def from_rpc_error(cls, exc: RPCError) -> "ProviderError":
+        data = decode_data(exc.data) if exc.data else None
+        parsed_code = ProviderErrorCode.from_int(exc.code)
+        return cls(exc.code, parsed_code, exc.message, data)
 
-class ExecutionFailed(ProviderError):
-    """
-    Raised if the transaction failed during execution.
-    """
-
-    def __init__(self, message: str, data: Optional[bytes]):
-        super().__init__(message, data)
+    def __init__(
+        self, raw_code: int, code: ProviderErrorCode, message: str, data: Optional[bytes] = None
+    ):
+        super().__init__(raw_code, code, message, data)
+        self.raw_code = raw_code
+        self.code = code
         self.message = message
         self.data = data
 
     def __str__(self):
-        return f"Execution failed: {self.message}" + (
+        # Substitute the known code if any, or report the raw integer value otherwise
+        code = self.raw_code if self.code == ProviderErrorCode.UNKNOWN_REASON else self.code.name
+        return f"Provider error ({code}): {self.message}" + (
             f" (data: {self.data.hex()})" if self.data else ""
         )
 
@@ -122,11 +148,7 @@ def rpc_call(method_name):
             except (RPCDecodingError, UnexpectedResponse) as exc:
                 raise BadResponseFormat(f"{method_name}: {exc}") from exc
             except RPCError as exc:
-                if exc.code == RPCErrorCode.EXECUTION_ERROR:
-                    data = decode_data(exc.data) if exc.data else None
-                    raise ExecutionFailed(exc.message, data) from exc
-                else:
-                    raise ProviderError(exc.server_code, exc.message, exc.data) from exc
+                raise ProviderError.from_rpc_error(exc) from exc
             return result
 
         return _wrapped

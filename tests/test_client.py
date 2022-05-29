@@ -2,6 +2,8 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 
+from eth_abi import encode_single
+from eth_utils import keccak
 from eth_account import Account
 import pytest
 import trio
@@ -21,8 +23,9 @@ from pons import (
     Block,
     Either,
 )
-from pons._client import BadResponseFormat, ExecutionFailed, ProviderError, TransactionFailed
+from pons._client import BadResponseFormat, ProviderError, ProviderErrorCode, TransactionFailed
 from pons._entities import LogTopic
+from pons._provider import RPCError
 
 from .compile import compile_file
 
@@ -198,7 +201,9 @@ async def test_estimate_deploy(test_provider, session, compiled_contracts, root_
     gas = await session.estimate_deploy(compiled_contract.constructor(1))
     assert isinstance(gas, int) and gas > 0
 
-    with pytest.raises(ExecutionFailed, match="Execution failed: execution reverted"):
+    with pytest.raises(
+        ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
+    ):
         await session.estimate_deploy(compiled_contract.constructor(0))
 
 
@@ -223,7 +228,9 @@ async def test_estimate_transact(test_provider, session, compiled_contracts, roo
     gas = await session.estimate_transact(deployed_contract.write.setState(456))
     assert isinstance(gas, int) and gas > 0
 
-    with pytest.raises(ExecutionFailed, match="Execution failed: execution reverted"):
+    with pytest.raises(
+        ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
+    ):
         await session.estimate_transact(deployed_contract.write.setState(0))
 
 
@@ -696,3 +703,100 @@ async def test_event_filter_high_level(
     assert events[0] == {"from": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
     assert events[1] == {"from": another_signer.address, "id": b"1111", "value": 2, "value2": 3}
     assert events[2] == {"from": another_signer.address, "id": b"1111", "value": 3, "value2": 4}
+
+
+async def test_unknown_rpc_status_code(test_provider, session, monkeypatch):
+    def faulty_net_version():
+        # This is a known exception type, and it will be transferred through the network
+        # keeping the status code.
+        raise RPCError(666, "this method is possessed")
+
+    monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
+
+    with pytest.raises(ProviderError, match=r"Provider error \(666\): this method is possessed"):
+        await session.net_version()
+
+
+async def check_rpc_error(awaitable, expected_code, expected_message, expected_data):
+    with pytest.raises(ProviderError) as exc:
+        await awaitable
+
+    assert exc.value.code == expected_code
+    assert exc.value.message == expected_message
+    assert exc.value.data == expected_data
+
+
+async def test_contract_exceptions(session, root_signer, another_signer, compiled_contracts):
+
+    compiled_contract = compiled_contracts["TestErrors"]
+    contract = await session.deploy(root_signer, compiled_contract.constructor(999))
+
+    error_selector = keccak(b"Error(string)")[:4]
+    custom_error_selector = keccak(b"CustomError(uint256)")[:4]
+
+    # `require(condition)`
+    kwargs = dict(
+        expected_code=ProviderErrorCode.SERVER_ERROR,
+        expected_message="execution reverted",
+        expected_data=None,
+    )
+    await check_rpc_error(session.eth_call(contract.read.viewError(0)), **kwargs)
+    await check_rpc_error(session.transact(root_signer, contract.write.transactError(0)), **kwargs)
+
+    # `require(condition, message)`
+    kwargs = dict(
+        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_message="execution reverted: require(string)",
+        expected_data=error_selector + encode_single("(string)", ["require(string)"]),
+    )
+    await check_rpc_error(session.eth_call(contract.read.viewError(1)), **kwargs)
+    await check_rpc_error(session.transact(root_signer, contract.write.transactError(1)), **kwargs)
+
+    # `revert()`
+    kwargs = dict(
+        expected_code=ProviderErrorCode.SERVER_ERROR,
+        expected_message="execution reverted",
+        expected_data=None,
+    )
+    await check_rpc_error(session.eth_call(contract.read.viewError(2)), **kwargs)
+    await check_rpc_error(session.transact(root_signer, contract.write.transactError(2)), **kwargs)
+
+    # `revert(message)`
+    kwargs = dict(
+        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_message="execution reverted: revert(string)",
+        expected_data=error_selector + encode_single("(string)", ["revert(string)"]),
+    )
+    await check_rpc_error(session.eth_call(contract.read.viewError(3)), **kwargs)
+    await check_rpc_error(session.transact(root_signer, contract.write.transactError(3)), **kwargs)
+
+    # `revert CustomError(...)`
+    kwargs = dict(
+        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_message="execution reverted",
+        expected_data=custom_error_selector + encode_single("(uint256)", [4]),
+    )
+    await check_rpc_error(session.eth_call(contract.read.viewError(4)), **kwargs)
+    await check_rpc_error(session.transact(root_signer, contract.write.transactError(4)), **kwargs)
+
+
+async def test_contract_panics(session, root_signer, another_signer, compiled_contracts):
+
+    compiled_contract = compiled_contracts["TestErrors"]
+    contract = await session.deploy(root_signer, compiled_contract.constructor(999))
+
+    panic_selector = keccak(b"Panic(uint256)")[:4]
+
+    await check_rpc_error(
+        session.eth_call(contract.read.viewPanic(0)),
+        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_message="execution reverted",
+        expected_data=panic_selector + encode_single("(uint256)", [0x01]),
+    )
+
+    await check_rpc_error(
+        session.eth_call(contract.read.viewPanic(1)),
+        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_message="execution reverted",
+        expected_data=panic_selector + encode_single("(uint256)", [0x11]),
+    )

@@ -2,16 +2,20 @@
 PyEVM-based provider for tests.
 """
 
+import ast
 from contextlib import asynccontextmanager, contextmanager
 from typing import Union, List
 
+from eth_abi import encode_single, decode_single
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 from eth_tester.exceptions import TransactionNotFound, TransactionFailed, BlockNotFound
 from eth.exceptions import Revert
+from eth_utils import keccak
 from eth_utils.exceptions import ValidationError
 
-from pons._provider import Provider, ProviderSession, RPCError, RPCErrorCode
+from pons._provider import Provider, ProviderSession, RPCError
+from pons._client import ProviderErrorCode
 from pons._entities import (
     Amount,
     Address,
@@ -22,28 +26,67 @@ from pons._entities import (
 )
 
 
+# The standard `revert(string)` is a EIP838 error.
+_ERROR_SELECTOR = keccak(b"Error(string)")[:4]
+
+
 @contextmanager
 def pyevm_errors_into_rpc_errors():
     try:
         yield
     except TransactionFailed as exc:
-        (reason,) = exc.args
+
+        assert len(exc.args) == 1  # sanity check in case eth-tester suddenly changes API
+        reason = exc.args[0]
+
         if isinstance(reason, Revert):
-            # TODO: unpack the data to get the revert reason
-            # The standard `revert(string)` is a EIP838 error.
-            raise RPCError(
-                RPCErrorCode.EXECUTION_ERROR.value,
-                "execution reverted",
-                encode_data(reason.args[0]),
-            )
+            # Happens when `require/revert` is called in a mutating method or a constructor.
+            assert len(reason.args) == 1
+            reason_data = reason.args[0]
+
+        elif isinstance(reason, str):
+            # Happens when `require/revert` is called in a view method.
+
+            # Have to go through this procedure because eth-tester doesn't bother
+            # to discriminate between legacy (string) reverts and reverts with custom types.
+            try:
+                # raises ValueError if it is not a Python literal
+                reason_data = ast.literal_eval(reason)
+                assert isinstance(reason_data, bytes)  # sanity check
+            except ValueError:
+                assert isinstance(reason, str)  # sanity check
+                # Bring `reason_data` to what a `Revert` instance would contain in this case
+                reason_data = _ERROR_SELECTOR + encode_single("(string)", [reason])
+
         else:
-            # TODO: what are the other possible reasons? Do they have the same error code?
-            # Since I don't know how to hit this line, skipping coverage for it.
-            raise RPCError(
-                RPCErrorCode.EXECUTION_ERROR.value, "transaction failed", reason
-            )  # pragma: no cover
+            # Shouldn't happen unless the API of eth-tester changes
+            raise NotImplementerError()  # pragma: no cover
+
+        if reason_data == b"":
+            # Empty `revert()`, or `require()` without a message.
+
+            # who knows why it's different in this specific case,
+            # but that's how Infura and Quicknode work
+            error = ProviderErrorCode.SERVER_ERROR
+
+            message = "execution reverted"
+            data = None
+
+        elif reason_data.startswith(_ERROR_SELECTOR):
+            error = ProviderErrorCode.EXECUTION_ERROR
+            reason_message = decode_single("(string)", reason_data[len(_ERROR_SELECTOR) :])[0]
+            message = f"execution reverted: {reason_message}"
+            data = encode_data(reason_data)
+
+        else:
+            error = ProviderErrorCode.EXECUTION_ERROR
+            message = "execution reverted"
+            data = encode_data(reason_data)
+
+        raise RPCError(error.value, message, data)
+
     except ValidationError as exc:
-        raise RPCError(RPCErrorCode.SERVER_ERROR.value, exc.args[0])
+        raise RPCError(ProviderErrorCode.SERVER_ERROR.value, exc.args[0])
 
 
 def make_camel_case(key):
@@ -124,7 +167,9 @@ class EthereumTesterProvider(Provider):
         assert "from" not in tx
         # EthereumTester needs it for whatever reason
         tx["from"] = self._default_address.encode()
-        return self._ethereum_tester.call(tx, block)
+
+        with pyevm_errors_into_rpc_errors():
+            return self._ethereum_tester.call(tx, block)
 
     def eth_get_transaction_receipt(self, tx_hash: str):
         try:
