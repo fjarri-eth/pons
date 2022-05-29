@@ -464,7 +464,7 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
     element_type_name = match.group(1)
     is_array = match.group(2)
     array_size = match.group(3)
-    if array_size:
+    if array_size is not None:
         array_size = int(array_size)
 
     if is_array:
