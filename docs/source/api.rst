@@ -103,44 +103,44 @@ Contract ABI
 Secondary classes
 -----------------
 
-.. autoclass:: pons._contract_abi.ConstructorCall
+.. autoclass:: pons._contract_abi.ConstructorCall()
    :members:
 
-.. autoclass:: pons._contract_abi.ReadCall
+.. autoclass:: pons._contract_abi.ReadCall()
    :members:
 
-.. autoclass:: pons._contract_abi.WriteCall
+.. autoclass:: pons._contract_abi.WriteCall()
    :members:
 
-.. autoclass:: pons._contract_abi.EventFilter
+.. autoclass:: pons._contract_abi.EventFilter()
    :members:
 
-.. autoclass:: pons._contract.BoundConstructor
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundConstructorCall
-   :members:
-
-.. autoclass:: pons._contract.BoundReadMethod
+.. autoclass:: pons._contract.BoundConstructor()
    :members:
    :special-members: __call__
 
-.. autoclass:: pons._contract.BoundReadCall
+.. autoclass:: pons._contract.BoundConstructorCall()
    :members:
 
-.. autoclass:: pons._contract.BoundWriteMethod
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundWriteCall
-   :members:
-
-.. autoclass:: pons._contract.BoundEvent
+.. autoclass:: pons._contract.BoundReadMethod()
    :members:
    :special-members: __call__
 
-.. autoclass:: pons._contract.BoundEventFilter
+.. autoclass:: pons._contract.BoundReadCall()
+   :members:
+
+.. autoclass:: pons._contract.BoundWriteMethod()
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundWriteCall()
+   :members:
+
+.. autoclass:: pons._contract.BoundEvent()
+   :members:
+   :special-members: __call__
+
+.. autoclass:: pons._contract.BoundEventFilter()
    :members:
 
 
