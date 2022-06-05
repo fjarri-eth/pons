@@ -1,5 +1,13 @@
 from . import abi
-from ._client import Client, RemoteError, ContractPanic, ContractLegacyError, ContractError
+from ._client import (
+    Client,
+    RemoteError,
+    ContractPanic,
+    ContractLegacyError,
+    ContractError,
+    TransactionFailed,
+    ProviderError,
+)
 from ._contract_abi import (
     ABIDecodingError,
     ContractABI,

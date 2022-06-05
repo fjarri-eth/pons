@@ -12,7 +12,7 @@ from ._contract import (
     BoundWriteCall,
     BoundEventFilter,
 )
-from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI
+from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI, Error
 from ._provider import (
     Provider,
     ProviderSession,
@@ -92,6 +92,7 @@ class ProviderErrorCode(Enum):
 
     # This is our placeholder value, shouldn't be encountered in a remote server response
     UNKNOWN_REASON = 0
+    """An error code whose description is not present in this enum."""
 
     SERVER_ERROR = -32000
     """Reserved for implementation-defined server-errors. See the message for details."""
@@ -111,6 +112,20 @@ class ProviderError(RemoteError):
     """
     A general problem with fulfilling the request at the provider's side.
     """
+
+    Code = ProviderErrorCode
+
+    raw_code: int
+    """The error code returned by the server."""
+
+    code: ProviderErrorCode
+    """The parsed error code."""
+
+    message: str
+    """The error message."""
+
+    data: Optional[bytes]
+    """The associated data (if any)."""
 
     @classmethod
     def from_rpc_error(cls, exc: RPCError) -> "ProviderError":
@@ -208,9 +223,15 @@ class ContractPanicReason(Enum):
             return cls.UNKNOWN
 
 
-class ContractPanic(Exception):
+class ContractPanic(RemoteError):
+    """
+    A panic raised in a contract call.
+    """
 
     Reason = ContractPanicReason
+
+    reason: ContractPanicReason
+    """Parsed panic reason."""
 
     @classmethod
     def from_code(cls, code: int):
@@ -221,14 +242,31 @@ class ContractPanic(Exception):
         self.reason = reason
 
 
-class ContractLegacyError(Exception):
+class ContractLegacyError(RemoteError):
+    """
+    A raised Solidity legacy error (from ``require()`` or ``revert()``).
+    """
+
+    message: str
+    """The error message."""
+
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
-class ContractError(Exception):
-    def __init__(self, error, decoded_data):
+class ContractError(RemoteError):
+    """
+    A raised Solidity error (from ``revert SomeError(...)``).
+    """
+
+    error: Error
+    """The recognized ABI Error object."""
+
+    data: Dict[str, Any]
+    """The unpacked error data, corresponding to the ABI."""
+
+    def __init__(self, error: Error, decoded_data: Dict[str, Any]):
         super().__init__(error, decoded_data)
         self.error = error
         self.data = decoded_data
@@ -381,6 +419,10 @@ class ClientSession:
     async def estimate_deploy(self, call: BoundConstructorCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
+
+        Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
+        or :py:class`ContractError` if a known error was caught during the dry run.
+        If the error was unknown, falls back to :py:class:`ProviderError`.
         """
         tx = {
             "data": encode_data(call.data_bytes),
@@ -396,7 +438,7 @@ class ClientSession:
     ) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
-        Raises an exception if there is not enough funds in ``source_address``.
+        Raises a :py:class:`ProviderError` if there is not enough funds in ``source_address``.
         """
         # source_address and amount are optional,
         # but if they are specified, we will fail here instead of later.
@@ -410,6 +452,10 @@ class ClientSession:
     async def estimate_transact(self, call: BoundWriteCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
+
+        Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
+        or :py:class`ContractError` if a known error was caught during the dry run.
+        If the error was unknown, falls back to :py:class:`ProviderError`.
         """
         tx = {
             "to": call.contract_address.encode(),
@@ -509,6 +555,9 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
+        but could not be processed.
         """
         tx_hash = await self.broadcast_transfer(signer, destination_address, amount, gas=gas)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
@@ -527,6 +576,11 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
+        but could not be processed.
+        If gas estimation is run, see the additional errors that may be raised in the docs for
+        :py:meth:`~ClientSession.estimate_deploy`.
         """
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This constructor does not accept an associated payment")
@@ -606,6 +660,11 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
+        but could not be processed.
+        If gas estimation is run, see the additional errors that may be raised in the docs for
+        :py:meth:`~ClientSession.estimate_transact`.
         """
         tx_hash = await self.broadcast_transact(signer, call, amount=amount, gas=gas)
         receipt = await self.wait_for_transaction_receipt(tx_hash)

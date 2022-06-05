@@ -24,7 +24,7 @@ from pons import (
     ContractError,
 )
 from pons._contract_abi import PANIC_ERROR
-from pons._client import BadResponseFormat, ProviderError, ProviderErrorCode, TransactionFailed
+from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._entities import encode_data
 from pons._provider import RPCError
 
@@ -719,7 +719,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
 
     # `require(condition)`
     kwargs = dict(
-        expected_code=ProviderErrorCode.SERVER_ERROR,
+        expected_code=ProviderError.Code.SERVER_ERROR,
         expected_message="execution reverted",
         expected_data=None,
     )
@@ -727,7 +727,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
 
     # `require(condition, message)`
     kwargs = dict(
-        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted: require(string)",
         expected_data=error_selector + encode_single("(string)", ["require(string)"]),
     )
@@ -735,7 +735,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
 
     # `revert()`
     kwargs = dict(
-        expected_code=ProviderErrorCode.SERVER_ERROR,
+        expected_code=ProviderError.Code.SERVER_ERROR,
         expected_message="execution reverted",
         expected_data=None,
     )
@@ -743,7 +743,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
 
     # `revert(message)`
     kwargs = dict(
-        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted: revert(string)",
         expected_data=error_selector + encode_single("(string)", ["revert(string)"]),
     )
@@ -751,7 +751,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
 
     # `revert CustomError(...)`
     kwargs = dict(
-        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=custom_error_selector + encode_single("(uint256)", [4]),
     )
@@ -767,14 +767,14 @@ async def test_contract_panics(session, root_signer, compiled_contracts):
 
     await check_rpc_error(
         session.eth_call(contract.read.viewPanic(0)),
-        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=panic_selector + encode_single("(uint256)", [0x01]),
     )
 
     await check_rpc_error(
         session.eth_call(contract.read.viewPanic(1)),
-        expected_code=ProviderErrorCode.EXECUTION_ERROR,
+        expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=panic_selector + encode_single("(uint256)", [0x11]),
     )
@@ -820,7 +820,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
         data = PANIC_ERROR.selector + encode_single("(uint256)", [888])
-        raise RPCError(ProviderErrorCode.EXECUTION_ERROR, "execution reverted", encode_data(data))
+        raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
@@ -831,7 +831,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
         data = b"1234" + encode_single("(uint256)", [1])
-        raise RPCError(ProviderErrorCode.EXECUTION_ERROR, "execution reverted", encode_data(data))
+        raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(

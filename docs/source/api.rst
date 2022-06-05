@@ -32,6 +32,30 @@ Errors
 
 .. autoclass:: pons.Unreachable
 
+.. autoclass:: pons.TransactionFailed
+
+.. autoclass:: pons._client.ProviderErrorCode
+   :members:
+
+.. autoclass:: pons.ProviderError()
+   :show-inheritance:
+   :members:
+
+.. autoclass:: pons._client.ContractPanicReason
+   :members:
+
+.. autoclass:: pons.ContractPanic()
+   :show-inheritance:
+   :members:
+
+.. autoclass:: pons.ContractLegacyError()
+   :show-inheritance:
+   :members:
+
+.. autoclass:: pons.ContractError()
+   :show-inheritance:
+   :members:
+
 
 Signers
 -------
