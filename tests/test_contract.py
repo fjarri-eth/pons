@@ -101,7 +101,7 @@ def test_api_binding(compiled_contracts):
     assert read_call.data_bytes == (
         compiled_contract.abi.read.getState.selector + b"\x00" * 31 + b"\x03"
     )
-    assert read_call.decode_output(b"\x00" * 31 + b"\x04") == [4]
+    assert read_call.decode_output(b"\x00" * 31 + b"\x04") == (4,)
 
     write_call = deployed_contract.write.setState(5)
     assert write_call.contract_address == address

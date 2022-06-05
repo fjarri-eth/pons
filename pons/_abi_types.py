@@ -40,7 +40,7 @@ class Type(ABC):
         ...
 
     @abstractmethod
-    def normalize(self, val) -> Any:
+    def _normalize(self, val) -> Any:
         """
         Checks and possibly normalizes the value making it ready to be passed
         to ``encode()`` for encoding.
@@ -48,7 +48,7 @@ class Type(ABC):
         ...
 
     @abstractmethod
-    def denormalize(self, val) -> Any:
+    def _denormalize(self, val) -> Any:
         """
         Checks the result of ``decode()``
         and wraps it in a specific type, if applicable.
@@ -80,7 +80,7 @@ class Type(ABC):
 
         # Before doing anything, normalize the value,
         # this will check that ensure the constituent values are actually valid.
-        return self._encode_to_topic_outer(self.normalize(val))
+        return self._encode_to_topic_outer(self._normalize(val))
 
     def _encode_to_topic_outer(self, val) -> bytes:
         """
@@ -110,7 +110,7 @@ class Type(ABC):
 
         # By default it's just the decoding of the value type.
         # May be overridden.
-        return self.denormalize(self.decode(val))
+        return self._denormalize(self.decode(val))
 
     def __str__(self):
         return self.canonical_form
@@ -157,11 +157,11 @@ class UInt(Type):
                 f"under {self._bits} bits, got {val}"
             )
 
-    def normalize(self, val):
+    def _normalize(self, val):
         self._check_val(val)
         return int(val)
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
         return val
 
@@ -196,11 +196,11 @@ class Int(Type):
                 f"under {self._bits} bits, got {val}"
             )
 
-    def normalize(self, val):
+    def _normalize(self, val):
         self._check_val(val)
         return val
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
         return val
 
@@ -231,11 +231,11 @@ class Bytes(Type):
         if self._size is not None and len(val) != self._size:
             raise ValueError(f"Expected {self._size} bytes, got {len(val)}")
 
-    def normalize(self, val):
+    def _normalize(self, val):
         self._check_val(val)
         return val
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
         return val
 
@@ -277,7 +277,7 @@ class AddressType(Type):
     def canonical_form(self):
         return "address"
 
-    def normalize(self, val):
+    def _normalize(self, val):
         if not isinstance(val, Address):
             raise TypeError(
                 f"`address` must correspond to an `Address`-type value, "
@@ -285,7 +285,7 @@ class AddressType(Type):
             )
         return bytes(val)
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         return Address.from_hex(val)
 
     def __eq__(self, other):
@@ -307,11 +307,11 @@ class String(Type):
                 f"`string` must correspond to a `str`-type value, got {type(val).__name__}"
             )
 
-    def normalize(self, val):
+    def _normalize(self, val):
         self._check_val(val)
         return val
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
         return val
 
@@ -346,11 +346,11 @@ class Bool(Type):
                 f"`bool` must correspond to a `bool`-type value, got {type(val).__name__}"
             )
 
-    def normalize(self, val):
+    def _normalize(self, val):
         self._check_val(val)
         return val
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
         return val
 
@@ -379,13 +379,13 @@ class Array(Type):
         if self._size is not None and len(val) != self._size:
             raise ValueError(f"Expected {self._size} elements, got {len(val)}")
 
-    def normalize(self, val):
+    def _normalize(self, val):
         self._check_val(val)
-        return [self._element_type.normalize(item) for item in val]
+        return [self._element_type._normalize(item) for item in val]
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
-        return [self._element_type.denormalize(item) for item in val]
+        return [self._element_type._denormalize(item) for item in val]
 
     def _encode_to_topic_outer(self, val):
         return keccak(self._encode_to_topic_inner(val))
@@ -422,20 +422,20 @@ class Struct(Type):
         if len(val) != len(self._fields):
             raise ValueError(f"Expected {len(self._fields)} elements, got {len(val)}")
 
-    def normalize(self, val):
+    def _normalize(self, val):
         if isinstance(val, Mapping):
             if val.keys() != self._fields.keys():
                 raise ValueError(
                     f"Expected fields {list(self._fields.keys())}, got {list(val.keys())}"
                 )
-            return [tp.normalize(val[name]) for name, tp in self._fields.items()]
+            return [tp._normalize(val[name]) for name, tp in self._fields.items()]
         else:
             self._check_val(val)
-            return [tp.normalize(item) for item, tp in zip(val, self._fields.values())]
+            return [tp._normalize(item) for item, tp in zip(val, self._fields.values())]
 
-    def denormalize(self, val):
+    def _denormalize(self, val):
         self._check_val(val)
-        return {name: tp.denormalize(item) for item, (name, tp) in zip(val, self._fields.items())}
+        return {name: tp._denormalize(item) for item, (name, tp) in zip(val, self._fields.items())}
 
     def _encode_to_topic_outer(self, val):
         return keccak(self._encode_to_topic_inner(val))
@@ -529,8 +529,11 @@ def encode_args(*types_and_args: Tuple[Type, Any]) -> bytes:
         types, args = zip(*types_and_args)
     else:
         types, args = (), ()
-    return encode_single(canonical_signature(types), args)
+    return encode_single(
+        canonical_signature(types), tuple(tp._normalize(arg) for tp, arg in zip(types, args))
+    )
 
 
 def decode_args(types: Iterable[Type], data: bytes) -> Tuple[Any, ...]:
-    return decode_abi(canonical_signature(types), data)
+    values = decode_abi(canonical_signature(types), data)
+    return tuple(tp._denormalize(value) for tp, value in zip(types, values))

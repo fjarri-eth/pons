@@ -16,8 +16,8 @@ from pons._abi_types import (
 
 def test_uint():
     for val in [0, 255, 10]:
-        assert abi.uint(8).normalize(val) == val
-        assert abi.uint(8).denormalize(val) == val
+        assert abi.uint(8)._normalize(val) == val
+        assert abi.uint(8)._denormalize(val) == val
 
     assert abi.uint(256).canonical_form == "uint256"
     assert abi.uint(8) == abi.uint(8)
@@ -28,25 +28,25 @@ def test_uint():
             abi.uint(bit_size)
 
     with pytest.raises(TypeError, match="`uint128` must correspond to an integer, got bool"):
-        abi.uint(128).normalize(True)
+        abi.uint(128)._normalize(True)
     with pytest.raises(TypeError, match="`uint128` must correspond to an integer, got str"):
-        abi.uint(128).normalize("abc")
+        abi.uint(128)._normalize("abc")
     with pytest.raises(
         ValueError, match="`uint128` must correspond to a non-negative integer, got -1"
     ):
-        abi.uint(128).normalize(-1)
+        abi.uint(128)._normalize(-1)
     with pytest.raises(
         ValueError,
         match="`uint128` must correspond to an unsigned integer under 128 bits, got "
         + str(2**128),
     ):
-        abi.uint(128).normalize(2**128)
+        abi.uint(128)._normalize(2**128)
 
 
 def test_int():
     for val in [0, 127, -128, 10]:
-        assert abi.int(8).normalize(val) == val
-        assert abi.int(8).denormalize(val) == val
+        assert abi.int(8)._normalize(val) == val
+        assert abi.int(8)._denormalize(val) == val
 
     assert abi.int(256).canonical_form == "int256"
     assert abi.int(8) == abi.int(8)
@@ -57,27 +57,27 @@ def test_int():
             abi.int(bit_size)
 
     with pytest.raises(TypeError, match="`int128` must correspond to an integer, got bool"):
-        abi.int(128).normalize(True)
+        abi.int(128)._normalize(True)
     with pytest.raises(TypeError, match="`int128` must correspond to an integer, got str"):
-        abi.int(128).normalize("abc")
+        abi.int(128)._normalize("abc")
     with pytest.raises(
         ValueError,
         match="`int128` must correspond to a signed integer under 128 bits, got "
         + str(-(2**127) - 1),
     ):
-        abi.int(128).normalize(-(2**127) - 1)
+        abi.int(128)._normalize(-(2**127) - 1)
     with pytest.raises(
         ValueError,
         match="`int128` must correspond to a signed integer under 128 bits, got " + str(2**127),
     ):
-        abi.int(128).normalize(2**127)
+        abi.int(128)._normalize(2**127)
 
 
 def test_bytes():
-    assert abi.bytes(3).normalize(b"foo") == b"foo"
-    assert abi.bytes(3).denormalize(b"foo") == b"foo"
-    assert abi.bytes().normalize(b"foobar") == b"foobar"
-    assert abi.bytes().denormalize(b"foobar") == b"foobar"
+    assert abi.bytes(3)._normalize(b"foo") == b"foo"
+    assert abi.bytes(3)._denormalize(b"foo") == b"foo"
+    assert abi.bytes()._normalize(b"foobar") == b"foobar"
+    assert abi.bytes()._denormalize(b"foobar") == b"foobar"
 
     assert abi.bytes(3).canonical_form == "bytes3"
     assert abi.bytes().canonical_form == "bytes"
@@ -89,53 +89,53 @@ def test_bytes():
             abi.bytes(size)
 
     with pytest.raises(TypeError, match="`bytes` must correspond to a bytestring, got str"):
-        abi.bytes().normalize("foo")
+        abi.bytes()._normalize("foo")
     with pytest.raises(ValueError, match="Expected 4 bytes, got 3"):
-        abi.bytes(4).normalize(b"foo")
+        abi.bytes(4)._normalize(b"foo")
 
 
 def test_address():
     addr_bytes = b"\x01" * 20
     addr = Address(addr_bytes)
 
-    assert abi.address.normalize(addr) == addr_bytes
-    assert abi.address.denormalize(addr_bytes) == addr
+    assert abi.address._normalize(addr) == addr_bytes
+    assert abi.address._denormalize(addr_bytes) == addr
 
     assert abi.address.canonical_form == "address"
 
     with pytest.raises(
         TypeError, match="`address` must correspond to an `Address`-type value, got str"
     ):
-        abi.address.normalize("0x" + "01" * 20)
+        abi.address._normalize("0x" + "01" * 20)
 
 
 def test_string():
-    assert abi.string.normalize("foo") == "foo"
-    assert abi.string.denormalize("foo") == "foo"
+    assert abi.string._normalize("foo") == "foo"
+    assert abi.string._denormalize("foo") == "foo"
 
     assert abi.string.canonical_form == "string"
 
     with pytest.raises(
         TypeError, match="`string` must correspond to a `str`-type value, got bytes"
     ):
-        abi.string.normalize(b"foo")
+        abi.string._normalize(b"foo")
 
 
 def test_bool():
-    assert abi.bool.normalize(True) is True
-    assert abi.bool.denormalize(True) is True
+    assert abi.bool._normalize(True) is True
+    assert abi.bool._denormalize(True) is True
 
     assert abi.bool.canonical_form == "bool"
 
     with pytest.raises(TypeError, match="`bool` must correspond to a `bool`-type value, got int"):
-        abi.bool.normalize(1)
+        abi.bool._normalize(1)
 
 
 def test_array():
-    assert abi.uint(8)[2].normalize([1, 2]) == [1, 2]
-    assert abi.uint(8)[2].denormalize([1, 2]) == [1, 2]
-    assert abi.uint(8)[...].normalize([1, 2, 3]) == [1, 2, 3]
-    assert abi.uint(8)[...].denormalize([1, 2, 3]) == [1, 2, 3]
+    assert abi.uint(8)[2]._normalize([1, 2]) == [1, 2]
+    assert abi.uint(8)[2]._denormalize([1, 2]) == [1, 2]
+    assert abi.uint(8)[...]._normalize([1, 2, 3]) == [1, 2, 3]
+    assert abi.uint(8)[...]._denormalize([1, 2, 3]) == [1, 2, 3]
 
     assert abi.uint(8)[2].canonical_form == "uint8[2]"
     assert abi.uint(8)[...].canonical_form == "uint8[]"
@@ -144,9 +144,9 @@ def test_array():
     assert abi.uint(8)[...] != abi.uint(8)[2]
 
     with pytest.raises(TypeError, match="Expected an iterable, got int"):
-        abi.uint(8)[1].normalize(1)
+        abi.uint(8)[1]._normalize(1)
     with pytest.raises(ValueError, match="Expected 2 elements, got 3"):
-        abi.uint(8)[2].normalize([1, 2, 3])
+        abi.uint(8)[2]._normalize([1, 2, 3])
 
 
 def test_struct():
@@ -156,9 +156,9 @@ def test_struct():
     s1_copy = abi.struct(a=u8, b=abi.bool)
     s2 = abi.struct(b=abi.bool, a=u8)
 
-    assert s1.normalize(dict(b=True, a=1)) == [1, True]
-    assert s1.normalize([1, True]) == [1, True]
-    assert s1.denormalize([1, True]) == dict(a=1, b=True)
+    assert s1._normalize(dict(b=True, a=1)) == [1, True]
+    assert s1._normalize([1, True]) == [1, True]
+    assert s1._denormalize([1, True]) == dict(a=1, b=True)
 
     assert s1.canonical_form == "(uint8,bool)"
     assert str(s1) == "(uint8 a, bool b)"
@@ -166,11 +166,11 @@ def test_struct():
     assert s1 != s2
 
     with pytest.raises(TypeError, match="Expected an iterable, got int"):
-        s1.normalize(1)
+        s1._normalize(1)
     with pytest.raises(ValueError, match="Expected 2 elements, got 3"):
-        s1.normalize([1, True, 2])
+        s1._normalize([1, True, 2])
     with pytest.raises(ValueError, match=r"Expected fields \['a', 'b'\], got \['a', 'c'\]"):
-        s1.normalize(dict(a=1, c=True))
+        s1._normalize(dict(a=1, c=True))
 
 
 def test_type_from_abi_string():
@@ -243,10 +243,10 @@ def test_normalization_roundtrip():
     expected_normalized = [1, [2, 3], bytes(addr), [True, "abcd"]]
 
     # normalize() loses info on struct field names
-    assert struct.normalize(value) == expected_normalized
+    assert struct._normalize(value) == expected_normalized
 
     # denormalize() should recover struct field names
-    assert struct.denormalize(expected_normalized) == value
+    assert struct._denormalize(expected_normalized) == value
 
 
 def check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=True):

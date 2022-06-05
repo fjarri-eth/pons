@@ -164,7 +164,7 @@ async def test_eth_call(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     result = await session.eth_call(deployed_contract.read.getState(456))
-    assert result == [123 + 456]
+    assert result == (123 + 456,)
 
 
 async def test_eth_call_decoding_error(session, compiled_contracts, root_signer):
@@ -295,7 +295,7 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
     # Normal deploy
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
     result = await session.eth_call(deployed_contract.read.getState(456))
-    assert result == [123 + 456]
+    assert result == (123 + 456,)
 
     with pytest.raises(ValueError, match="This constructor does not accept an associated payment"):
         await session.deploy(root_signer, basic_contract.constructor(1), Amount.ether(1))
@@ -341,7 +341,7 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
     await session.transact(root_signer, deployed_contract.write.setState(456))
     result = await session.eth_call(deployed_contract.read.getState(789))
-    assert result == [456 + 789]
+    assert result == (456 + 789,)
 
     with pytest.raises(ValueError, match="This method does not accept an associated payment"):
         await session.transact(root_signer, deployed_contract.write.setState(456), Amount.ether(1))

@@ -31,8 +31,8 @@ def test_signature_from_dict():
     sig = Signature(dict(a=abi.uint(8), b=abi.bool))
     assert sig.canonical_form == "(uint8,bool)"
     assert str(sig) == "(uint8 a, bool b)"
-    assert sig.decode_into_list(sig.encode(1, True)) == [1, True]
-    assert sig.decode_into_list(sig.encode(b=True, a=1)) == [1, True]
+    assert sig.decode_into_tuple(sig.encode(1, True)) == (1, True)
+    assert sig.decode_into_tuple(sig.encode(b=True, a=1)) == (1, True)
     assert sig.decode_into_dict(sig.encode(b=True, a=1)) == dict(b=True, a=1)
 
 
@@ -40,7 +40,7 @@ def test_signature_from_list():
     sig = Signature([abi.uint(8), abi.bool])
     assert str(sig) == "(uint8, bool)"
     assert sig.canonical_form == "(uint8,bool)"
-    assert sig.decode_into_list(sig.encode(1, True)) == [1, True]
+    assert sig.decode_into_tuple(sig.encode(1, True)) == (1, True)
     assert sig.decode_into_dict(sig.encode(1, True)) == {"_0": 1, "_1": True}
 
 
@@ -156,7 +156,7 @@ def _check_read_method(read):
     assert rcall.data_bytes == read.selector + encoded_bytes
 
     vals = read.decode_output(encoded_bytes)
-    assert vals == [1, True]
+    assert vals == (1, True)
 
 
 def test_read_method_from_json_anonymous_outputs():
