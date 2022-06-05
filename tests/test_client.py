@@ -2,8 +2,6 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 
-from eth_abi import encode_single
-from eth_utils import keccak
 import pytest
 import trio
 
@@ -23,9 +21,10 @@ from pons import (
     ContractLegacyError,
     ContractError,
 )
+from pons._abi_types import keccak, encode_args
 from pons._contract_abi import PANIC_ERROR
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
-from pons._entities import encode_data
+from pons._entities import rpc_encode_data
 from pons._provider import RPCError
 
 from .compile import compile_file
@@ -165,7 +164,7 @@ async def test_eth_call(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     result = await session.eth_call(deployed_contract.read.getState(456))
-    assert result == [123 + 456]
+    assert result == (123 + 456,)
 
 
 async def test_eth_call_decoding_error(session, compiled_contracts, root_signer):
@@ -296,7 +295,7 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
     # Normal deploy
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
     result = await session.eth_call(deployed_contract.read.getState(456))
-    assert result == [123 + 456]
+    assert result == (123 + 456,)
 
     with pytest.raises(ValueError, match="This constructor does not accept an associated payment"):
         await session.deploy(root_signer, basic_contract.constructor(1), Amount.ether(1))
@@ -342,7 +341,7 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
     await session.transact(root_signer, deployed_contract.write.setState(456))
     result = await session.eth_call(deployed_contract.read.getState(789))
-    assert result == [456 + 789]
+    assert result == (456 + 789,)
 
     with pytest.raises(ValueError, match="This method does not accept an associated payment"):
         await session.transact(root_signer, deployed_contract.write.setState(456), Amount.ether(1))
@@ -729,7 +728,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted: require(string)",
-        expected_data=error_selector + encode_single("(string)", ["require(string)"]),
+        expected_data=error_selector + encode_args((abi.string, "require(string)")),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(1)), **kwargs)
 
@@ -745,7 +744,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted: revert(string)",
-        expected_data=error_selector + encode_single("(string)", ["revert(string)"]),
+        expected_data=error_selector + encode_args((abi.string, "revert(string)")),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(3)), **kwargs)
 
@@ -753,7 +752,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
-        expected_data=custom_error_selector + encode_single("(uint256)", [4]),
+        expected_data=custom_error_selector + encode_args((abi.uint(256), 4)),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(4)), **kwargs)
 
@@ -769,14 +768,14 @@ async def test_contract_panics(session, root_signer, compiled_contracts):
         session.eth_call(contract.read.viewPanic(0)),
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
-        expected_data=panic_selector + encode_single("(uint256)", [0x01]),
+        expected_data=panic_selector + encode_args((abi.uint(256), 0x01)),
     )
 
     await check_rpc_error(
         session.eth_call(contract.read.viewPanic(1)),
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
-        expected_data=panic_selector + encode_single("(uint256)", [0x11]),
+        expected_data=panic_selector + encode_args((abi.uint(256), 0x11)),
     )
 
 
@@ -819,8 +818,10 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
-        data = PANIC_ERROR.selector + encode_single("(uint256)", [888])
-        raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
+        data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
+        raise RPCError(
+            ProviderError.Code.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
+        )
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
@@ -830,8 +831,10 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
-        data = b"1234" + encode_single("(uint256)", [1])
-        raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
+        data = b"1234" + encode_args((abi.uint(256), 1))
+        raise RPCError(
+            ProviderError.Code.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
+        )
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(
@@ -843,8 +846,8 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
-        data = PANIC_ERROR.selector + encode_single("(uint256)", [0])
-        raise RPCError(12345, "execution reverted", encode_data(data))
+        data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
+        raise RPCError(12345, "execution reverted", rpc_encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):

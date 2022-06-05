@@ -4,12 +4,12 @@ import pytest
 
 from pons import Amount, Address, TxHash, Block, BlockHash
 from pons._entities import (
-    encode_quantity,
-    encode_data,
-    encode_block,
-    decode_quantity,
-    decode_data,
-    decode_block,
+    rpc_encode_quantity,
+    rpc_encode_data,
+    rpc_encode_block,
+    rpc_decode_quantity,
+    rpc_decode_data,
+    rpc_decode_block,
     RPCDecodingError,
     LogTopic,
     LogEntry,
@@ -37,8 +37,8 @@ def test_amount():
         Amount.wei(-100)
 
     # Encoding
-    assert Amount.wei(100).encode() == "0x64"
-    assert Amount.decode("0x64") == Amount.wei(100)
+    assert Amount.wei(100).rpc_encode() == "0x64"
+    assert Amount.rpc_decode("0x64") == Amount.wei(100)
 
     assert Amount.wei(100) + Amount.wei(50) == Amount.wei(150)
     assert Amount.wei(100) - Amount.wei(50) == Amount.wei(50)
@@ -88,8 +88,8 @@ def test_address():
 
     assert Address(random_addr).checksum == random_addr_checksum
 
-    assert Address(random_addr).encode() == random_addr_checksum
-    assert Address.decode(random_addr_checksum) == Address(random_addr)
+    assert Address(random_addr).rpc_encode() == random_addr_checksum
+    assert Address.rpc_decode(random_addr_checksum) == Address(random_addr)
     assert Address(random_addr) == Address(random_addr)
     assert Address(random_addr) != Address(os.urandom(20))
 
@@ -123,7 +123,7 @@ def test_address():
         Address.from_hex(random_addr_checksum[:-1])
 
     with pytest.raises(RPCDecodingError, match="Address must be 20 bytes long, got 19"):
-        Address.decode("0x" + random_addr[:-1].hex())
+        Address.rpc_decode("0x" + random_addr[:-1].hex())
 
 
 def test_typed_data():
@@ -131,7 +131,7 @@ def test_typed_data():
     data = os.urandom(32)
     tx_hash = TxHash(data)
     assert repr(tx_hash) == f'TxHash(bytes.fromhex("{data.hex()}"))'
-    assert tx_hash.encode() == "0x" + data.hex()
+    assert tx_hash.rpc_encode() == "0x" + data.hex()
 
 
 def test_typed_data_lengths():
@@ -151,7 +151,7 @@ def test_decode_tx_receipt():
         "transactionHash": "0xf105e4ee72d1538a4e10ee9584581e2b6f13cd9be82acd14e8edd65d954483c5",
         "blockHash": "0x3f62ac76f9551dbf878c334657ce19a86881734cbf53f8ecd9c3afb9a22d5bee",
         "blockNumber": "0xa38696",
-        "contractAddress": address.encode(),
+        "contractAddress": address.rpc_encode(),
         "cumulativeGasUsed": "0x43641c",
         "effectiveGasPrice": "0x45463c1c",
         "from": "0x8d75f6db12c444e290db995f2650a68159364e25",
@@ -162,16 +162,16 @@ def test_decode_tx_receipt():
         "type": "0x0",
     }
 
-    tx_receipt = TxReceipt.decode(tx_receipt_json)
+    tx_receipt = TxReceipt.rpc_decode(tx_receipt_json)
 
     assert tx_receipt.succeeded
     assert tx_receipt.contract_address == address
 
     tx_receipt_json["contractAddress"] = None
-    tx_receipt_json["to"] = address.encode()
+    tx_receipt_json["to"] = address.rpc_encode()
     tx_receipt_json["status"] = "0x0"
 
-    tx_receipt = TxReceipt.decode(tx_receipt_json)
+    tx_receipt = TxReceipt.rpc_decode(tx_receipt_json)
 
     assert not tx_receipt.succeeded
     assert tx_receipt.contract_address is None
@@ -179,42 +179,42 @@ def test_decode_tx_receipt():
 
 
 def test_encode_decode_quantity():
-    assert encode_quantity(100) == "0x64"
-    assert decode_quantity("0x64") == 100
+    assert rpc_encode_quantity(100) == "0x64"
+    assert rpc_decode_quantity("0x64") == 100
 
     with pytest.raises(RPCDecodingError, match="Encoded quantity must be a string"):
-        decode_quantity(100)
+        rpc_decode_quantity(100)
 
     with pytest.raises(RPCDecodingError, match="Encoded quantity must start with `0x`"):
-        decode_quantity("616263")
+        rpc_decode_quantity("616263")
 
     with pytest.raises(RPCDecodingError, match="Could not convert encoded quantity to an integer"):
-        decode_quantity("0xefgh")
+        rpc_decode_quantity("0xefgh")
 
 
 def test_encode_decode_data():
-    assert encode_data(b"abc") == "0x616263"
-    assert decode_data("0x616263") == b"abc"
+    assert rpc_encode_data(b"abc") == "0x616263"
+    assert rpc_decode_data("0x616263") == b"abc"
 
     with pytest.raises(RPCDecodingError, match="Encoded data must be a string"):
-        decode_data(616263)
+        rpc_decode_data(616263)
 
     with pytest.raises(RPCDecodingError, match="Encoded data must start with `0x`"):
-        decode_data("616263")
+        rpc_decode_data("616263")
 
     with pytest.raises(RPCDecodingError, match="Could not convert encoded data to bytes"):
-        decode_data("0xefgh")
+        rpc_decode_data("0xefgh")
 
 
 def test_encode_decode_block():
-    assert encode_block(Block.LATEST) == "latest"
-    assert encode_block(Block.EARLIEST) == "earliest"
-    assert encode_block(Block.PENDING) == "pending"
-    assert encode_block(123) == "0x7b"
-    assert decode_block("latest") == "latest"
-    assert decode_block("earliest") == "earliest"
-    assert decode_block("pending") == "pending"
-    assert decode_block("0x7b") == 123
+    assert rpc_encode_block(Block.LATEST) == "latest"
+    assert rpc_encode_block(Block.EARLIEST) == "earliest"
+    assert rpc_encode_block(Block.PENDING) == "pending"
+    assert rpc_encode_block(123) == "0x7b"
+    assert rpc_decode_block("latest") == "latest"
+    assert rpc_decode_block("earliest") == "earliest"
+    assert rpc_decode_block("pending") == "pending"
+    assert rpc_decode_block("0x7b") == 123
 
 
 def test_decode_block_info():
@@ -266,24 +266,26 @@ def test_decode_block_info():
     }
 
     # Parse output with the transaction info
-    block_info = BlockInfo.decode(json_result)
-    assert block_info.transactions[0].block_hash == BlockHash.decode(
+    block_info = BlockInfo.rpc_decode(json_result)
+    assert block_info.transactions[0].block_hash == BlockHash.rpc_decode(
         json_result["transactions"][0]["blockHash"]
     )
-    assert block_info.transaction_hashes[0] == TxHash.decode(json_result["transactions"][0]["hash"])
+    assert block_info.transaction_hashes[0] == TxHash.rpc_decode(
+        json_result["transactions"][0]["hash"]
+    )
 
     # Parse output without the transaction info
     json_result["transactions"] = [
         json_result["transactions"][0]["hash"],
         json_result["transactions"][1]["hash"],
     ]
-    block_info = BlockInfo.decode(json_result)
+    block_info = BlockInfo.rpc_decode(json_result)
     assert block_info.transactions is None
-    assert block_info.transaction_hashes[0] == TxHash.decode(json_result["transactions"][0])
+    assert block_info.transaction_hashes[0] == TxHash.rpc_decode(json_result["transactions"][0])
 
     # Parse output without any transactions
     json_result["transactions"] = []
-    block_info = BlockInfo.decode(json_result)
+    block_info = BlockInfo.rpc_decode(json_result)
     assert block_info.transactions == ()
     assert block_info.transaction_hashes == ()
 
@@ -305,5 +307,5 @@ def test_decode_log_entry():
         "removed": False,
     }
 
-    log_entry = LogEntry.decode(log_entry_json)
+    log_entry = LogEntry.rpc_decode(log_entry_json)
     assert log_entry.data == b""
