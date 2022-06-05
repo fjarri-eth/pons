@@ -13,6 +13,8 @@ Added
 - ``eth_new_block_filter()``, ``eth_new_pending_transaction_filter()``, ``eth_new_filter()``, ``eth_get_filter_changes()`` for low-level event filtering support. (PR_32_)
 - ``iter_blocks()``, ``iter_pending_transactions()``, ``iter_events()`` for high-level event filtering support. (PR_32_)
 - More fields in ``TxReceipt``. (PR_32_)
+- ``Error`` class for Contract ABI, and support of ``type="error"`` declarations in JSON ABI. (PR_33_)
+- Error data parsing and matching it with known errors from the ABI when calling ``estimate_transact()`` and ``estimate_deploy()``. (PR_33_)
 
 
 Fixed
@@ -22,6 +24,7 @@ Fixed
 
 
 .. _PR_32: https://github.com/fjarri/pons/pull/32
+.. _PR_33: https://github.com/fjarri/pons/pull/33
 
 
 0.4.1 (01-05-2022)
