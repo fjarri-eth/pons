@@ -50,24 +50,6 @@ contract BasicContract {
 }
 
 
-contract ConstructionError {
-    constructor(uint256 _x) {
-        if (_x == 0) {
-            revert("Wrong value");
-        }
-    }
-}
-
-
-contract TransactionError {
-    function setState(uint256 _x) public {
-        if (_x == 0) {
-            revert("Wrong value");
-        }
-    }
-}
-
-
 contract PayableConstructor {
     uint256 public state;
 
@@ -123,5 +105,9 @@ contract TestErrors {
 
     function viewPanic(uint256 x) public view returns (uint256) {
         return raisePanic(x);
+    }
+
+    function transactPanic(uint256 x) public {
+        state = raisePanic(x);
     }
 }

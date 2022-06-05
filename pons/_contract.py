@@ -1,6 +1,6 @@
 from typing import Any, Dict, Tuple, Optional
 
-from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod, Event, EventFilter
+from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod, Event, EventFilter, Error
 from ._entities import Address, LogEntry, LogTopic
 
 
@@ -88,7 +88,8 @@ class BoundWriteMethod:
     A mutating method bound to a specific contract's address.
     """
 
-    def __init__(self, contract_address: Address, method: WriteMethod):
+    def __init__(self, contract_abi: ContractABI, contract_address: Address, method: WriteMethod):
+        self._contract_abi = contract_abi
         self._contract_address = contract_address
         self._method = method
 
@@ -97,13 +98,18 @@ class BoundWriteMethod:
         Returns a contract call with encoded arguments bound to a specific address.
         """
         call = self._method(*args, **kwargs)
-        return BoundWriteCall(self._contract_address, call.data_bytes, self._method.payable)
+        return BoundWriteCall(
+            self._contract_abi, self._contract_address, call.data_bytes, self._method.payable
+        )
 
 
 class BoundWriteCall:
     """
     A mutating method call with encoded arguments bound to a specific contract address.
     """
+
+    contract_abi: ContractABI
+    """The corresponding contract's ABI"""
 
     contract_address: Address
     """The contract address."""
@@ -114,7 +120,10 @@ class BoundWriteCall:
     data_bytes: bytes
     """Encoded call arguments with the selector."""
 
-    def __init__(self, contract_address: Address, data_bytes: bytes, payable: bool):
+    def __init__(
+        self, contract_abi: ContractABI, contract_address: Address, data_bytes: bytes, payable: bool
+    ):
+        self.contract_abi = contract_abi
         self.payable = payable
         self.contract_address = contract_address
         self.data_bytes = data_bytes
@@ -209,6 +218,9 @@ class DeployedContract:
     event: Methods[BoundEvent]
     """Contract's events bound to the address."""
 
+    error: Methods[Error]
+    """Contract's errors."""
+
     def __init__(self, abi: ContractABI, address: Address):
         self.abi = abi
         self.address = address
@@ -217,8 +229,12 @@ class DeployedContract:
             {method.name: BoundReadMethod(self.address, method) for method in self.abi.read}
         )
         self.write = Methods(
-            {method.name: BoundWriteMethod(self.address, method) for method in self.abi.write}
+            {
+                method.name: BoundWriteMethod(self.abi, self.address, method)
+                for method in self.abi.write
+            }
         )
         self.event = Methods(
             {event.name: BoundEvent(self.address, event) for event in self.abi.event}
         )
+        self.error = self.abi.error

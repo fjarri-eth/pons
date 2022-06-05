@@ -66,6 +66,9 @@ Contract ABI
 .. autoclass:: Event
    :members:
 
+.. autoclass:: Error
+   :members:
+
 .. autoclass:: Fallback
    :members:
 
@@ -128,8 +131,8 @@ Utility classes
 
    Generic method type parameter.
 
-.. autoclass:: pons._contract_abi.Signature
-   :members:
+.. autoclass:: pons._contract_abi.Signature()
+   :members: canonical_form
 
 .. autoclass:: pons._contract_abi.Method
    :members:

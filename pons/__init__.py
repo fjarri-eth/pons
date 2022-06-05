@@ -1,5 +1,5 @@
 from . import abi
-from ._client import Client, RemoteError
+from ._client import Client, RemoteError, ContractPanic, ContractLegacyError, ContractError
 from ._contract_abi import (
     ABIDecodingError,
     ContractABI,
@@ -7,6 +7,7 @@ from ._contract_abi import (
     ReadMethod,
     WriteMethod,
     Event,
+    Error,
     Fallback,
     Receive,
     Either,

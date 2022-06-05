@@ -22,9 +22,13 @@ from pons import (
     BlockHash,
     Block,
     Either,
+    ContractPanic,
+    ContractLegacyError,
+    ContractError,
 )
+from pons._contract_abi import PANIC_ERROR
 from pons._client import BadResponseFormat, ProviderError, ProviderErrorCode, TransactionFailed
-from pons._entities import LogTopic
+from pons._entities import LogTopic, encode_data
 from pons._provider import RPCError
 
 from .compile import compile_file
@@ -197,14 +201,9 @@ async def test_eth_call_decoding_error(test_provider, session, compiled_contract
 
 
 async def test_estimate_deploy(test_provider, session, compiled_contracts, root_signer):
-    compiled_contract = compiled_contracts["ConstructionError"]
+    compiled_contract = compiled_contracts["BasicContract"]
     gas = await session.estimate_deploy(compiled_contract.constructor(1))
     assert isinstance(gas, int) and gas > 0
-
-    with pytest.raises(
-        ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
-    ):
-        await session.estimate_deploy(compiled_contract.constructor(0))
 
 
 async def test_estimate_transfer(test_provider, session, root_signer, another_signer):
@@ -223,15 +222,10 @@ async def test_estimate_transfer(test_provider, session, root_signer, another_si
 
 
 async def test_estimate_transact(test_provider, session, compiled_contracts, root_signer):
-    compiled_contract = compiled_contracts["TransactionError"]
-    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
+    compiled_contract = compiled_contracts["BasicContract"]
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(1))
     gas = await session.estimate_transact(deployed_contract.write.setState(456))
     assert isinstance(gas, int) and gas > 0
-
-    with pytest.raises(
-        ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
-    ):
-        await session.estimate_transact(deployed_contract.write.setState(0))
 
 
 async def test_eth_gas_price(test_provider, session):
@@ -300,7 +294,7 @@ async def test_transfer_failed(test_provider, session, root_signer, another_sign
 
 async def test_deploy(test_provider, session, compiled_contracts, root_signer):
     basic_contract = compiled_contracts["BasicContract"]
-    construction_error = compiled_contracts["ConstructionError"]
+    construction_error = compiled_contracts["TestErrors"]
     payable_constructor = compiled_contracts["PayableConstructor"]
 
     # Normal deploy
@@ -321,7 +315,8 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
     balance = await session.eth_get_balance(contract.address)
     assert balance == Amount.ether(1)
 
-    # Not enough gas
+    # When gas is set manually, the gas estimation step is skipped,
+    # and we don't see the actual error, only the failed transaction.
     with pytest.raises(TransactionFailed, match="Deploy failed"):
         await session.deploy(root_signer, construction_error.constructor(0), gas=300000)
 
@@ -741,7 +736,7 @@ async def test_contract_exceptions(session, root_signer, another_signer, compile
         expected_data=None,
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(0)), **kwargs)
-    await check_rpc_error(session.transact(root_signer, contract.write.transactError(0)), **kwargs)
+    # await check_rpc_error(session.transact(root_signer, contract.write.transactError(0)), **kwargs)
 
     # `require(condition, message)`
     kwargs = dict(
@@ -750,7 +745,7 @@ async def test_contract_exceptions(session, root_signer, another_signer, compile
         expected_data=error_selector + encode_single("(string)", ["require(string)"]),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(1)), **kwargs)
-    await check_rpc_error(session.transact(root_signer, contract.write.transactError(1)), **kwargs)
+    # await check_rpc_error(session.transact(root_signer, contract.write.transactError(1)), **kwargs)
 
     # `revert()`
     kwargs = dict(
@@ -759,7 +754,7 @@ async def test_contract_exceptions(session, root_signer, another_signer, compile
         expected_data=None,
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(2)), **kwargs)
-    await check_rpc_error(session.transact(root_signer, contract.write.transactError(2)), **kwargs)
+    # await check_rpc_error(session.transact(root_signer, contract.write.transactError(2)), **kwargs)
 
     # `revert(message)`
     kwargs = dict(
@@ -768,7 +763,7 @@ async def test_contract_exceptions(session, root_signer, another_signer, compile
         expected_data=error_selector + encode_single("(string)", ["revert(string)"]),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(3)), **kwargs)
-    await check_rpc_error(session.transact(root_signer, contract.write.transactError(3)), **kwargs)
+    # await check_rpc_error(session.transact(root_signer, contract.write.transactError(3)), **kwargs)
 
     # `revert CustomError(...)`
     kwargs = dict(
@@ -777,7 +772,7 @@ async def test_contract_exceptions(session, root_signer, another_signer, compile
         expected_data=custom_error_selector + encode_single("(uint256)", [4]),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(4)), **kwargs)
-    await check_rpc_error(session.transact(root_signer, contract.write.transactError(4)), **kwargs)
+    # await check_rpc_error(session.transact(root_signer, contract.write.transactError(4)), **kwargs)
 
 
 async def test_contract_panics(session, root_signer, another_signer, compiled_contracts):
@@ -800,3 +795,76 @@ async def test_contract_panics(session, root_signer, another_signer, compiled_co
         expected_message="execution reverted",
         expected_data=panic_selector + encode_single("(uint256)", [0x11]),
     )
+
+
+async def test_contract_exceptions_high_level(
+    session, root_signer, another_signer, compiled_contracts
+):
+
+    compiled_contract = compiled_contracts["TestErrors"]
+    contract = await session.deploy(root_signer, compiled_contract.constructor(999))
+
+    with pytest.raises(ContractPanic) as exc:
+        await session.estimate_transact(contract.write.transactPanic(1))
+    assert exc.value.reason == ContractPanic.Reason.OVERFLOW
+
+    with pytest.raises(ContractLegacyError) as exc:
+        await session.estimate_transact(contract.write.transactError(0))
+    assert exc.value.message == ""
+
+    with pytest.raises(ContractLegacyError) as exc:
+        await session.estimate_transact(contract.write.transactError(1))
+    assert exc.value.message == "require(string)"
+
+    with pytest.raises(ContractError) as exc:
+        await session.estimate_transact(contract.write.transactError(4))
+    assert exc.value.error == contract.error.CustomError
+    assert exc.value.data == {"x": 4}
+
+    # Check that the same works for deployment
+
+    with pytest.raises(ContractError) as exc:
+        await session.estimate_deploy(compiled_contract.constructor(4))
+    assert exc.value.error == contract.error.CustomError
+    assert exc.value.data == {"x": 4}
+
+
+async def test_unknown_error_reasons(test_provider, session, compiled_contracts, root_signer):
+
+    compiled_contract = compiled_contracts["TestErrors"]
+    contract = await session.deploy(root_signer, compiled_contract.constructor(999))
+
+    # Provider returns an unknown panic code
+
+    def eth_estimate_gas(*args, **kwargs):
+        # Invalid selector
+        data = PANIC_ERROR.selector + encode_single("(uint256)", [888])
+        raise RPCError(ProviderErrorCode.EXECUTION_ERROR, "execution reverted", encode_data(data))
+
+    with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
+        with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
+            await session.estimate_transact(contract.write.transactPanic(999))
+
+    # Provider returns an unknown error (a selector not present in the ABI)
+
+    def eth_estimate_gas(*args, **kwargs):
+        # Invalid selector
+        data = b"1234" + encode_single("(uint256)", [1])
+        raise RPCError(ProviderErrorCode.EXECUTION_ERROR, "execution reverted", encode_data(data))
+
+    with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
+        with pytest.raises(
+            ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
+        ):
+            await session.estimate_transact(contract.write.transactPanic(999))
+
+    # Provider returns an error with an unknown RPC code
+
+    def eth_estimate_gas(*args, **kwargs):
+        # Invalid selector
+        data = PANIC_ERROR.selector + encode_single("(uint256)", [0])
+        raise RPCError(12345, "execution reverted", encode_data(data))
+
+    with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
+        with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
+            await session.estimate_transact(contract.write.transactPanic(999))

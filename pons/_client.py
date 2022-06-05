@@ -12,7 +12,7 @@ from ._contract import (
     BoundWriteCall,
     BoundEventFilter,
 )
-from ._contract_abi import EventFilter
+from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI
 from ._provider import (
     Provider,
     ProviderSession,
@@ -156,6 +156,107 @@ def rpc_call(method_name):
     return _wrapper
 
 
+class ContractPanicReason(Enum):
+    """
+    Reasons leading to a contract call panicking.
+    """
+
+    UNKNOWN = -1
+    """Unknown panic code."""
+
+    COMPILER = 0
+    """Used for generic compiler inserted panics."""
+
+    ASSERTION = 0x01
+    """If you call assert with an argument that evaluates to ``false``."""
+
+    OVERFLOW = 0x11
+    """
+    If an arithmetic operation results in underflow or overflow
+    outside of an ``unchecked { ... }`` block.
+    """
+
+    DIVISION_BY_ZERO = 0x12
+    """If you divide or modulo by zero (e.g. ``5 / 0`` or ``23 % 0``)."""
+
+    INVALID_ENUM_VALUE = 0x21
+    """If you convert a value that is too big or negative into an ``enum`` type."""
+
+    INVALID_ENCODING = 0x22
+    """If you access a storage byte array that is incorrectly encoded."""
+
+    EMPTY_ARRAY = 0x31
+    """If you call ``.pop()`` on an empty array."""
+
+    OUT_OF_BOUNDS = 0x32
+    """
+    If you access an array, ``bytesN`` or an array slice at an out-of-bounds or negative index
+    (i.e. ``x[i]`` where ``i >= x.length`` or ``i < 0``).
+    """
+
+    OUT_OF_MEMORY = 0x41
+    """If you allocate too much memory or create an array that is too large."""
+
+    ZERO_DEREFERENCE = 0x51
+    """If you call a zero-initialized variable of internal function type."""
+
+    @classmethod
+    def from_int(cls, val: int) -> "ContractPanicReason":
+        try:
+            return cls(val)
+        except ValueError:
+            return cls.UNKNOWN
+
+
+class ContractPanic(Exception):
+
+    Reason = ContractPanicReason
+
+    @classmethod
+    def from_code(cls, code: int):
+        return cls(ContractPanicReason.from_int(code))
+
+    def __init__(self, reason: ContractPanicReason):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class ContractLegacyError(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class ContractError(Exception):
+    def __init__(self, error, decoded_data):
+        super().__init__(error, decoded_data)
+        self.error = error
+        self.data = decoded_data
+
+
+def decode_contract_error(
+    abi: ContractABI, exc: ProviderError
+) -> Union[ContractPanic, ContractLegacyError, ContractError, ProviderError]:
+    # A little wonky, but there's no better way to detect legacy errors without a message.
+    # Hopefully these are used very rarely.
+    if exc.code == ProviderErrorCode.SERVER_ERROR and exc.message == "execution reverted":
+        return ContractLegacyError("")
+    elif exc.code == ProviderErrorCode.EXECUTION_ERROR:
+        try:
+            error, decoded_data = abi.resolve_error(exc.data or b"")
+        except UnknownError:
+            return exc
+
+        if error == PANIC_ERROR:
+            return ContractPanic.from_code(decoded_data["code"])
+        elif error == LEGACY_ERROR:
+            return ContractLegacyError(decoded_data["message"])
+        else:
+            return ContractError(error, decoded_data)
+    else:
+        return exc
+
+
 class ClientSession:
     """
     An open session to the provider.
@@ -273,6 +374,10 @@ class ClientSession:
         return TxHash.decode(result)
 
     @rpc_call("eth_estimateGas")
+    async def _estimate_gas(self, tx: dict):
+        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
+        return decode_quantity(result)
+
     async def estimate_deploy(self, call: BoundConstructorCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
@@ -281,10 +386,11 @@ class ClientSession:
             "data": encode_data(call.data_bytes),
             "value": amount.encode(),
         }
-        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
-        return decode_quantity(result)
+        try:
+            return await self._estimate_gas(tx)
+        except ProviderError as exc:
+            raise decode_contract_error(call.contract_abi, exc) from exc
 
-    @rpc_call("eth_estimateGas")
     async def estimate_transfer(
         self, source_address: Address, destination_address: Address, amount: Amount
     ) -> int:
@@ -299,10 +405,8 @@ class ClientSession:
             "to": destination_address.encode(),
             "value": amount.encode(),
         }
-        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
-        return decode_quantity(result)
+        return await self._estimate_gas(tx)
 
-    @rpc_call("eth_estimateGas")
     async def estimate_transact(self, call: BoundWriteCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
@@ -312,8 +416,10 @@ class ClientSession:
             "data": encode_data(call.data_bytes),
             "value": amount.encode(),
         }
-        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
-        return decode_quantity(result)
+        try:
+            return await self._estimate_gas(tx)
+        except ProviderError as exc:
+            raise decode_contract_error(call.contract_abi, exc) from exc
 
     @rpc_call("eth_gasPrice")
     async def eth_gas_price(self) -> Amount:
