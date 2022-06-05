@@ -17,10 +17,10 @@ from pons._abi_types import keccak, encode_args, decode_args
 from pons._provider import Provider, ProviderSession, RPCError
 from pons._client import ProviderErrorCode
 from pons._entities import (
-    encode_quantity,
-    decode_quantity,
-    encode_data,
-    decode_block,
+    rpc_encode_quantity,
+    rpc_decode_quantity,
+    rpc_encode_data,
+    rpc_decode_block,
 )
 
 
@@ -74,12 +74,12 @@ def pyevm_errors_into_rpc_errors():
             error = ProviderErrorCode.EXECUTION_ERROR
             reason_message = decode_args([abi.string], reason_data[len(_ERROR_SELECTOR) :])[0]
             message = f"execution reverted: {reason_message}"
-            data = encode_data(reason_data)
+            data = rpc_encode_data(reason_data)
 
         else:
             error = ProviderErrorCode.EXECUTION_ERROR
             message = "execution reverted"
-            data = encode_data(reason_data)
+            data = rpc_encode_data(reason_data)
 
         raise RPCError(error.value, message, data) from exc
 
@@ -96,9 +96,9 @@ def make_camel_case(key):
 
 def normalize_return_value(value):
     if isinstance(value, int):
-        return encode_quantity(value)
+        return rpc_encode_quantity(value)
     elif isinstance(value, bytes):
-        return encode_data(value)
+        return rpc_encode_data(value)
     elif isinstance(value, dict):
         return {make_camel_case(key): normalize_return_value(item) for key, item in value.items()}
     elif isinstance(value, (list, tuple)):
@@ -149,13 +149,13 @@ class EthereumTesterProvider(Provider):
         return "0"
 
     def eth_chain_id(self) -> str:
-        return encode_quantity(self._ethereum_tester.backend.chain.chain_id)
+        return rpc_encode_quantity(self._ethereum_tester.backend.chain.chain_id)
 
     def eth_get_balance(self, address: str, block: str) -> str:
-        return encode_quantity(self._ethereum_tester.get_balance(address, block))
+        return rpc_encode_quantity(self._ethereum_tester.get_balance(address, block))
 
     def eth_get_transaction_count(self, address: str, block: str) -> str:
-        return encode_quantity(self._ethereum_tester.get_nonce(address, block))
+        return rpc_encode_quantity(self._ethereum_tester.get_nonce(address, block))
 
     def eth_send_raw_transaction(self, tx_hex: str) -> str:
         with pyevm_errors_into_rpc_errors():
@@ -164,7 +164,7 @@ class EthereumTesterProvider(Provider):
     def eth_call(self, tx: dict, block: str) -> Union[List, str]:
         assert "from" not in tx
         # EthereumTester needs it for whatever reason
-        tx["from"] = self._default_address.encode()
+        tx["from"] = self._default_address.rpc_encode()
 
         with pyevm_errors_into_rpc_errors():
             return self._ethereum_tester.call(tx, block)
@@ -178,13 +178,13 @@ class EthereumTesterProvider(Provider):
 
     def eth_estimate_gas(self, tx: dict, block: str) -> str:
         if "from" not in tx:
-            tx["from"] = self._default_address.encode()
-        tx["value"] = decode_quantity(tx["value"])
+            tx["from"] = self._default_address.rpc_encode()
+        tx["value"] = rpc_decode_quantity(tx["value"])
 
         with pyevm_errors_into_rpc_errors():
             gas = self._ethereum_tester.estimate_gas(tx, block)
 
-        return encode_quantity(gas)
+        return rpc_encode_quantity(gas)
 
     def eth_gas_price(self):
         # The specific algorithm is not enforced in the standard,
@@ -192,11 +192,11 @@ class EthereumTesterProvider(Provider):
         block_info = self._ethereum_tester.get_block_by_number("latest", False)
 
         # Base fee plus 1 GWei
-        return encode_quantity(block_info["base_fee_per_gas"] + 10**9)
+        return rpc_encode_quantity(block_info["base_fee_per_gas"] + 10**9)
 
     def eth_block_number(self):
         result = self._ethereum_tester.get_block_by_number("latest")["number"]
-        return encode_quantity(result)
+        return rpc_encode_quantity(result)
 
     def eth_get_transaction_by_hash(self, tx_hash: str):
         try:
@@ -219,7 +219,7 @@ class EthereumTesterProvider(Provider):
     def eth_get_block_by_number(self, block: str, with_transactions: bool):
         try:
             result = self._ethereum_tester.get_block_by_number(
-                decode_block(block), full_transactions=with_transactions
+                rpc_decode_block(block), full_transactions=with_transactions
             )
         except BlockNotFound:
             return None
@@ -227,25 +227,25 @@ class EthereumTesterProvider(Provider):
 
     def eth_new_block_filter(self):
         filter_id = self._ethereum_tester.create_block_filter()
-        return encode_quantity(filter_id)
+        return rpc_encode_quantity(filter_id)
 
     def eth_new_pending_transaction_filter(self):
         filter_id = self._ethereum_tester.create_pending_transaction_filter()
-        return encode_quantity(filter_id)
+        return rpc_encode_quantity(filter_id)
 
     def eth_new_filter(self, params: dict):
         address = params.get("address", None)
         topics = params.get("topics", None)
         filter_id = self._ethereum_tester.create_log_filter(
-            from_block=decode_block(params["fromBlock"]),
-            to_block=decode_block(params["toBlock"]),
+            from_block=rpc_decode_block(params["fromBlock"]),
+            to_block=rpc_decode_block(params["toBlock"]),
             address=address,
             topics=topics,
         )
-        return encode_quantity(filter_id)
+        return rpc_encode_quantity(filter_id)
 
     def eth_get_filter_changes(self, filter_id: str):
-        results = self._ethereum_tester.get_only_filter_changes(decode_quantity(filter_id))
+        results = self._ethereum_tester.get_only_filter_changes(rpc_decode_quantity(filter_id))
         results = normalize_return_value(results)
         # There's no public way to detect the type of the filter,
         # and we need to apply this transformation only for log filters.

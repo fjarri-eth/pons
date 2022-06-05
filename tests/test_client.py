@@ -24,7 +24,7 @@ from pons import (
 from pons._abi_types import keccak, encode_args
 from pons._contract_abi import PANIC_ERROR
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
-from pons._entities import encode_data
+from pons._entities import rpc_encode_data
 from pons._provider import RPCError
 
 from .compile import compile_file
@@ -819,7 +819,9 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
         data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
-        raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
+        raise RPCError(
+            ProviderError.Code.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
+        )
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
@@ -830,7 +832,9 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
         data = b"1234" + encode_args((abi.uint(256), 1))
-        raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
+        raise RPCError(
+            ProviderError.Code.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
+        )
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(
@@ -843,7 +847,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
         data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
-        raise RPCError(12345, "execution reverted", encode_data(data))
+        raise RPCError(12345, "execution reverted", rpc_encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
