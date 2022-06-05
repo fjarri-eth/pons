@@ -115,8 +115,8 @@ def test_string():
 
 
 def test_bool():
-    assert abi.bool.normalize(True) == True
-    assert abi.bool.denormalize(True) == True
+    assert abi.bool.normalize(True) is True
+    assert abi.bool.denormalize(True) is True
 
     assert abi.bool.canonical_form == "bool"
 
@@ -303,8 +303,6 @@ def test_encode_to_topic():
     string = "abcdefghijklmnopqrstuvwxyz0123456789"
     val = [[small_bytes, big_bytes], True, [small_bytes, string]]
     # Values in the struct and nested arrays/structs are padded to multiples of 32 bytes
-    padded_small = small_bytes + b"\x00" * 27
-    padded_big = big_bytes + b"\x00" * 31
     encoded_val = keccak(
         (small_bytes + b"\x00" * 27)
         + (big_bytes + b"\x00" * 31)

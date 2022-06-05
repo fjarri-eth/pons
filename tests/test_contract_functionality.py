@@ -1,13 +1,8 @@
 from pathlib import Path
 
-from eth_account import Account
 import pytest
-import trio
 
 from pons import (
-    Client,
-    AccountSigner,
-    Address,
     Amount,
     ContractABI,
     abi,
@@ -44,14 +39,9 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
 
     compiled_contract = compiled_contracts["Test"]
 
-    root_address = root_signer.address
-    acc1_address = another_signer.address
-
-    # Fund the deployer account
-    await session.transfer(root_signer, acc1_address, Amount.ether(10))
-
     # Deploy the contract
     call = compiled_contract.constructor(12345, 56789)
+    await session.transfer(root_signer, another_signer.address, Amount.ether(10))
     deployed_contract = await session.deploy(another_signer, call)
 
     # Check the state
@@ -77,13 +67,8 @@ async def test_abi_declaration(session, root_signer, another_signer, compiled_co
 
     compiled_contract = compiled_contracts["Test"]
 
-    root_address = root_signer.address
-    acc1_address = another_signer.address
-
-    # Fund the deployer account
-    await session.transfer(root_signer, acc1_address, Amount.ether(10))
-
     # Deploy the contract
+    await session.transfer(root_signer, another_signer.address, Amount.ether(10))
     call = compiled_contract.constructor(12345, 56789)
     previously_deployed_contract = await session.deploy(another_signer, call)
 
@@ -106,6 +91,7 @@ async def test_abi_declaration(session, root_signer, another_signer, compiled_co
     deployed_contract = DeployedContract(declared_abi, previously_deployed_contract.address)
 
     # Transact with the contract
+    await session.transfer(root_signer, another_signer.address, Amount.ether(10))
     await session.transact(another_signer, deployed_contract.write.setState(111))
 
     # Call the contract
@@ -119,7 +105,7 @@ async def test_abi_declaration(session, root_signer, another_signer, compiled_co
     assert result == [inner, outer]
 
 
-async def test_complicated_event(session, root_signer, another_signer, compiled_contracts):
+async def test_complicated_event(session, root_signer, compiled_contracts):
     # Smoke test for topic encoding, emitting an event with non-trivial topic structure.
     # The details of the encoding should be covered in ABI tests,
     # here we're just checking we got them right.
@@ -135,7 +121,6 @@ async def test_complicated_event(session, root_signer, another_signer, compiled_
         b"aaaa", bytestring33len2, foo, [inner1, inner2]
     )
 
-    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract = await session.deploy(root_signer, basic_contract.constructor(123, 456))
 
     log_filter1 = await session.eth_new_filter(event_filter=event_filter)  # filter by topics

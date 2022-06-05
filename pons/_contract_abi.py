@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
 import inspect
+from itertools import chain
 from typing import (
     Any,
     AbstractSet,
@@ -21,7 +22,8 @@ from eth_utils import keccak
 from eth_abi import encode_single, decode_single
 from eth_abi.exceptions import DecodingError as BackendDecodingError
 
-from ._abi_types import Type, dispatch_types, dispatch_type, String, Bytes, Array, Struct
+from . import abi
+from ._abi_types import Type, dispatch_types, dispatch_type
 from ._entities import LogTopic, LogEntry
 
 
@@ -72,7 +74,7 @@ class Signature:
         normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
         return encode_single(self.canonical_form, normalized_values)
 
-    def decode(self, value_bytes: bytes) -> List[Any]:
+    def decode_into_list(self, value_bytes: bytes) -> List[Any]:
         """
         Decodes the packed bytestring into a list of values.
         """
@@ -87,6 +89,13 @@ class Signature:
             raise ABIDecodingError(message) from exc
 
         return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
+
+    def decode_into_dict(self, value_bytes: bytes) -> Dict[str, Any]:
+        """
+        Decodes the packed bytestring into a dict of values.
+        """
+        decoded = self.decode_into_list(value_bytes)
+        return {name: val for name, val in zip(self._signature.parameters, decoded)}
 
     def __str__(self):
         if self._named_parameters:
@@ -360,7 +369,7 @@ class ReadMethod(Method):
         """
         Decodes the output from ABI-packed bytes.
         """
-        results = self.outputs.decode(output_bytes)
+        results = self.outputs.decode_into_list(output_bytes)
         if self._single_output:
             results = results[0]
         return results
@@ -521,6 +530,49 @@ class EventFilter:
         self.topics = topics
 
 
+class Error:
+    """
+    A custom contract error.
+    """
+
+    @classmethod
+    def from_json(cls, error_entry: Dict[str, Any]) -> "Error":
+        """
+        Creates this object from a JSON ABI method entry.
+        """
+        if error_entry["type"] != "error":
+            raise ValueError("Error object must be created from a JSON entry with type='error'")
+
+        name = error_entry["name"]
+        fields = dispatch_types(error_entry["inputs"])
+
+        return cls(name=name, fields=fields)
+
+    def __init__(
+        self,
+        name: str,
+        fields: Mapping[str, Type],
+    ):
+        self.name = name
+        self.fields = Signature(fields)
+
+    @cached_property
+    def selector(self) -> bytes:
+        """
+        Error's selector.
+        """
+        return keccak(self.name.encode() + self.fields.canonical_form.encode())[:4]
+
+    def decode_fields(self, data_bytes: bytes) -> Dict[str, Any]:
+        """
+        Decodes the error fields from the given packed data.
+        """
+        return self.fields.decode_into_dict(data_bytes)
+
+    def __str__(self):
+        return f"error {self.name}{self.fields}"
+
+
 class Fallback:
     """
     A fallback method.
@@ -653,6 +705,16 @@ class Methods(Generic[MethodType]):
         return iter(self._methods_dict.values())
 
 
+PANIC_ERROR = Error("Panic", dict(code=abi.uint(256)))
+
+
+LEGACY_ERROR = Error("Error", dict(message=abi.string))
+
+
+class UnknownError(Exception):
+    pass
+
+
 class ContractABI:
     """
     A wrapper for contract ABI.
@@ -679,6 +741,9 @@ class ContractABI:
     event: Methods[Event]
     """Contract's events."""
 
+    error: Methods[Error]
+    """Contract's errors."""
+
     @classmethod
     def from_json(cls, json_abi: list) -> "ContractABI":
         constructor = None
@@ -688,6 +753,7 @@ class ContractABI:
         write = []
         methods = set()
         events = {}
+        errors = {}
 
         for entry in json_abi:
 
@@ -727,6 +793,13 @@ class ContractABI:
                     )
                 events[entry["name"]] = Event.from_json(entry)
 
+            elif entry["type"] == "error":
+                if entry["name"] in errors:
+                    raise ValueError(
+                        f"JSON ABI contains more than one declarations of `{entry['name']}`"
+                    )
+                errors[entry["name"]] = Error.from_json(entry)
+
             else:
                 raise ValueError(f"Unknown ABI entry type: {entry['type']}")
 
@@ -737,6 +810,7 @@ class ContractABI:
             read=read,
             write=write,
             events=events.values(),
+            errors=errors.values(),
         )
 
     def __init__(
@@ -747,6 +821,7 @@ class ContractABI:
         read: Optional[Iterable[ReadMethod]] = None,
         write: Optional[Iterable[WriteMethod]] = None,
         events: Optional[Iterable[Event]] = None,
+        errors: Optional[Iterable[Error]] = None,
     ):
 
         if constructor is None:
@@ -758,6 +833,28 @@ class ContractABI:
         self.read = Methods({method.name: method for method in (read or [])})
         self.write = Methods({method.name: method for method in (write or [])})
         self.event = Methods({event.name: event for event in (events or [])})
+        self.error = Methods({error.name: error for error in (errors or [])})
+
+        self._error_by_selector = {
+            error.selector: error for error in chain([PANIC_ERROR, LEGACY_ERROR], self.error)
+        }
+
+    def resolve_error(self, error_data: bytes) -> Tuple[Error, Dict[str, Any]]:
+        """
+        Given the packed error data, attempts to find the error in the ABI
+        and decode the data into its fields.
+        """
+        if len(error_data) < 4:
+            raise ValueError("Error data too short to contain a selector")
+
+        selector, data = error_data[:4], error_data[4:]
+
+        if selector in self._error_by_selector:
+            error = self._error_by_selector[selector]
+            decoded = error.decode_fields(data)
+            return error, decoded
+
+        raise UnknownError(f"Could not find an error with selector {selector.hex()} in the ABI")
 
     def __str__(self):
         all_methods = (
@@ -767,6 +864,7 @@ class ContractABI:
             + list(self.read)
             + list(self.write)
             + list(self.event)
+            + list(self.error)
         )
         method_list = ["    " + str(method) for method in all_methods]
         return "{\n" + "\n".join(method_list) + "\n}"

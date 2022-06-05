@@ -1,5 +1,4 @@
 import http
-import sys
 
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
@@ -11,7 +10,6 @@ import trio
 
 from pons import HTTPProvider
 from pons._provider import RPCError
-from pons._entities import encode_data
 
 
 async def process_request(provider, data):
@@ -20,7 +18,7 @@ async def process_request(provider, data):
         async with provider.session() as session:
             result = await session.rpc(data["method"], *data["params"])
     except RPCError as e:
-        error = {"code": e.server_code, "message": e.message, "data": e.data}
+        error = {"code": e.code, "message": e.message, "data": e.data}
         return {"jsonrpc": "2.0", "id": request_id, "error": error}
 
     return {"jsonrpc": "2.0", "id": request_id, "result": result}

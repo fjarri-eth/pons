@@ -11,7 +11,6 @@ from pons._entities import (
     decode_data,
     decode_block,
     RPCDecodingError,
-    BlockHash,
     LogTopic,
     LogEntry,
     TxReceipt,
@@ -46,11 +45,11 @@ def test_amount():
     assert Amount.wei(100) * 2 == Amount.wei(200)
     assert Amount.wei(100) // 2 == Amount.wei(50)
     assert Amount.wei(100) > Amount.wei(50)
-    assert not (Amount.wei(50) > Amount.wei(50))
+    assert not Amount.wei(50) > Amount.wei(50)
     assert Amount.wei(100) >= Amount.wei(50)
     assert Amount.wei(50) >= Amount.wei(50)
     assert Amount.wei(50) < Amount.wei(100)
-    assert not (Amount.wei(50) < Amount.wei(50))
+    assert not Amount.wei(50) < Amount.wei(50)
     assert Amount.wei(50) <= Amount.wei(100)
     assert Amount.wei(50) <= Amount.wei(50)
 

@@ -14,9 +14,17 @@ from pons import (
     Receive,
     ContractABI,
     Event,
+    Error,
     Either,
 )
-from pons._contract_abi import Signature, EventSignature, ABIDecodingError
+from pons._contract_abi import (
+    Signature,
+    EventSignature,
+    ABIDecodingError,
+    PANIC_ERROR,
+    LEGACY_ERROR,
+    UnknownError,
+)
 from pons._entities import LogTopic
 
 
@@ -24,15 +32,17 @@ def test_signature_from_dict():
     sig = Signature(dict(a=abi.uint(8), b=abi.bool))
     assert sig.canonical_form == "(uint8,bool)"
     assert str(sig) == "(uint8 a, bool b)"
-    assert sig.decode(sig.encode(1, True)) == [1, True]
-    assert sig.decode(sig.encode(b=True, a=1)) == [1, True]
+    assert sig.decode_into_list(sig.encode(1, True)) == [1, True]
+    assert sig.decode_into_list(sig.encode(b=True, a=1)) == [1, True]
+    assert sig.decode_into_dict(sig.encode(b=True, a=1)) == dict(b=True, a=1)
 
 
 def test_signature_from_list():
     sig = Signature([abi.uint(8), abi.bool])
     assert str(sig) == "(uint8, bool)"
     assert sig.canonical_form == "(uint8,bool)"
-    assert sig.decode(sig.encode(1, True)) == [1, True]
+    assert sig.decode_into_list(sig.encode(1, True)) == [1, True]
+    assert sig.decode_into_dict(sig.encode(1, True)) == {"_0": 1, "_1": True}
 
 
 def test_event_signature():
@@ -115,26 +125,24 @@ def test_constructor_errors():
         ValueError,
         match="Constructor object must be created from a JSON entry with type='constructor'",
     ):
-        ctr = Constructor.from_json(dict(type="function"))
+        Constructor.from_json(dict(type="function"))
 
     with pytest.raises(ValueError, match="Constructor's JSON entry cannot have a `name`"):
-        ctr = Constructor.from_json(dict(type="constructor", name="myConstructor"))
+        Constructor.from_json(dict(type="constructor", name="myConstructor"))
 
     with pytest.raises(
         ValueError, match="Constructor's JSON entry cannot have non-empty `outputs`"
     ):
-        ctr = Constructor.from_json(
-            dict(type="constructor", outputs=[dict(type="uint8", name="a")])
-        )
+        Constructor.from_json(dict(type="constructor", outputs=[dict(type="uint8", name="a")]))
 
     # This is fine though
-    ctr = Constructor.from_json(dict(type="constructor", outputs=[], stateMutability="nonpayable"))
+    Constructor.from_json(dict(type="constructor", outputs=[], stateMutability="nonpayable"))
 
     with pytest.raises(
         ValueError,
         match="Constructor's JSON entry state mutability must be `nonpayable` or `payable`",
     ):
-        ctr = Constructor.from_json(dict(type="constructor", stateMutability="view"))
+        Constructor.from_json(dict(type="constructor", stateMutability="view"))
 
 
 def _check_read_method(read):
@@ -239,7 +247,7 @@ def test_read_method_errors():
     with pytest.raises(
         ValueError, match="ReadMethod object must be created from a JSON entry with type='function'"
     ):
-        ctr = ReadMethod.from_json(dict(type="constructor"))
+        ReadMethod.from_json(dict(type="constructor"))
 
     with pytest.raises(
         ValueError,
@@ -296,7 +304,7 @@ def test_write_method_errors():
         ValueError,
         match="WriteMethod object must be created from a JSON entry with type='function'",
     ):
-        ctr = WriteMethod.from_json(dict(type="constructor"))
+        WriteMethod.from_json(dict(type="constructor"))
 
     with pytest.raises(
         ValueError, match="Mutating method's JSON entry cannot have non-empty `outputs`"
@@ -415,11 +423,21 @@ def test_contract_abi_json():
         ],
     )
 
+    error_abi = dict(
+        type="error",
+        name="CustomError",
+        inputs=[
+            dict(internalType="address", name="from", type="address"),
+            dict(internalType="bytes", name="foo", type="bytes"),
+            dict(internalType="uint8", name="bar", type="uint8"),
+        ],
+    )
+
     fallback_abi = dict(type="fallback", stateMutability="payable")
     receive_abi = dict(type="receive", stateMutability="payable")
 
     cabi = ContractABI.from_json(
-        [constructor_abi, read_abi, write_abi, fallback_abi, receive_abi, event_abi]
+        [constructor_abi, read_abi, write_abi, fallback_abi, receive_abi, event_abi, error_abi]
     )
     assert str(cabi) == (
         "{\n"
@@ -429,6 +447,7 @@ def test_contract_abi_json():
         "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
         "    event Deposit(address indexed from, bytes indexed foo, uint8 bar) anonymous\n"
+        "    error CustomError(address from, bytes foo, uint8 bar)\n"
         "}"
     )
 
@@ -437,6 +456,8 @@ def test_contract_abi_json():
     assert isinstance(cabi.receive, Receive)
     assert isinstance(cabi.read.readMethod, ReadMethod)
     assert isinstance(cabi.write.writeMethod, WriteMethod)
+    assert isinstance(cabi.event.Deposit, Event)
+    assert isinstance(cabi.error.CustomError, Error)
 
 
 def test_contract_abi_init():
@@ -452,6 +473,20 @@ def test_contract_abi_init():
                 outputs=[abi.uint(8), abi.bool],
             )
         ],
+        events=[
+            Event(
+                name="Deposit",
+                fields=dict(from_=abi.address, foo=abi.bytes(), bar=abi.uint(8)),
+                indexed={"from_", "foo"},
+                anonymous=True,
+            )
+        ],
+        errors=[
+            Error(
+                "CustomError",
+                dict(from_=abi.address, foo=abi.bytes(), bar=abi.uint(8)),
+            )
+        ],
         fallback=Fallback(payable=True),
         receive=Receive(payable=True),
     )
@@ -463,6 +498,8 @@ def test_contract_abi_init():
         "    receive() payable\n"
         "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
+        "    event Deposit(address indexed from_, bytes indexed foo, uint8 bar) anonymous\n"
+        "    error CustomError(address from_, bytes foo, uint8 bar)\n"
         "}"
     )
 
@@ -505,6 +542,10 @@ def test_contract_abi_errors():
     event_abi = dict(type="event", name="Foo", inputs=[], anonymous=False)
     with pytest.raises(ValueError, match="JSON ABI contains more than one declarations of `Foo`"):
         abi = ContractABI.from_json([event_abi, event_abi])
+
+    error_abi = dict(type="error", name="Foo", inputs=[])
+    with pytest.raises(ValueError, match="JSON ABI contains more than one declarations of `Foo`"):
+        abi = ContractABI.from_json([error_abi, error_abi])
 
     with pytest.raises(ValueError, match="Unknown ABI entry type: foobar"):
         abi = ContractABI.from_json([dict(type="foobar")])
@@ -618,7 +659,7 @@ def test_event_errors():
         ValueError,
         match="Event object must be created from a JSON entry with type='event'",
     ):
-        ctr = Event.from_json(dict(type="constructor"))
+        Event.from_json(dict(type="constructor"))
 
     uint8 = abi.uint(8)
 
@@ -645,3 +686,78 @@ def test_event_errors():
 
     # This works
     Event("Foo", dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8), indexed={"a", "b", "c"})
+
+
+def test_error_from_json():
+    error = Error.from_json(
+        dict(
+            inputs=[
+                dict(internalType="address", name="from", type="address"),
+                dict(internalType="bytes", name="foo", type="bytes"),
+                dict(internalType="uint8", name="bar", type="uint8"),
+            ],
+            name="Foo",
+            type="error",
+        )
+    )
+    assert error.name == "Foo"
+    assert str(error.fields) == "(address from, bytes foo, uint8 bar)"
+
+    with pytest.raises(
+        ValueError,
+        match="Error object must be created from a JSON entry with type='error'",
+    ):
+        Error.from_json(dict(type="constructor"))
+
+
+def test_error_init():
+    error = Error(
+        "Foo",
+        dict(from_=abi.address, foo=abi.bytes(), bar=abi.uint(8)),
+    )
+    assert error.name == "Foo"
+    assert str(error.fields) == "(address from_, bytes foo, uint8 bar)"
+
+
+def test_error_decode():
+    error = Error(
+        "Foo",
+        dict(foo=abi.bytes(), bar=abi.uint(8)),
+    )
+
+    encoded_bytes = encode_single("(bytes,uint8)", [b"12345", 9])
+    decoded = error.decode_fields(encoded_bytes)
+    assert decoded == dict(foo=b"12345", bar=9)
+
+
+def test_resolve_error():
+    error1 = Error("Error1", dict(foo=abi.bytes(), bar=abi.uint(8)))
+    error2 = Error("Error2", dict(foo=abi.bool, bar=abi.string))
+    contract_abi = ContractABI(errors=[error1, error2])
+
+    # Decode custom error
+    error_data = error1.selector + error1.fields.encode(b"12345", 9)
+    error, decoded = contract_abi.resolve_error(error_data)
+    assert error is error1
+    assert decoded == dict(foo=b"12345", bar=9)
+
+    # Decode a panic (the description is added automatically to the ABI)
+    error_data = PANIC_ERROR.selector + PANIC_ERROR.fields.encode(9)
+    error, decoded = contract_abi.resolve_error(error_data)
+    assert error is PANIC_ERROR
+    assert decoded == dict(code=9)
+
+    # Decode a legacy error (the description is added automatically to the ABI)
+    error_data = LEGACY_ERROR.selector + LEGACY_ERROR.fields.encode("error message")
+    error, decoded = contract_abi.resolve_error(error_data)
+    assert error is LEGACY_ERROR
+    assert decoded == dict(message="error message")
+
+    with pytest.raises(ValueError, match="Error data too short to contain a selector"):
+        contract_abi.resolve_error(b"123")
+
+    bad_selector = b"1234"
+    with pytest.raises(
+        UnknownError, match=f"Could not find an error with selector {bad_selector.hex()} in the ABI"
+    ):
+        contract_abi.resolve_error(bad_selector + error1.fields.encode(b"12345", 9))

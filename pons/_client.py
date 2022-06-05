@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
+from enum import Enum
 from functools import wraps
-from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Any, Tuple
+from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Tuple
 
 import anyio
 
@@ -11,13 +12,12 @@ from ._contract import (
     BoundWriteCall,
     BoundEventFilter,
 )
-from ._contract_abi import EventFilter
+from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI, Error
 from ._provider import (
     Provider,
     ProviderSession,
     UnexpectedResponse,
     RPCError,
-    RPCErrorCode,
     ResponseDict,
 )
 from ._signer import Signer
@@ -28,11 +28,9 @@ from ._entities import (
     BlockFilter,
     PendingTransactionFilter,
     LogFilter,
-    LogTopic,
     LogEntry,
     BlockHash,
     TxHash,
-    BlockHash,
     BlockInfo,
     TxReceipt,
     TxInfo,
@@ -87,24 +85,67 @@ class TransactionFailed(RemoteError):
     """
 
 
+class ProviderErrorCode(Enum):
+    """
+    Known RPC error codes returned by providers.
+    """
+
+    # This is our placeholder value, shouldn't be encountered in a remote server response
+    UNKNOWN_REASON = 0
+    """An error code whose description is not present in this enum."""
+
+    SERVER_ERROR = -32000
+    """Reserved for implementation-defined server-errors. See the message for details."""
+
+    EXECUTION_ERROR = 3
+    """Contract transaction failed during execution. See the data for details."""
+
+    @classmethod
+    def from_int(cls, val: int) -> "ProviderErrorCode":
+        try:
+            return cls(val)
+        except ValueError:
+            return cls.UNKNOWN_REASON
+
+
 class ProviderError(RemoteError):
     """
     A general problem with fulfilling the request at the provider's side.
     """
 
+    Code = ProviderErrorCode
 
-class ExecutionFailed(ProviderError):
-    """
-    Raised if the transaction failed during execution.
-    """
+    raw_code: int
+    """The error code returned by the server."""
 
-    def __init__(self, message: str, data: Optional[bytes]):
-        super().__init__(message, data)
+    code: ProviderErrorCode
+    """The parsed error code."""
+
+    message: str
+    """The error message."""
+
+    data: Optional[bytes]
+    """The associated data (if any)."""
+
+    @classmethod
+    def from_rpc_error(cls, exc: RPCError) -> "ProviderError":
+        data = decode_data(exc.data) if exc.data else None
+        parsed_code = ProviderErrorCode.from_int(exc.code)
+        return cls(exc.code, parsed_code, exc.message, data)
+
+    def __init__(
+        self, raw_code: int, code: ProviderErrorCode, message: str, data: Optional[bytes] = None
+    ):
+        super().__init__(raw_code, code, message, data)
+        self.raw_code = raw_code
+        self.code = code
         self.message = message
         self.data = data
 
     def __str__(self):
-        return f"Execution failed: {self.message}" + (
+        # Substitute the known code if any, or report the raw integer value otherwise
+        code = self.raw_code if self.code == ProviderErrorCode.UNKNOWN_REASON else self.code.name
+        return f"Provider error ({code}): {self.message}" + (
             f" (data: {self.data.hex()})" if self.data else ""
         )
 
@@ -122,16 +163,136 @@ def rpc_call(method_name):
             except (RPCDecodingError, UnexpectedResponse) as exc:
                 raise BadResponseFormat(f"{method_name}: {exc}") from exc
             except RPCError as exc:
-                if exc.code == RPCErrorCode.EXECUTION_ERROR:
-                    data = decode_data(exc.data) if exc.data else None
-                    raise ExecutionFailed(exc.message, data) from exc
-                else:
-                    raise ProviderError(exc.server_code, exc.message, exc.data) from exc
+                raise ProviderError.from_rpc_error(exc) from exc
             return result
 
         return _wrapped
 
     return _wrapper
+
+
+class ContractPanicReason(Enum):
+    """
+    Reasons leading to a contract call panicking.
+    """
+
+    UNKNOWN = -1
+    """Unknown panic code."""
+
+    COMPILER = 0
+    """Used for generic compiler inserted panics."""
+
+    ASSERTION = 0x01
+    """If you call assert with an argument that evaluates to ``false``."""
+
+    OVERFLOW = 0x11
+    """
+    If an arithmetic operation results in underflow or overflow
+    outside of an ``unchecked { ... }`` block.
+    """
+
+    DIVISION_BY_ZERO = 0x12
+    """If you divide or modulo by zero (e.g. ``5 / 0`` or ``23 % 0``)."""
+
+    INVALID_ENUM_VALUE = 0x21
+    """If you convert a value that is too big or negative into an ``enum`` type."""
+
+    INVALID_ENCODING = 0x22
+    """If you access a storage byte array that is incorrectly encoded."""
+
+    EMPTY_ARRAY = 0x31
+    """If you call ``.pop()`` on an empty array."""
+
+    OUT_OF_BOUNDS = 0x32
+    """
+    If you access an array, ``bytesN`` or an array slice at an out-of-bounds or negative index
+    (i.e. ``x[i]`` where ``i >= x.length`` or ``i < 0``).
+    """
+
+    OUT_OF_MEMORY = 0x41
+    """If you allocate too much memory or create an array that is too large."""
+
+    ZERO_DEREFERENCE = 0x51
+    """If you call a zero-initialized variable of internal function type."""
+
+    @classmethod
+    def from_int(cls, val: int) -> "ContractPanicReason":
+        try:
+            return cls(val)
+        except ValueError:
+            return cls.UNKNOWN
+
+
+class ContractPanic(RemoteError):
+    """
+    A panic raised in a contract call.
+    """
+
+    Reason = ContractPanicReason
+
+    reason: ContractPanicReason
+    """Parsed panic reason."""
+
+    @classmethod
+    def from_code(cls, code: int):
+        return cls(ContractPanicReason.from_int(code))
+
+    def __init__(self, reason: ContractPanicReason):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class ContractLegacyError(RemoteError):
+    """
+    A raised Solidity legacy error (from ``require()`` or ``revert()``).
+    """
+
+    message: str
+    """The error message."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class ContractError(RemoteError):
+    """
+    A raised Solidity error (from ``revert SomeError(...)``).
+    """
+
+    error: Error
+    """The recognized ABI Error object."""
+
+    data: Dict[str, Any]
+    """The unpacked error data, corresponding to the ABI."""
+
+    def __init__(self, error: Error, decoded_data: Dict[str, Any]):
+        super().__init__(error, decoded_data)
+        self.error = error
+        self.data = decoded_data
+
+
+def decode_contract_error(
+    abi: ContractABI, exc: ProviderError
+) -> Union[ContractPanic, ContractLegacyError, ContractError, ProviderError]:
+    # A little wonky, but there's no better way to detect legacy errors without a message.
+    # Hopefully these are used very rarely.
+    if exc.code == ProviderErrorCode.SERVER_ERROR and exc.message == "execution reverted":
+        return ContractLegacyError("")
+    elif exc.code == ProviderErrorCode.EXECUTION_ERROR:
+        try:
+            error, decoded_data = abi.resolve_error(exc.data or b"")
+        except UnknownError:
+            return exc
+
+        if error == PANIC_ERROR:
+            return ContractPanic.from_code(decoded_data["code"])
+        elif error == LEGACY_ERROR:
+            return ContractLegacyError(decoded_data["message"])
+        else:
+            return ContractError(error, decoded_data)
+    else:
+        return exc
 
 
 class ClientSession:
@@ -251,24 +412,33 @@ class ClientSession:
         return TxHash.decode(result)
 
     @rpc_call("eth_estimateGas")
+    async def _estimate_gas(self, tx: dict):
+        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
+        return decode_quantity(result)
+
     async def estimate_deploy(self, call: BoundConstructorCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
+
+        Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
+        or :py:class`ContractError` if a known error was caught during the dry run.
+        If the error was unknown, falls back to :py:class:`ProviderError`.
         """
         tx = {
             "data": encode_data(call.data_bytes),
             "value": amount.encode(),
         }
-        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
-        return decode_quantity(result)
+        try:
+            return await self._estimate_gas(tx)
+        except ProviderError as exc:
+            raise decode_contract_error(call.contract_abi, exc) from exc
 
-    @rpc_call("eth_estimateGas")
     async def estimate_transfer(
         self, source_address: Address, destination_address: Address, amount: Amount
     ) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
-        Raises an exception if there is not enough funds in ``source_address``.
+        Raises a :py:class:`ProviderError` if there is not enough funds in ``source_address``.
         """
         # source_address and amount are optional,
         # but if they are specified, we will fail here instead of later.
@@ -277,21 +447,25 @@ class ClientSession:
             "to": destination_address.encode(),
             "value": amount.encode(),
         }
-        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
-        return decode_quantity(result)
+        return await self._estimate_gas(tx)
 
-    @rpc_call("eth_estimateGas")
     async def estimate_transact(self, call: BoundWriteCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
+
+        Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
+        or :py:class`ContractError` if a known error was caught during the dry run.
+        If the error was unknown, falls back to :py:class:`ProviderError`.
         """
         tx = {
             "to": call.contract_address.encode(),
             "data": encode_data(call.data_bytes),
             "value": amount.encode(),
         }
-        result = await self._provider_session.rpc("eth_estimateGas", tx, encode_block(Block.LATEST))
-        return decode_quantity(result)
+        try:
+            return await self._estimate_gas(tx)
+        except ProviderError as exc:
+            raise decode_contract_error(call.contract_abi, exc) from exc
 
     @rpc_call("eth_gasPrice")
     async def eth_gas_price(self) -> Amount:
@@ -381,6 +555,9 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
+        but could not be processed.
         """
         tx_hash = await self.broadcast_transfer(signer, destination_address, amount, gas=gas)
         receipt = await self.wait_for_transaction_receipt(tx_hash)
@@ -399,6 +576,11 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
+        but could not be processed.
+        If gas estimation is run, see the additional errors that may be raised in the docs for
+        :py:meth:`~ClientSession.estimate_deploy`.
         """
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This constructor does not accept an associated payment")
@@ -478,6 +660,11 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
+        but could not be processed.
+        If gas estimation is run, see the additional errors that may be raised in the docs for
+        :py:meth:`~ClientSession.estimate_transact`.
         """
         tx_hash = await self.broadcast_transact(signer, call, amount=amount, gas=gas)
         receipt = await self.wait_for_transaction_receipt(tx_hash)

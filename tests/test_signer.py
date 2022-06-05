@@ -1,5 +1,3 @@
-import pytest
-
 from eth_account import Account
 
 from pons import AccountSigner, Address

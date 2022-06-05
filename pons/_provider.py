@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from enum import Enum
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Dict, Optional, Union
+from typing import Any, AsyncIterator, Dict, Optional
 
 import httpx
 
@@ -88,25 +87,6 @@ class HTTPProvider(Provider):
             yield HTTPSession(self._url, client)
 
 
-class RPCErrorCode(Enum):
-    # This is our placeholder value, shouldn't be encountered in a remote server response
-    UNKNOWN_REASON = 0
-
-    SERVER_ERROR = -32000
-    """Reserved for implementation-defined server-errors. See the message for details."""
-
-    EXECUTION_ERROR = 3
-    """Contract transaction failed during execution. See the data for details."""
-
-    @classmethod
-    def from_json(cls, val: Union[int, str]):
-        val = int(val)
-        try:
-            return cls(val)
-        except ValueError:
-            return cls.UNKNOWN_REASON
-
-
 class RPCError(Exception):
     """
     A wrapper for a server error returned either as a proper RPC response,
@@ -117,12 +97,12 @@ class RPCError(Exception):
     def from_json(cls, response: Dict[str, Any]):
         error = ResponseDict(response)
         data = error["data"] if "data" in error else None
-        return cls(error["code"], error["message"], data)
+        code = int(error["code"])
+        return cls(code, error["message"], data)
 
-    def __init__(self, server_code: Union[int, str], message: str, data: Optional[Any] = None):
-        super().__init__(server_code, message, data)
-        self.server_code = int(server_code)
-        self.code = RPCErrorCode.from_json(server_code)
+    def __init__(self, code: int, message: str, data: Optional[str] = None):
+        super().__init__(code, message, data)
+        self.code = code
         self.message = message
         self.data = data
 
@@ -148,6 +128,7 @@ class HTTPSession(ProviderSession):
             raise RPCError(response.status_code, response.content.decode())
 
         response_json = response.json()
+        print(response_json)
         if "error" in response_json:
             raise RPCError.from_json(response_json["error"])
         if "result" not in response_json:
