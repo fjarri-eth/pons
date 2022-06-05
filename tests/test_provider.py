@@ -3,7 +3,6 @@ import pytest
 
 from pons import Client, Amount, HTTPProvider, Unreachable
 from pons._client import ProviderError, BadResponseFormat
-from pons._provider import RPCError
 
 from .provider_server import ServerHandle
 from . import provider_server  # For monkeypatching purposes

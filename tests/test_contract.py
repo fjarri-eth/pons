@@ -5,10 +5,7 @@ from eth_abi import encode_single
 from eth_utils import keccak
 import pytest
 
-from pons import abi
 from pons import (
-    Client,
-    AccountSigner,
     Address,
     Constructor,
     ReadMethod,
@@ -17,7 +14,7 @@ from pons import (
     Receive,
     Event,
 )
-from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod, BoundConstructor
+from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod
 from pons._entities import LogTopic
 
 from .compile import compile_file

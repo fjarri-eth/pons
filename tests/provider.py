@@ -60,7 +60,7 @@ def pyevm_errors_into_rpc_errors():
 
         else:
             # Shouldn't happen unless the API of eth-tester changes
-            raise NotImplementerError()  # pragma: no cover
+            raise NotImplementedError() from exc  # pragma: no cover
 
         if reason_data == b"":
             # Empty `revert()`, or `require()` without a message.
@@ -83,10 +83,10 @@ def pyevm_errors_into_rpc_errors():
             message = "execution reverted"
             data = encode_data(reason_data)
 
-        raise RPCError(error.value, message, data)
+        raise RPCError(error.value, message, data) from exc
 
     except ValidationError as exc:
-        raise RPCError(ProviderErrorCode.SERVER_ERROR.value, exc.args[0])
+        raise RPCError(ProviderErrorCode.SERVER_ERROR.value, exc.args[0]) from exc
 
 
 def make_camel_case(key):

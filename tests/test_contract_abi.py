@@ -125,26 +125,24 @@ def test_constructor_errors():
         ValueError,
         match="Constructor object must be created from a JSON entry with type='constructor'",
     ):
-        ctr = Constructor.from_json(dict(type="function"))
+        Constructor.from_json(dict(type="function"))
 
     with pytest.raises(ValueError, match="Constructor's JSON entry cannot have a `name`"):
-        ctr = Constructor.from_json(dict(type="constructor", name="myConstructor"))
+        Constructor.from_json(dict(type="constructor", name="myConstructor"))
 
     with pytest.raises(
         ValueError, match="Constructor's JSON entry cannot have non-empty `outputs`"
     ):
-        ctr = Constructor.from_json(
-            dict(type="constructor", outputs=[dict(type="uint8", name="a")])
-        )
+        Constructor.from_json(dict(type="constructor", outputs=[dict(type="uint8", name="a")]))
 
     # This is fine though
-    ctr = Constructor.from_json(dict(type="constructor", outputs=[], stateMutability="nonpayable"))
+    Constructor.from_json(dict(type="constructor", outputs=[], stateMutability="nonpayable"))
 
     with pytest.raises(
         ValueError,
         match="Constructor's JSON entry state mutability must be `nonpayable` or `payable`",
     ):
-        ctr = Constructor.from_json(dict(type="constructor", stateMutability="view"))
+        Constructor.from_json(dict(type="constructor", stateMutability="view"))
 
 
 def _check_read_method(read):
@@ -249,7 +247,7 @@ def test_read_method_errors():
     with pytest.raises(
         ValueError, match="ReadMethod object must be created from a JSON entry with type='function'"
     ):
-        ctr = ReadMethod.from_json(dict(type="constructor"))
+        ReadMethod.from_json(dict(type="constructor"))
 
     with pytest.raises(
         ValueError,
@@ -306,7 +304,7 @@ def test_write_method_errors():
         ValueError,
         match="WriteMethod object must be created from a JSON entry with type='function'",
     ):
-        ctr = WriteMethod.from_json(dict(type="constructor"))
+        WriteMethod.from_json(dict(type="constructor"))
 
     with pytest.raises(
         ValueError, match="Mutating method's JSON entry cannot have non-empty `outputs`"
@@ -661,7 +659,7 @@ def test_event_errors():
         ValueError,
         match="Event object must be created from a JSON entry with type='event'",
     ):
-        ctr = Event.from_json(dict(type="constructor"))
+        Event.from_json(dict(type="constructor"))
 
     uint8 = abi.uint(8)
 
@@ -709,7 +707,7 @@ def test_error_from_json():
         ValueError,
         match="Error object must be created from a JSON entry with type='error'",
     ):
-        ctr = Error.from_json(dict(type="constructor"))
+        Error.from_json(dict(type="constructor"))
 
 
 def test_error_init():

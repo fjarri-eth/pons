@@ -1,13 +1,8 @@
 from pathlib import Path
 
-from eth_account import Account
 import pytest
-import trio
 
 from pons import (
-    Client,
-    AccountSigner,
-    Address,
     Amount,
     ContractABI,
     abi,

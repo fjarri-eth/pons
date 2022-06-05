@@ -1,5 +1,4 @@
 import http
-import sys
 
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
@@ -11,7 +10,6 @@ import trio
 
 from pons import HTTPProvider
 from pons._provider import RPCError
-from pons._entities import encode_data
 
 
 async def process_request(provider, data):
