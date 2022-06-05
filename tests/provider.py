@@ -6,19 +6,17 @@ import ast
 from contextlib import asynccontextmanager, contextmanager
 from typing import Union, List
 
-from eth_abi import encode_single, decode_single
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
 from eth_tester.exceptions import TransactionNotFound, TransactionFailed, BlockNotFound
 from eth.exceptions import Revert
-from eth_utils import keccak
 from eth_utils.exceptions import ValidationError
 
+from pons import abi, Amount, Address
+from pons._abi_types import keccak, encode_args, decode_args
 from pons._provider import Provider, ProviderSession, RPCError
 from pons._client import ProviderErrorCode
 from pons._entities import (
-    Amount,
-    Address,
     encode_quantity,
     decode_quantity,
     encode_data,
@@ -56,7 +54,7 @@ def pyevm_errors_into_rpc_errors():
             except ValueError:
                 assert isinstance(reason, str)  # sanity check
                 # Bring `reason_data` to what a `Revert` instance would contain in this case
-                reason_data = _ERROR_SELECTOR + encode_single("(string)", [reason])
+                reason_data = _ERROR_SELECTOR + encode_args((abi.string, reason))
 
         else:
             # Shouldn't happen unless the API of eth-tester changes
@@ -74,7 +72,7 @@ def pyevm_errors_into_rpc_errors():
 
         elif reason_data.startswith(_ERROR_SELECTOR):
             error = ProviderErrorCode.EXECUTION_ERROR
-            reason_message = decode_single("(string)", reason_data[len(_ERROR_SELECTOR) :])[0]
+            reason_message = decode_args([abi.string], reason_data[len(_ERROR_SELECTOR) :])[0]
             message = f"execution reverted: {reason_message}"
             data = encode_data(reason_data)
 

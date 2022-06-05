@@ -1,8 +1,6 @@
 from collections import namedtuple
 import re
 
-from eth_abi import encode_single
-from eth_utils import keccak
 import pytest
 
 from pons import (
@@ -16,11 +14,12 @@ from pons import (
     Event,
     Error,
     Either,
+    ABIDecodingError,
 )
+from pons._abi_types import keccak, encode_args
 from pons._contract_abi import (
     Signature,
     EventSignature,
-    ABIDecodingError,
     PANIC_ERROR,
     LEGACY_ERROR,
     UnknownError,
@@ -58,21 +57,21 @@ def test_event_signature_encode():
 
     # All indexed parameters provided
     encoded = sig.encode_to_topics(1, True)
-    assert encoded == ((encode_single("uint8", 1),), (encode_single("bool", True),))
+    assert encoded == ((abi.uint(8).encode(1),), (abi.bool.encode(True),))
 
     # One indexed parameter not provided
     encoded = sig.encode_to_topics(b=True)
-    assert encoded == (None, (encode_single("bool", True),))
+    assert encoded == (None, (abi.bool.encode(True),))
 
     # An indexed parameter at the end not provided - the trailing Nones are trimmed
     encoded = sig.encode_to_topics(a=1)
-    assert encoded == ((encode_single("uint8", 1),),)
+    assert encoded == ((abi.uint(8).encode(1),),)
 
     # Using Either to encode several possible values for a parameter
     encoded = sig.encode_to_topics(a=Either(1, 2), b=True)
     assert encoded == (
-        (encode_single("uint8", 1), encode_single("uint8", 2)),
-        (encode_single("bool", True),),
+        (abi.uint(8).encode(1), abi.uint(8).encode(2)),
+        (abi.bool.encode(True),),
     )
 
 
@@ -81,8 +80,8 @@ def test_event_signature_decode():
     sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
 
     decoded = sig.decode_log_entry(
-        [encode_single("uint8", 1), encode_single("bool", True)],
-        encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+        [abi.uint(8).encode(1), abi.bool.encode(True)],
+        encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
     )
     assert decoded == dict(a=1, b=True, c=b"1234", d=b"bytestring")
 
@@ -223,24 +222,6 @@ def test_read_method_single_output():
 
     encoded_bytes = b"\x00" * 31 + b"\x01"
     assert read.decode_output(encoded_bytes) == 1
-
-
-async def test_decoding_error():
-    """
-    Checks handling of an event when data returned by `eth_call` does not match
-    the output signature of the method.
-    """
-    read = ReadMethod(name="someMethod", inputs=[], outputs=[abi.uint(256), abi.uint(256)])
-
-    encoded_bytes = b"\x00" * 31 + b"\x01"  # Only one uint256
-
-    expected_message = (
-        r"Could not decode the return value with the expected signature \(uint256,uint256\): "
-        r"Tried to read 32 bytes.  Only got 0 bytes"
-    )
-
-    with pytest.raises(ABIDecodingError, match=expected_message):
-        read.decode_output(encoded_bytes)
 
 
 def test_read_method_errors():
@@ -590,7 +571,7 @@ def test_event_encode():
     assert event_filter.topics == (
         (LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),),
         None,
-        (LogTopic(encode_single("uint8", 1)), LogTopic(encode_single("uint8", 2))),
+        (LogTopic(abi.uint(8).encode(1)), LogTopic(abi.uint(8).encode(2))),
     )
 
     # Anonymous event filter does not include the selector
@@ -600,7 +581,7 @@ def test_event_encode():
     event_filter = event(b=Either(1, 2))
     assert event_filter.topics == (
         None,
-        (LogTopic(encode_single("uint8", 1)), LogTopic(encode_single("uint8", 2))),
+        (LogTopic(abi.uint(8).encode(1)), LogTopic(abi.uint(8).encode(2))),
     )
 
 
@@ -615,10 +596,10 @@ def test_event_decode():
         fake_log_entry(
             [
                 LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),
-                LogTopic(encode_single("bool", True)),
-                LogTopic(encode_single("uint8", 2)),
+                LogTopic(abi.bool.encode(True)),
+                LogTopic(abi.uint(8).encode(2)),
             ],
-            encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+            encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
         )
     )
     assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
@@ -629,10 +610,10 @@ def test_event_decode():
             fake_log_entry(
                 [
                     LogTopic(keccak(b"NotFoo" + event.fields.canonical_form.encode())),
-                    LogTopic(encode_single("bool", True)),
-                    LogTopic(encode_single("uint8", 2)),
+                    LogTopic(abi.bool.encode(True)),
+                    LogTopic(abi.uint(8).encode(2)),
                 ],
-                encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+                encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
             )
         )
 
@@ -647,8 +628,8 @@ def test_event_decode():
 
     decoded = event.decode_log_entry(
         fake_log_entry(
-            [LogTopic(encode_single("bool", True)), LogTopic(encode_single("uint8", 2))],
-            encode_single("(bytes4,bytes)", [b"1234", b"bytestring"]),
+            [LogTopic(abi.bool.encode(True)), LogTopic(abi.uint(8).encode(2))],
+            encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
         )
     )
     assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
@@ -725,7 +706,7 @@ def test_error_decode():
         dict(foo=abi.bytes(), bar=abi.uint(8)),
     )
 
-    encoded_bytes = encode_single("(bytes,uint8)", [b"12345", 9])
+    encoded_bytes = encode_args((abi.bytes(), b"12345"), (abi.uint(8), 9))
     decoded = error.decode_fields(encoded_bytes)
     assert decoded == dict(foo=b"12345", bar=9)
 

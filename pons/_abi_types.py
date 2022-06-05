@@ -1,12 +1,31 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
 import re
-from typing import Optional, Any, Union, Iterable, Mapping, Dict
+from typing import Optional, Any, Union, Iterable, Mapping, Dict, Tuple
 
+from eth_abi.exceptions import DecodingError
 from eth_abi import encode_single, decode_single
 from eth_utils import keccak
 
 from ._entities import Address
+
+
+class ABIDecodingError(Exception):
+    """
+    Raised on an error when decoding a value in an Eth ABI encoded bytestring.
+    """
+
+
+def decode_abi(signature: str, data: bytes) -> Tuple[Any, ...]:
+    try:
+        return decode_single(signature, data)
+    except DecodingError as exc:
+        # wrap possible `eth_abi` errors
+        message = (
+            f"Could not decode the return value "
+            f"with the expected signature {signature}: {str(exc)}"
+        )
+        raise ABIDecodingError(message) from exc
 
 
 class Type(ABC):
@@ -24,17 +43,29 @@ class Type(ABC):
     def normalize(self, val) -> Any:
         """
         Checks and possibly normalizes the value making it ready to be passed
-        to ``eth_abi.encode_single()`` for encoding.
+        to ``encode()`` for encoding.
         """
         ...
 
     @abstractmethod
     def denormalize(self, val) -> Any:
         """
-        Checks the result of ``eth_abi.decode_single()``
+        Checks the result of ``decode()``
         and wraps it in a specific type, if applicable.
         """
         ...
+
+    def encode(self, val) -> bytes:
+        """
+        Encodes the given value in the contract ABI format.
+        """
+        return encode_single(self.canonical_form, val)
+
+    def decode(self, val: bytes) -> Any:
+        """
+        Encodes the given value in the contract ABI format.
+        """
+        return decode_abi(self.canonical_form, val)
 
     def encode_to_topic(self, val) -> bytes:
         """
@@ -57,7 +88,7 @@ class Type(ABC):
         """
         # By default it's just the encoding of the value type.
         # May be overridden.
-        return encode_single(self.canonical_form, val)
+        return self.encode(val)
 
     def _encode_to_topic_inner(self, val) -> bytes:
         """
@@ -65,7 +96,7 @@ class Type(ABC):
         """
         # By default it's just the encoding of the value type.
         # May be overridden.
-        return encode_single(self.canonical_form, val)
+        return self.encode(val)
 
     def decode_from_topic(self, val: bytes) -> Any:
         """
@@ -79,7 +110,7 @@ class Type(ABC):
 
         # By default it's just the decoding of the value type.
         # May be overridden.
-        return self.denormalize(decode_single(self.canonical_form, val))
+        return self.denormalize(self.decode(val))
 
     def __str__(self):
         return self.canonical_form
@@ -487,3 +518,19 @@ def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Dict[str, Type]:
     if len(names) != len(set(names)):
         raise ValueError("All ABI entries must have distinct names")
     return {entry["name"]: dispatch_type(entry) for entry in abi_entry}
+
+
+def canonical_signature(types: Iterable[Type]) -> str:
+    return "(" + ",".join(tp.canonical_form for tp in types) + ")"
+
+
+def encode_args(*types_and_args: Tuple[Type, Any]) -> bytes:
+    if types_and_args:
+        types, args = zip(*types_and_args)
+    else:
+        types, args = (), ()
+    return encode_single(canonical_signature(types), args)
+
+
+def decode_args(types: Iterable[Type], data: bytes) -> Tuple[Any, ...]:
+    return decode_abi(canonical_signature(types), data)

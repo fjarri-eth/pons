@@ -1,11 +1,10 @@
 from collections import namedtuple
 from pathlib import Path
 
-from eth_abi import encode_single
-from eth_utils import keccak
 import pytest
 
 from pons import (
+    abi,
     Address,
     Constructor,
     ReadMethod,
@@ -14,6 +13,7 @@ from pons import (
     Receive,
     Event,
 )
+from pons._abi_types import keccak, encode_args
 from pons._contract import DeployedContract, BoundReadMethod, BoundWriteMethod
 from pons._entities import LogTopic
 
@@ -113,7 +113,7 @@ def test_api_binding(compiled_contracts):
     event_filter = deployed_contract.event.Foo(1, b"1234")
     assert event_filter.contract_address == address
     assert event_filter.topics == (
-        (LogTopic(encode_single("uint", 1)),),
+        (LogTopic(abi.uint(256).encode(1)),),
         (LogTopic(keccak(b"1234")),),
     )
 
@@ -122,8 +122,8 @@ def test_api_binding(compiled_contracts):
     decoded = event_filter.decode_log_entry(
         fake_log_entry(
             address=address,
-            topics=[LogTopic(encode_single("uint", 1)), LogTopic(keccak(b"1234"))],
-            data=encode_single("(bytes4,bytes)", [b"4567", b"bytestring"]),
+            topics=[LogTopic(abi.uint(256).encode(1)), LogTopic(keccak(b"1234"))],
+            data=encode_args((abi.bytes(4), b"4567"), (abi.bytes(), b"bytestring")),
         )
     )
     assert decoded == dict(x=1, y=None, u=b"4567", v=b"bytestring")

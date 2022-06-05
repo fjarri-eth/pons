@@ -1,4 +1,5 @@
 from . import abi
+from ._abi_types import ABIDecodingError
 from ._client import (
     Client,
     RemoteError,
@@ -9,7 +10,6 @@ from ._client import (
     ProviderError,
 )
 from ._contract_abi import (
-    ABIDecodingError,
     ContractABI,
     Constructor,
     ReadMethod,

@@ -1,10 +1,17 @@
 import os
 
-from eth_utils import keccak
 import pytest
 
 from pons import abi, Address
-from pons._abi_types import type_from_abi_string, dispatch_type, dispatch_types
+from pons._abi_types import (
+    type_from_abi_string,
+    dispatch_type,
+    dispatch_types,
+    ABIDecodingError,
+    encode_args,
+    decode_args,
+    keccak,
+)
 
 
 def test_uint():
@@ -311,3 +318,27 @@ def test_encode_to_topic():
         + (string.encode() + b"\x00" * 28)
     )
     check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=False)
+
+
+def test_encode_decode_args():
+    args = ("some string", b"bytestring", 1234)
+    types = [abi.string, abi.bytes(), abi.uint(256)]
+    encoded = encode_args(*zip(types, args))
+    assert decode_args(types, encoded) == args
+
+    # empty types/args list
+    assert encode_args() == b""
+
+
+def test_decoding_error():
+
+    types = [abi.uint(256), abi.uint(256)]
+    encoded_bytes = b"\x00" * 31 + b"\x01"  # Only one uint256
+
+    expected_message = (
+        r"Could not decode the return value with the expected signature \(uint256,uint256\): "
+        r"Tried to read 32 bytes.  Only got 0 bytes"
+    )
+
+    with pytest.raises(ABIDecodingError, match=expected_message):
+        decode_args(types, encoded_bytes)

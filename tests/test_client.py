@@ -2,8 +2,6 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 
-from eth_abi import encode_single
-from eth_utils import keccak
 import pytest
 import trio
 
@@ -23,6 +21,7 @@ from pons import (
     ContractLegacyError,
     ContractError,
 )
+from pons._abi_types import keccak, encode_args
 from pons._contract_abi import PANIC_ERROR
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._entities import encode_data
@@ -729,7 +728,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted: require(string)",
-        expected_data=error_selector + encode_single("(string)", ["require(string)"]),
+        expected_data=error_selector + encode_args((abi.string, "require(string)")),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(1)), **kwargs)
 
@@ -745,7 +744,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted: revert(string)",
-        expected_data=error_selector + encode_single("(string)", ["revert(string)"]),
+        expected_data=error_selector + encode_args((abi.string, "revert(string)")),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(3)), **kwargs)
 
@@ -753,7 +752,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
-        expected_data=custom_error_selector + encode_single("(uint256)", [4]),
+        expected_data=custom_error_selector + encode_args((abi.uint(256), 4)),
     )
     await check_rpc_error(session.eth_call(contract.read.viewError(4)), **kwargs)
 
@@ -769,14 +768,14 @@ async def test_contract_panics(session, root_signer, compiled_contracts):
         session.eth_call(contract.read.viewPanic(0)),
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
-        expected_data=panic_selector + encode_single("(uint256)", [0x01]),
+        expected_data=panic_selector + encode_args((abi.uint(256), 0x01)),
     )
 
     await check_rpc_error(
         session.eth_call(contract.read.viewPanic(1)),
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
-        expected_data=panic_selector + encode_single("(uint256)", [0x11]),
+        expected_data=panic_selector + encode_args((abi.uint(256), 0x11)),
     )
 
 
@@ -819,7 +818,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
-        data = PANIC_ERROR.selector + encode_single("(uint256)", [888])
+        data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
         raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
@@ -830,7 +829,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
-        data = b"1234" + encode_single("(uint256)", [1])
+        data = b"1234" + encode_args((abi.uint(256), 1))
         raise RPCError(ProviderError.Code.EXECUTION_ERROR, "execution reverted", encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
@@ -843,7 +842,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     def eth_estimate_gas(*args, **kwargs):
         # Invalid selector
-        data = PANIC_ERROR.selector + encode_single("(uint256)", [0])
+        data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
         raise RPCError(12345, "execution reverted", encode_data(data))
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):

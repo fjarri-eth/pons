@@ -18,19 +18,9 @@ from typing import (
     Tuple,
 )
 
-from eth_utils import keccak
-from eth_abi import encode_single, decode_single
-from eth_abi.exceptions import DecodingError as BackendDecodingError
-
 from . import abi
-from ._abi_types import Type, dispatch_types, dispatch_type
+from ._abi_types import Type, dispatch_types, dispatch_type, encode_args, decode_args, keccak
 from ._entities import LogTopic, LogEntry
-
-
-class ABIDecodingError(Exception):
-    """
-    Raised on an error when decoding a value in an Eth ABI encoded bytestring.
-    """
 
 
 class Signature:
@@ -71,23 +61,16 @@ class Signature:
         according to the ABI format.
         """
         bound_args = self._signature.bind(*args, **kwargs)
-        normalized_values = [tp.normalize(arg) for arg, tp in zip(bound_args.args, self._types)]
-        return encode_single(self.canonical_form, normalized_values)
+        types_and_args = tuple(
+            (tp, tp.normalize(arg)) for arg, tp in zip(bound_args.args, self._types)
+        )
+        return encode_args(*types_and_args)
 
     def decode_into_list(self, value_bytes: bytes) -> List[Any]:
         """
         Decodes the packed bytestring into a list of values.
         """
-        try:
-            normalized_values = decode_single(self.canonical_form, value_bytes)
-        except BackendDecodingError as exc:
-            # wrap possible `eth_abi` errors
-            message = (
-                f"Could not decode the return value "
-                f"with the expected signature {self.canonical_form}: {str(exc)}"
-            )
-            raise ABIDecodingError(message) from exc
-
+        normalized_values = decode_args(self._types, value_bytes)
         return [tp.denormalize(result) for result, tp in zip(normalized_values, self._types)]
 
     def decode_into_dict(self, value_bytes: bytes) -> Dict[str, Any]:
@@ -182,10 +165,10 @@ class EventSignature:
             for name, topic in zip(self._signature.parameters, topics)
         }
 
-        decoded_data = decode_single(self.canonical_form_nonindexed, data)
+        decoded_data_tuple = decode_args(self._types_nonindexed.values(), data)
         decoded_data = {
             name: self._types[name].denormalize(value)
-            for name, value in zip(self._types_nonindexed, decoded_data)
+            for name, value in zip(self._types_nonindexed, decoded_data_tuple)
         }
 
         result = {}
