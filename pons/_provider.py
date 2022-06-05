@@ -128,7 +128,6 @@ class HTTPSession(ProviderSession):
             raise RPCError(response.status_code, response.content.decode())
 
         response_json = response.json()
-        print(response_json)
         if "error" in response_json:
             raise RPCError.from_json(response_json["error"])
         if "result" not in response_json:
