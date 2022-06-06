@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
     strategy:
@@ -44,3 +44,31 @@ jobs:
         curl -Os https://uploader.codecov.io/latest/linux/codecov
         chmod +x codecov
         ./codecov
+
+  doctest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8"]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install system dependencies
+      run: |
+        sudo add-apt-repository ppa:ethereum/ethereum
+        sudo apt-get update
+        sudo apt-get install solc
+    - name: Install PDM
+      run: curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3
+    - name: Install dependencies
+      run: |
+        pdm sync -G tests -G docs
+    # py-solc-x can do it too, but let's use standard system tools
+    - name: Doctests with sphinx
+      run: |
+        pdm run sphinx-build -n docs/source build/sphinx -b doctest
