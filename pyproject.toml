@@ -15,6 +15,7 @@ dependencies = [
 ]
 requires-python = ">=3.8"
 license-expression = "MIT"
+readme = "README.md"
 
 [project.urls]
 homepage = "https://github.com/fjarri/pons"

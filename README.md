@@ -5,6 +5,9 @@ Async RPC client for Ethereum
 
 An experimental client for those who think that [`web3`](https://github.com/ethereum/web3.py) grew too unwieldy, and also wants [`trio`](https://github.com/python-trio/trio) support.
 
+For more information see [the documentation](https://pons.readthedocs.io/en/latest/).
+
+
 [pypi-image]: https://img.shields.io/pypi/v/pons
 [pypi-link]: https://pypi.org/project/pons/
 [pypi-license-image]: https://img.shields.io/pypi/l/pons
