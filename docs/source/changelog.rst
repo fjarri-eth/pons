@@ -5,7 +5,13 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
-Under construction.
+Fixed
+^^^^^
+
+- Fix return type of classmethods of ``Amount`` and ``Address`` to provide correct information to ``mypy`` in dependent projects. (PR_37_)
+
+
+.. _PR_37: https://github.com/fjarri/pons/pull/37
 
 
 0.4.2 (05-06-2022)

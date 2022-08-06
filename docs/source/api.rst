@@ -178,8 +178,16 @@ Entities
 .. autoclass:: Amount
    :members:
 
+.. class:: pons._entities.CustomAmount
+
+   A type derived from :py:class:`Amount`.
+
 .. autoclass:: Address
    :members:
+
+.. class:: pons._entities.CustomAddress
+
+   A type derived from :py:class:`Address`.
 
 .. autoclass:: Block()
    :members:

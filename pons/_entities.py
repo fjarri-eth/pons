@@ -99,6 +99,13 @@ class TypedQuantity:
         return f"{self.__class__.__name__}({self._value})"
 
 
+# This is force-documented as :py:class in ``api.rst``
+# because Sphinx cannot resolve typevars correctly.
+# See https://github.com/sphinx-doc/sphinx/issues/9705
+CustomAmount = TypeVar("CustomAmount", bound="Amount")
+"""A subclass of :py:class:`Amount`."""
+
+
 class Amount(TypedQuantity):
     """
     Represents a sum in the chain's native currency.
@@ -109,21 +116,21 @@ class Amount(TypedQuantity):
     """
 
     @classmethod
-    def wei(cls, value: int) -> "Amount":
+    def wei(cls: Type[CustomAmount], value: int) -> CustomAmount:
         """
         Creates a sum from the amount in wei (``10^(-18)`` of the main unit).
         """
         return cls(value)
 
     @classmethod
-    def gwei(cls, value: Union[int, float]) -> "Amount":
+    def gwei(cls: Type[CustomAmount], value: Union[int, float]) -> CustomAmount:
         """
         Creates a sum from the amount in gwei (``10^(-9)`` of the main unit).
         """
         return cls(int(10**9 * value))
 
     @classmethod
-    def ether(cls, value: Union[int, float]) -> "Amount":
+    def ether(cls: Type[CustomAmount], value: Union[int, float]) -> CustomAmount:
         """
         Creates a sum from the amount in the main currency unit.
         """
@@ -182,6 +189,13 @@ class Amount(TypedQuantity):
         return self._value <= other._value
 
 
+# This is force-documented as :py:class in ``api.rst``
+# because Sphinx cannot resolve typevars correctly.
+# See https://github.com/sphinx-doc/sphinx/issues/9705
+CustomAddress = TypeVar("CustomAddress", bound="Address")
+"""A subclass of :py:class:`Address`."""
+
+
 class Address(TypedData):
     """
     Represents an Ethereum address.
@@ -191,7 +205,7 @@ class Address(TypedData):
         return 20
 
     @classmethod
-    def from_hex(cls, address_str: str) -> "Address":
+    def from_hex(cls: Type[CustomAddress], address_str: str) -> CustomAddress:
         """
         Creates the address from a hex representation
         (with or without the ``0x`` prefix, checksummed or not).
