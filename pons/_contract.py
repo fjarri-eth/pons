@@ -1,7 +1,17 @@
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional, List
 
-from ._contract_abi import ContractABI, Methods, ReadMethod, WriteMethod, Event, EventFilter, Error
+from ._contract_abi import (
+    ContractABI,
+    Methods,
+    ReadMethod,
+    WriteMethod,
+    Event,
+    EventFilter,
+    Error,
+    Any,
+)
 from ._entities import Address, LogEntry, LogTopic
+from ._provider import JSON
 
 
 class BoundConstructor:
@@ -14,7 +24,7 @@ class BoundConstructor:
         self._contract_abi = compiled_contract.abi
         self._constructor = compiled_contract.abi.constructor
 
-    def __call__(self, *args, **kwargs) -> "BoundConstructorCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "BoundConstructorCall":
         """
         Returns a constructor call with encoded arguments and bytecode.
         """
@@ -52,7 +62,7 @@ class BoundReadMethod:
         self._contract_address = contract_address
         self._method = method
 
-    def __call__(self, *args, **kwargs) -> "BoundReadCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "BoundReadCall":
         """
         Returns a contract call with encoded arguments bound to a specific address.
         """
@@ -93,7 +103,7 @@ class BoundWriteMethod:
         self._contract_address = contract_address
         self._method = method
 
-    def __call__(self, *args, **kwargs) -> "BoundWriteCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "BoundWriteCall":
         """
         Returns a contract call with encoded arguments bound to a specific address.
         """
@@ -138,7 +148,7 @@ class BoundEvent:
         self.contract_address = contract_address
         self.event = event
 
-    def __call__(self, *args, **kwargs) -> "BoundEventFilter":
+    def __call__(self, *args: Any, **kwargs: Any) -> "BoundEventFilter":
         """
         Returns an event filter with encoded arguments bound to a specific address.
         """
@@ -179,7 +189,9 @@ class CompiledContract:
     """Contract's bytecode."""
 
     @classmethod
-    def from_compiler_output(cls, json_abi: list, bytecode: bytes) -> "CompiledContract":
+    def from_compiler_output(
+        cls, json_abi: List[Dict[str, JSON]], bytecode: bytes
+    ) -> "CompiledContract":
         """
         Creates a compiled contract object from the output of a Solidity compiler.
         """

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
 from enum import Enum
-from typing import NamedTuple, Union, Optional, Tuple, Type, TypeVar
+from typing import NamedTuple, Union, Optional, Tuple, Type, TypeVar, Any, Sequence, Iterable, cast
 
 from eth_utils import to_checksum_address, to_canonical_address
 
@@ -40,27 +40,27 @@ class TypedData(ABC):
         return rpc_encode_data(self._value)
 
     @classmethod
-    def rpc_decode(cls: Type[TypedDataLike], val: str) -> TypedDataLike:
+    def rpc_decode(cls: Type[TypedDataLike], val: Any) -> TypedDataLike:
         try:
             return cls(rpc_decode_data(val))
         except ValueError as exc:
             raise RPCDecodingError(str(exc)) from exc
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self._value
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._value)
 
-    def _check_type(self, other):
+    def _check_type(self: TypedDataLike, other: Any) -> TypedDataLike:
         if type(self) != type(other):
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+        return cast(TypedDataLike, other)
 
-    def __eq__(self, other):
-        self._check_type(other)
-        return self._value == other._value
+    def __eq__(self, other: Any) -> bool:
+        return self._value == self._check_type(other)._value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.__class__.__name__}(bytes.fromhex("{self._value.hex()}"))'
 
 
@@ -78,24 +78,24 @@ class TypedQuantity:
         return rpc_encode_quantity(self._value)
 
     @classmethod
-    def rpc_decode(cls: Type[TypedQuantityLike], val: str) -> TypedQuantityLike:
+    def rpc_decode(cls: Type[TypedQuantityLike], val: Any) -> TypedQuantityLike:
         # `rpc_decode_quantity` will raise RPCDecodingError on any error,
         # and if it succeeds, constructor won't raise anything -
         # the value is already guaranteed to be `int` and non-negative
         return cls(rpc_decode_quantity(val))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._value)
 
-    def _check_type(self, other):
+    def _check_type(self: TypedQuantityLike, other: Any) -> TypedQuantityLike:
         if type(self) != type(other):
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+        return cast(TypedQuantityLike, other)
 
-    def __eq__(self, other):
-        self._check_type(other)
-        return self._value == other._value
+    def __eq__(self, other: Any) -> bool:
+        return self._value == self._check_type(other)._value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._value})"
 
 
@@ -154,39 +154,33 @@ class Amount(TypedQuantity):
         """
         return self._value / 10**18
 
-    def __add__(self, other):
-        self._check_type(other)
-        return self.wei(self._value + other._value)
+    def __add__(self: CustomAmount, other: Any) -> CustomAmount:
+        return self.wei(self._value + self._check_type(other)._value)
 
-    def __sub__(self, other):
-        self._check_type(other)
-        return self.wei(self._value - other._value)
+    def __sub__(self: CustomAmount, other: Any) -> CustomAmount:
+        return self.wei(self._value - self._check_type(other)._value)
 
-    def __mul__(self, other: int):
+    def __mul__(self: CustomAmount, other: int) -> CustomAmount:
         if not isinstance(other, int):
             raise TypeError(f"Expected an integer, got {type(other).__name__}")
         return self.wei(self._value * other)
 
-    def __floordiv__(self, other: int):
+    def __floordiv__(self: CustomAmount, other: int) -> CustomAmount:
         if not isinstance(other, int):
             raise TypeError(f"Expected an integer, got {type(other).__name__}")
         return self.wei(self._value // other)
 
-    def __gt__(self, other):
-        self._check_type(other)
-        return self._value > other._value
+    def __gt__(self, other: Any) -> bool:
+        return self._value > self._check_type(other)._value
 
-    def __ge__(self, other):
-        self._check_type(other)
-        return self._value >= other._value
+    def __ge__(self, other: Any) -> bool:
+        return self._value >= self._check_type(other)._value
 
-    def __lt__(self, other):
-        self._check_type(other)
-        return self._value < other._value
+    def __lt__(self, other: Any) -> bool:
+        return self._value < self._check_type(other)._value
 
-    def __le__(self, other):
-        self._check_type(other)
-        return self._value <= other._value
+    def __le__(self, other: Any) -> bool:
+        return self._value <= self._check_type(other)._value
 
 
 # This is force-documented as :py:class in ``api.rst``
@@ -201,7 +195,7 @@ class Address(TypedData):
     Represents an Ethereum address.
     """
 
-    def _length(self):
+    def _length(self) -> int:
         return 20
 
     @classmethod
@@ -224,10 +218,10 @@ class Address(TypedData):
         # some providers require it.
         return self.checksum
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.checksum
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}.from_hex({self.checksum})"
 
 
@@ -269,7 +263,7 @@ class LogTopic(TypedData):
     A log topic for log filtering.
     """
 
-    def _length(self):
+    def _length(self) -> int:
         return 32
 
 
@@ -278,7 +272,7 @@ class BlockHash(TypedData):
     A wrapper for the block hash.
     """
 
-    def _length(self):
+    def _length(self) -> int:
         return 32
 
 
@@ -287,7 +281,7 @@ class TxHash(TypedData):
     A wrapper for the transaction hash.
     """
 
-    def _length(self):
+    def _length(self) -> int:
         return 32
 
 
@@ -421,16 +415,21 @@ class BlockInfo(NamedTuple):
     def rpc_decode(cls, val: ResponseDict) -> "BlockInfo":
         transactions: Optional[Tuple[TxInfo, ...]]
         transaction_hashes: Tuple[TxHash, ...]
-        if len(val["transactions"]) == 0:
+        transactions_raw = val["transactions"]
+        if not isinstance(transactions_raw, Sequence):
+            raise RPCDecodingError(
+                f"`transactions` in a block info must be an iterable, got {transactions_raw}"
+            )
+        if len(transactions_raw) == 0:
             transactions = ()
             transaction_hashes = ()
-        elif isinstance(val["transactions"][0], str):
+        elif isinstance(transactions_raw[0], str):
             transactions = None
-            transaction_hashes = tuple(
-                TxHash.rpc_decode(tx_hash) for tx_hash in val["transactions"]
-            )
+            transaction_hashes = tuple(TxHash.rpc_decode(tx_hash) for tx_hash in transactions_raw)
         else:
-            transactions = tuple(TxInfo.rpc_decode(tx_info) for tx_info in val["transactions"])
+            transactions = tuple(
+                TxInfo.rpc_decode(ResponseDict(tx_info)) for tx_info in transactions_raw
+            )
             transaction_hashes = tuple(tx.hash for tx in transactions)
 
         return cls(
@@ -564,8 +563,13 @@ class LogEntry(NamedTuple):
 
     @classmethod
     def rpc_decode(cls, val: ResponseDict) -> "LogEntry":
+
+        topics = val["topics"]
+        if not isinstance(topics, Iterable):
+            raise RPCDecodingError(f"`topics` in a log entry must be an iterable, got {topics}")
+
         return cls(
-            removed=val["removed"],
+            removed=rpc_decode_bool(val["removed"]),
             log_index=rpc_decode_quantity(val["logIndex"]),
             transaction_index=rpc_decode_quantity(val["transactionIndex"]),
             transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
@@ -573,7 +577,7 @@ class LogEntry(NamedTuple):
             block_number=rpc_decode_quantity(val["blockNumber"]),
             address=Address.rpc_decode(val["address"]),
             data=rpc_decode_data(val["data"]),
-            topics=tuple(LogTopic.rpc_decode(topic) for topic in val["topics"]),
+            topics=tuple(LogTopic.rpc_decode(topic) for topic in topics),
         )
 
 
@@ -588,11 +592,10 @@ def rpc_encode_data(val: bytes) -> str:
 def rpc_encode_block(val: Union[int, Block]) -> str:
     if isinstance(val, Block):
         return val.value
-    else:
-        return rpc_encode_quantity(val)
+    return rpc_encode_quantity(val)
 
 
-def rpc_decode_quantity(val: str) -> int:
+def rpc_decode_quantity(val: Any) -> int:
     if not isinstance(val, str):
         raise RPCDecodingError("Encoded quantity must be a string")
     if not val.startswith("0x"):
@@ -603,7 +606,7 @@ def rpc_decode_quantity(val: str) -> int:
         raise RPCDecodingError(f"Could not convert encoded quantity to an integer: {exc}") from exc
 
 
-def rpc_decode_data(val: str) -> bytes:
+def rpc_decode_data(val: Any) -> bytes:
     if not isinstance(val, str):
         raise RPCDecodingError("Encoded data must be a string")
     if not val.startswith("0x"):
@@ -614,11 +617,19 @@ def rpc_decode_data(val: str) -> bytes:
         raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
 
 
-def rpc_decode_block(val: str) -> Union[int, str]:
+# Only used intests, but I'll leave it here so that it could be matched with `rpc_encode_block()`
+def rpc_decode_block(val: Any) -> Union[int, str]:
     try:
         Block(val)  # check if it's one of the enum's values
-        return val
+        # `Block` only has string values
+        return cast(str, val)
     except ValueError:
         pass
 
     return rpc_decode_quantity(val)
+
+
+def rpc_decode_bool(val: Any) -> bool:
+    if not isinstance(val, bool):
+        raise RPCDecodingError("Encoded boolean must be `true` or `false`")
+    return val

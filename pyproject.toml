@@ -12,6 +12,7 @@ dependencies = [
     "eth-abi>=2",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
+    "typing_extensions>=4.3",
 ]
 requires-python = ">=3.8"
 license-expression = "MIT"

@@ -4,6 +4,7 @@ from typing import Mapping
 
 from eth_account.signers.base import BaseAccount
 
+from ._provider import JSON
 from ._entities import Address
 
 
@@ -20,7 +21,7 @@ class Signer(ABC):
         """
 
     @abstractmethod
-    def sign_transaction(self, tx_dict: Mapping) -> bytes:
+    def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
         """
         Signs the given JSON transaction and returns the RLP-packed transaction
         along with the signature.
@@ -39,5 +40,6 @@ class AccountSigner(Signer):
     def address(self) -> Address:
         return Address.from_hex(self._account.address)
 
-    def sign_transaction(self, tx_dict: Mapping) -> bytes:
-        return bytes(self._account.sign_transaction(tx_dict).rawTransaction)
+    def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
+        # Ignoring the type since BaseAccount.sign_transaction is untyped
+        return bytes(self._account.sign_transaction(tx_dict).rawTransaction)  # type: ignore

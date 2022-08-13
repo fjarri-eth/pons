@@ -21,6 +21,7 @@ from typing import (
 from . import abi
 from ._abi_types import Type, dispatch_types, dispatch_type, encode_args, decode_args, keccak
 from ._entities import LogTopic, LogEntry
+from ._provider import JSON
 
 
 class Signature:
@@ -55,7 +56,7 @@ class Signature:
         """
         return "(" + ",".join(tp.canonical_form for tp in self._types) + ")"
 
-    def encode(self, *args, **kwargs) -> bytes:
+    def encode(self, *args: Any, **kwargs: Any) -> bytes:
         """
         Encodes assorted positional/keyword arguments into the bytestring
         according to the ABI format.
@@ -74,9 +75,9 @@ class Signature:
         Decodes the packed bytestring into a dict of values.
         """
         decoded = self.decode_into_tuple(value_bytes)
-        return {name: val for name, val in zip(self._signature.parameters, decoded)}
+        return dict(zip(self._signature.parameters, decoded))
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._named_parameters:
             params = ", ".join(
                 f"{tp.canonical_form} {name}"
@@ -115,7 +116,9 @@ class EventSignature:
         }
         self._indexed = indexed
 
-    def encode_to_topics(self, *args, **kwargs) -> Tuple[Optional[Tuple[bytes, ...]], ...]:
+    def encode_to_topics(
+        self, *args: Any, **kwargs: Any
+    ) -> Tuple[Optional[Tuple[bytes, ...]], ...]:
         """
         Binds given arguments to event's indexed parameters
         and encodes them as log topics.
@@ -187,7 +190,7 @@ class EventSignature:
         """
         return "(" + ",".join(tp.canonical_form for tp in self._types_nonindexed.values()) + ")"
 
-    def __str__(self):
+    def __str__(self) -> str:
         params = []
         for name, tp in self._types.items():
             indexed = "indexed " if name in self._indexed else ""
@@ -223,7 +226,7 @@ class Method(ABC):
         """
         return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
 
-    def _encode_call(self, *args, **kwargs) -> bytes:
+    def _encode_call(self, *args: Any, **kwargs: Any) -> bytes:
         input_bytes = self.inputs.encode(*args, *kwargs)
         return self.selector + input_bytes
 
@@ -264,14 +267,14 @@ class Constructor:
         self.inputs = Signature(inputs)
         self.payable = payable
 
-    def __call__(self, *args, **kwargs) -> "ConstructorCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "ConstructorCall":
         """
         Returns an encoded call with given arguments.
         """
         input_bytes = self.inputs.encode(*args, *kwargs)
         return ConstructorCall(input_bytes)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"constructor{self.inputs} " + ("payable" if self.payable else "nonpayable")
 
 
@@ -335,7 +338,7 @@ class ReadMethod(Method):
     def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args, **kwargs) -> "ReadCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "ReadCall":
         """
         Returns an encoded call with given arguments.
         """
@@ -350,7 +353,7 @@ class ReadMethod(Method):
             results = results[0]
         return results
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"function {self.name}{self.inputs} returns {self.outputs}"
 
 
@@ -402,13 +405,13 @@ class WriteMethod(Method):
     def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args, **kwargs) -> "WriteCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "WriteCall":
         """
         Returns an encoded call with given arguments.
         """
         return WriteCall(self._encode_call(*args, **kwargs))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"function {self.name}{self.inputs} " + ("payable" if self.payable else "nonpayable")
 
 
@@ -440,7 +443,7 @@ class Event:
     ):
         if anonymous and len(indexed) > 4:
             raise ValueError("Anonymous events can have at most 4 indexed fields")
-        elif not anonymous and len(indexed) > 3:
+        if not anonymous and len(indexed) > 3:
             raise ValueError("Non-anonymous events can have at most 3 indexed fields")
 
         self.name = name
@@ -455,7 +458,7 @@ class Event:
         """
         return LogTopic(keccak(self.name.encode() + self.fields.canonical_form.encode()))
 
-    def __call__(self, *args, **kwargs) -> "EventFilter":
+    def __call__(self, *args: Any, **kwargs: Any) -> "EventFilter":
         """
         Creates an event filter from provided values for indexed parameters.
         Some arguments can be omitted, which will mean that the filter
@@ -491,7 +494,7 @@ class Event:
 
         return self.fields.decode_log_entry([bytes(topic) for topic in topics], log_entry.data)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"event {self.name}{self.fields}" + (" anonymous" if self.anonymous else "")
 
 
@@ -545,7 +548,7 @@ class Error:
         """
         return self.fields.decode_into_dict(data_bytes)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"error {self.name}{self.fields}"
 
 
@@ -576,7 +579,7 @@ class Fallback:
     def __init__(self, payable: bool = False):
         self.payable = payable
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "fallback() " + ("payable" if self.payable else "nonpayable")
 
 
@@ -607,7 +610,7 @@ class Receive:
     def __init__(self, payable: bool = False):
         self.payable = payable
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "receive() " + ("payable" if self.payable else "nonpayable")
 
 
@@ -721,7 +724,7 @@ class ContractABI:
     """Contract's errors."""
 
     @classmethod
-    def from_json(cls, json_abi: list) -> "ContractABI":
+    def from_json(cls, json_abi: List[Dict[str, JSON]]) -> "ContractABI":
         constructor = None
         fallback = None
         receive = None
@@ -832,15 +835,17 @@ class ContractABI:
 
         raise UnknownError(f"Could not find an error with selector {selector.hex()} in the ABI")
 
-    def __str__(self):
-        all_methods = (
-            ([self.constructor] if self.constructor else [])
-            + ([self.fallback] if self.fallback else [])
-            + ([self.receive] if self.receive else [])
-            + list(self.read)
-            + list(self.write)
-            + list(self.event)
-            + list(self.error)
+    def __str__(self) -> str:
+        all_methods: Iterable[
+            Union[Constructor, Fallback, Receive, ReadMethod, WriteMethod, Event, Error]
+        ] = chain(
+            [self.constructor] if self.constructor else [],
+            [self.fallback] if self.fallback else [],
+            [self.receive] if self.receive else [],
+            self.read,
+            self.write,
+            self.event,
+            self.error,
         )
         method_list = ["    " + str(method) for method in all_methods]
         return "{\n" + "\n".join(method_list) + "\n}"
