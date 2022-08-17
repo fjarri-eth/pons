@@ -1,7 +1,33 @@
 from contextlib import asynccontextmanager
 from enum import Enum
 from functools import wraps
-from typing import Union, Any, Optional, AsyncIterator, Iterable, Dict, List, Tuple
+from typing import (
+    Union,
+    Any,
+    Optional,
+    AsyncIterator,
+    Iterable,
+    Dict,
+    List,
+    Tuple,
+    Callable,
+    Mapping,
+    TypeVar,
+    Awaitable,
+    cast,
+)
+import sys
+
+# This is the only thing we need from 3.10, and it's only used for `mypy`,
+# and is not exposed to the user.
+# We could use `typing_extensions`, but currently has an upper bound (<4.0) set by some of `pyevm`
+# dependencies, and `ParamSpec` is beyound that bound (introduced in 4.2).
+# So just gate it here for now and wait until the minimum Python version for the package
+# can be reaised to 3.10 safely.
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    ParamSpec = lambda _: [Any]  # pragma: no cover
 
 import anyio
 
@@ -41,6 +67,7 @@ from ._entities import (
     rpc_decode_data,
     RPCDecodingError,
 )
+from ._provider import JSON
 
 
 class Client:
@@ -142,7 +169,7 @@ class ProviderError(RemoteError):
         self.message = message
         self.data = data
 
-    def __str__(self):
+    def __str__(self) -> str:
         # Substitute the known code if any, or report the raw integer value otherwise
         code = self.raw_code if self.code == ProviderErrorCode.UNKNOWN_REASON else self.code.name
         return f"Provider error ({code}): {self.message}" + (
@@ -150,14 +177,20 @@ class ProviderError(RemoteError):
         )
 
 
-def rpc_call(method_name):
+Param = ParamSpec("Param")
+RetType = TypeVar("RetType")
+
+
+def rpc_call(
+    method_name: str,
+) -> Callable[[Callable[Param, Awaitable[RetType]]], Callable[Param, Awaitable[RetType]]]:
     """
     Catches various response formatting errors and returns them in a unified way.
     """
 
-    def _wrapper(func):
+    def _wrapper(func: Callable[Param, Awaitable[RetType]]) -> Callable[Param, Awaitable[RetType]]:
         @wraps(func)
-        async def _wrapped(*args, **kwargs):
+        async def _wrapped(*args: Any, **kwargs: Any) -> RetType:
             try:
                 result = await func(*args, **kwargs)
             except (RPCDecodingError, UnexpectedResponse) as exc:
@@ -234,7 +267,7 @@ class ContractPanic(RemoteError):
     """Parsed panic reason."""
 
     @classmethod
-    def from_code(cls, code: int):
+    def from_code(cls, code: int) -> "ContractPanic":
         return cls(ContractPanicReason.from_int(code))
 
     def __init__(self, reason: ContractPanicReason):
@@ -279,7 +312,7 @@ def decode_contract_error(
     # Hopefully these are used very rarely.
     if exc.code == ProviderErrorCode.SERVER_ERROR and exc.message == "execution reverted":
         return ContractLegacyError("")
-    elif exc.code == ProviderErrorCode.EXECUTION_ERROR:
+    if exc.code == ProviderErrorCode.EXECUTION_ERROR:
         try:
             error, decoded_data = abi.resolve_error(exc.data or b"")
         except UnknownError:
@@ -291,8 +324,7 @@ def decode_contract_error(
             return ContractLegacyError(decoded_data["message"])
         else:
             return ContractError(error, decoded_data)
-    else:
-        return exc
+    return exc
 
 
 class ClientSession:
@@ -383,7 +415,7 @@ class ClientSession:
         """
         while True:
             receipt = await self.eth_get_transaction_receipt(tx_hash)
-            if receipt:
+            if receipt is not None:
                 return receipt
             await anyio.sleep(poll_latency)
 
@@ -416,7 +448,7 @@ class ClientSession:
         return TxHash.rpc_decode(result)
 
     @rpc_call("eth_estimateGas")
-    async def _estimate_gas(self, tx: dict):
+    async def _estimate_gas(self, tx: Mapping[str, JSON]) -> int:
         result = await self._provider_session.rpc(
             "eth_estimateGas", tx, rpc_encode_block(Block.LATEST)
         )
@@ -536,7 +568,7 @@ class ClientSession:
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
-        tx = {
+        tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
             "to": destination_address.rpc_encode(),
@@ -555,7 +587,7 @@ class ClientSession:
         destination_address: Address,
         amount: Amount,
         gas: Optional[int] = None,
-    ):
+    ) -> None:
         """
         Transfers funds from the address of the attached signer to the destination address.
         If ``gas`` is ``None``, the required amount of gas is estimated first,
@@ -598,7 +630,7 @@ class ClientSession:
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
-        tx = {
+        tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
             "value": amount.rpc_encode(),
@@ -640,7 +672,7 @@ class ClientSession:
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
-        tx = {
+        tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
             "to": call.contract_address.rpc_encode(),
@@ -660,7 +692,7 @@ class ClientSession:
         call: BoundWriteCall,
         amount: Amount = Amount(0),
         gas: Optional[int] = None,
-    ):
+    ) -> None:
         """
         Transacts with the contract using a prepared method call.
         If ``gas`` is ``None``, the required amount of gas is estimated first,
@@ -732,14 +764,14 @@ class ClientSession:
         Calls the ``eth_getFilterChangers`` RPC method.
         Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
+        # TODO: split into separate functions wiht specific return types?
         results = await self._provider_session.rpc("eth_getFilterChanges", filter_.rpc_encode())
 
         if isinstance(filter_, BlockFilter):
             return tuple(BlockHash.rpc_decode(elem) for elem in results)
-        elif isinstance(filter_, PendingTransactionFilter):
+        if isinstance(filter_, PendingTransactionFilter):
             return tuple(TxHash.rpc_decode(elem) for elem in results)
-        else:
-            return tuple(LogEntry.rpc_decode(ResponseDict(elem)) for elem in results)
+        return tuple(LogEntry.rpc_decode(ResponseDict(elem)) for elem in results)
 
     async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
         """
@@ -749,7 +781,9 @@ class ClientSession:
         while True:
             block_hashes = await self.eth_get_filter_changes(block_filter)
             for block_hash in block_hashes:
-                yield block_hash
+                # We can't ensure it statically, since `eth_getFilterChanges` return type depends
+                # on the filter passed to it.
+                yield cast(BlockHash, block_hash)
             await anyio.sleep(poll_interval)
 
     async def iter_pending_transactions(self, poll_interval: int = 1) -> AsyncIterator[TxHash]:
@@ -760,7 +794,9 @@ class ClientSession:
         while True:
             tx_hashes = await self.eth_get_filter_changes(tx_filter)
             for tx_hash in tx_hashes:
-                yield tx_hash
+                # We can't ensure it statically, since `eth_getFilterChanges` return type depends
+                # on the filter passed to it.
+                yield cast(TxHash, tx_hash)
             await anyio.sleep(poll_interval)
 
     async def iter_events(
@@ -784,5 +820,7 @@ class ClientSession:
         while True:
             log_entries = await self.eth_get_filter_changes(log_filter)
             for log_entry in log_entries:
-                yield event_filter.decode_log_entry(log_entry)
+                # We can't ensure it statically, since `eth_getFilterChanges` return type depends
+                # on the filter passed to it.
+                yield event_filter.decode_log_entry(cast(LogEntry, log_entry))
             await anyio.sleep(poll_interval)

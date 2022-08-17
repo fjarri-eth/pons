@@ -10,6 +10,7 @@ from pons._entities import (
     rpc_decode_quantity,
     rpc_decode_data,
     rpc_decode_block,
+    rpc_decode_bool,
     RPCDecodingError,
     LogTopic,
     LogEntry,
@@ -217,6 +218,13 @@ def test_encode_decode_block():
     assert rpc_decode_block("0x7b") == 123
 
 
+def test_decode_bool():
+    assert rpc_decode_bool(True) == True
+
+    with pytest.raises(RPCDecodingError, match="Encoded boolean must be `true` or `false`"):
+        rpc_decode_bool(1)
+
+
 def test_decode_block_info():
 
     json_result = {
@@ -289,6 +297,12 @@ def test_decode_block_info():
     assert block_info.transactions == ()
     assert block_info.transaction_hashes == ()
 
+    json_result["transactions"] = 1
+    with pytest.raises(
+        RPCDecodingError, match="`transactions` in a block info must be an iterable, got 1"
+    ):
+        BlockInfo.rpc_decode(json_result)
+
 
 def test_decode_log_entry():
     log_entry_json = {
@@ -309,3 +323,9 @@ def test_decode_log_entry():
 
     log_entry = LogEntry.rpc_decode(log_entry_json)
     assert log_entry.data == b""
+
+    log_entry_json["topics"] = 1
+    with pytest.raises(
+        RPCDecodingError, match="`topics` in a log entry must be an iterable, got 1"
+    ):
+        LogEntry.rpc_decode(log_entry_json)

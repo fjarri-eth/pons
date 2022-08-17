@@ -1,9 +1,15 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncIterator, Dict, Optional, Union, cast, Iterable, Mapping
 
 import httpx
+
+
+# TODO: currently mypy does not support recursive type aliases,
+# make it recursive when it's possible.
+# See https://github.com/python/mypy/issues/731
+JSON = Union[bool, int, float, str, None, Iterable[Any], Mapping[str, Any]]
 
 
 class Provider(ABC):
@@ -33,17 +39,19 @@ class ResponseDict:
     resulting from an incorrectly formatted response.
     """
 
-    def __init__(self, response: Dict[str, Any]):
+    def __init__(self, response: Any):
         if not isinstance(response, dict):
             raise UnexpectedResponse(
                 f"Expected a dictionary as a response, got {type(response).__name__}"
             )
-        self._response = response
+        if not all(isinstance(key, str) for key in response):
+            raise UnexpectedResponse(f"Some keys in the response are not strings: {response}")
+        self._response = cast(Dict[str, JSON], response)
 
-    def __contains__(self, field: str):
+    def __contains__(self, field: str) -> bool:
         return field in self._response
 
-    def __getitem__(self, field: str) -> Any:
+    def __getitem__(self, field: str) -> JSON:
         try:
             contents = self._response[field]
         except KeyError as exc:
@@ -59,18 +67,17 @@ class ProviderSession(ABC):
     """
 
     @abstractmethod
-    async def rpc(self, method: str, *args) -> Any:
+    async def rpc(self, method: str, *args: JSON) -> Any:
         """
         Calls the given RPC method with the already json-ified arguments.
         """
         ...
 
-    async def rpc_dict(self, method: str, *args) -> Optional[ResponseDict]:
+    async def rpc_dict(self, method: str, *args: JSON) -> Optional[ResponseDict]:
         result = await self.rpc(method, *args)
         if result is None:
             return None
-        else:
-            return ResponseDict(result)
+        return ResponseDict(result)
 
 
 class HTTPProvider(Provider):
@@ -94,11 +101,35 @@ class RPCError(Exception):
     """
 
     @classmethod
-    def from_json(cls, response: Dict[str, Any]):
+    def from_json(cls, response: Dict[str, JSON]) -> "RPCError":
         error = ResponseDict(response)
-        data = error["data"] if "data" in error else None
-        code = int(error["code"])
-        return cls(code, error["message"], data)
+        if "data" in error:
+            data = error["data"]
+            if data is not None and not isinstance(data, str):
+                raise UnexpectedResponse(
+                    f"Error data must be a string or None, got {type(data)} ({data})"
+                )
+        else:
+            data = None
+
+        error_code = error["code"]
+        if isinstance(error_code, str):
+            code = int(error_code)
+        elif isinstance(error_code, int):
+            code = error_code
+        else:
+            raise UnexpectedResponse(
+                "Error code must be an integer (possibly string-encoded), "
+                f"got {type(error_code)} ({error_code})"
+            )
+
+        message = error["message"]
+        if not isinstance(message, str):
+            raise UnexpectedResponse(
+                f"Error message must be a string, got {type(message)} ({message})"
+            )
+
+        return cls(code, message, data)
 
     def __init__(self, code: int, message: str, data: Optional[str] = None):
         super().__init__(code, message, data)
@@ -118,8 +149,8 @@ class HTTPSession(ProviderSession):
         self._url = url
         self._client = http_client
 
-    async def rpc(self, method: str, *args):
-        json = {"jsonrpc": "2.0", "method": method, "params": list(args), "id": 0}
+    async def rpc(self, method: str, *args: JSON) -> JSON:
+        json = {"jsonrpc": "2.0", "method": method, "params": args, "id": 0}
         try:
             response = await self._client.post(self._url, json=json)
         except Exception as exc:
@@ -127,9 +158,12 @@ class HTTPSession(ProviderSession):
         if response.status_code != HTTPStatus.OK:
             raise RPCError(response.status_code, response.content.decode())
 
-        response_json = response.json()
+        response_json = cast(JSON, response.json())
+        if not isinstance(response_json, dict):
+            raise UnexpectedResponse(f"RPC response must be a dictionary, got: {response_json}")
         if "error" in response_json:
             raise RPCError.from_json(response_json["error"])
         if "result" not in response_json:
             raise UnexpectedResponse(f"`result` is not present in the response: {response_json}")
-        return response_json["result"]
+        # TODO: see the TODO above; when JSON is recursive, this cast won't be necessary.
+        return cast(JSON, response_json["result"])

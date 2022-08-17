@@ -3,6 +3,7 @@ import pytest
 
 from pons import Client, Amount, HTTPProvider, Unreachable
 from pons._client import ProviderError, BadResponseFormat
+from pons._provider import ResponseDict, UnexpectedResponse, RPCError
 
 from .provider_server import ServerHandle
 from . import provider_server  # For monkeypatching purposes
@@ -29,6 +30,40 @@ async def test_single_value_request(session):
 
 async def test_dict_request(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, Amount.ether(10))
+
+
+def test_response_dict():
+    with pytest.raises(
+        UnexpectedResponse, match="Some keys in the response are not strings: {1: 2}"
+    ):
+        ResponseDict({1: 2})
+
+
+def test_rpc_error():
+    with pytest.raises(
+        UnexpectedResponse, match=r"Error data must be a string or None, got <class 'int'> \(1\)"
+    ):
+        RPCError.from_json({"data": 1, "code": 2, "message": "error"})
+
+    error = RPCError.from_json({"code": 2, "message": "error"})
+    assert error.data is None
+
+    error = RPCError.from_json({"code": "2", "message": "error"})
+    assert error.code == 2
+
+    with pytest.raises(
+        UnexpectedResponse,
+        match=(
+            r"Error code must be an integer \(possibly string-encoded\), "
+            "got <class 'float'> \(1\.0\)"
+        ),
+    ):
+        RPCError.from_json({"code": 1.0, "message": "error"})
+
+    with pytest.raises(
+        UnexpectedResponse, match=r"Error message must be a string, got <class 'int'> \(1\)"
+    ):
+        RPCError.from_json({"code": 2, "message": 1})
 
 
 async def test_dict_request_introspection(session, root_signer, another_signer):
@@ -123,6 +158,19 @@ async def test_neither_result_nor_error_field(test_provider, session, monkeypatc
     monkeypatch.setattr(provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(BadResponseFormat, match="`result` is not present in the response"):
+        await session.net_version()
+
+
+async def test_result_is_not_a_dict(test_provider, session, monkeypatch):
+    # Tests the handling of a badly formed provider response that is not a dictionary.
+    # Unfortunately we can't achieve that by just patching the provider, have to patch the server
+
+    async def faulty_process_request(*args, **kwargs):
+        return 1
+
+    monkeypatch.setattr(provider_server, "process_request", faulty_process_request)
+
+    with pytest.raises(BadResponseFormat, match="RPC response must be a dictionary, got: 1"):
         await session.net_version()
 
 
