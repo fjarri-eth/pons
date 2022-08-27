@@ -134,11 +134,9 @@ async def test_wait_for_transaction_receipt(
 
     # The receipt won't be available until we mine, so the waiting should time out
     start_time = trio.current_time()
-    try:
+    with pytest.raises(trio.TooSlowError):
         with trio.fail_after(5):
             receipt = await session.wait_for_transaction_receipt(tx_hash)
-    except trio.TooSlowError:
-        pass
     end_time = trio.current_time()
     assert end_time - start_time == 5
 
