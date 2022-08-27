@@ -55,7 +55,7 @@ def test_rpc_error():
         UnexpectedResponse,
         match=(
             r"Error code must be an integer \(possibly string-encoded\), "
-            "got <class 'float'> \(1\.0\)"
+            r"got <class 'float'> \(1\.0\)"
         ),
     ):
         RPCError.from_json({"code": 1.0, "message": "error"})
