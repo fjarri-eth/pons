@@ -5,6 +5,12 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
+Changed
+^^^^^^^
+
+- Bumped dependencies: ``eth-account>=0.6``, ``eth-utils>=2``, ``eth-abi>=3``. (PR_40_)
+
+
 Fixed
 ^^^^^
 
@@ -12,6 +18,7 @@ Fixed
 
 
 .. _PR_37: https://github.com/fjarri/pons/pull/37
+.. _PR_40: https://github.com/fjarri/pons/pull/40
 
 
 0.4.2 (05-06-2022)
