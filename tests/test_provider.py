@@ -14,7 +14,7 @@ async def test_server(nursery, test_provider):
     handle = ServerHandle(test_provider)
     await nursery.start(handle)
     yield handle
-    handle.shutdown()
+    await handle.shutdown()
 
 
 @pytest.fixture
