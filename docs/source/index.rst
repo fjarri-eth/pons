@@ -71,7 +71,7 @@ A quick usage example:
             http_provider = handle.http_provider
             await nursery.start(handle)
             await func()
-            handle.shutdown()
+            await handle.shutdown()
 
 .. testcode::
 

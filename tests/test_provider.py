@@ -14,7 +14,7 @@ async def test_server(nursery, test_provider):
     handle = ServerHandle(test_provider)
     await nursery.start(handle)
     yield handle
-    handle.shutdown()
+    await handle.shutdown()
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def test_rpc_error():
         UnexpectedResponse,
         match=(
             r"Error code must be an integer \(possibly string-encoded\), "
-            "got <class 'float'> \(1\.0\)"
+            r"got <class 'float'> \(1\.0\)"
         ),
     ):
         RPCError.from_json({"code": 1.0, "message": "error"})

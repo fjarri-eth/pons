@@ -4,7 +4,7 @@ import re
 from typing import Optional, Any, Union, Iterable, Mapping, Dict, Tuple, Sequence, List, cast
 
 from eth_abi.exceptions import DecodingError
-from eth_abi import encode_single, decode_single
+import eth_abi
 from eth_utils import keccak
 
 from ._entities import Address
@@ -21,22 +21,25 @@ class ABIDecodingError(Exception):
 # See https://github.com/python/mypy/issues/731
 ABIType = Any
 """
-Represents the type that can be received from ``decode_single()``.
+Represents the type that can be received from ``eth_decode()``.
 ``ABIType = Union[int, str, bytes, bool, List[ABIType]]``
 """
 
 
-def decode_abi(signature: str, data: bytes) -> ABIType:
-    try:
-        # We know that `signature` is a tuple of types, so the function will return a tuple
-        return cast(ABIType, decode_single(signature, data))
-    except DecodingError as exc:
-        # wrap possible `eth_abi` errors
-        message = (
-            f"Could not decode the return value "
-            f"with the expected signature {signature}: {str(exc)}"
-        )
-        raise ABIDecodingError(message) from exc
+def encode_typed(types: Iterable[str], args: Iterable[ABIType]) -> bytes:
+    # ``eth_abi.encode()`` does not have type annotations.
+    # This is a typed wrapper (easier than making custom stubs).
+    # Remove when typing is added in ``eth_abi``.
+    encoded = eth_abi.encode(types, args)  # type: ignore
+    return cast(bytes, encoded)
+
+
+def decode_typed(types: Iterable[str], data: bytes) -> Tuple[ABIType, ...]:
+    # ``eth_abi.decode()`` does not have type annotations.
+    # This is a typed wrapper (easier than making custom stubs).
+    # Remove when typing is added in ``eth_abi``.
+    decoded = eth_abi.decode(types, data)  # type: ignore
+    return cast(Tuple[ABIType, ...], decoded)
 
 
 class Type(ABC):
@@ -70,7 +73,7 @@ class Type(ABC):
         """
         Encodes the given value in the contract ABI format.
         """
-        return encode_single(self.canonical_form, val)
+        return encode_typed([self.canonical_form], [val])
 
     def encode_to_topic(self, val: Any) -> bytes:
         """
@@ -84,7 +87,7 @@ class Type(ABC):
         # and cannot just use the functions from ``eth_abi``.
 
         # Before doing anything, normalize the value,
-        # this will check that ensure the constituent values are actually valid.
+        # this will ensure the constituent values are actually valid.
         return self._encode_to_topic_outer(self._normalize(val))
 
     def _encode_to_topic_outer(self, val: Any) -> bytes:
@@ -115,7 +118,7 @@ class Type(ABC):
 
         # By default it's just the decoding of the value type.
         # May be overridden.
-        return self._denormalize(decode_abi(self.canonical_form, val))
+        return self._denormalize(decode_typed([self.canonical_form], val)[0])
 
     def __str__(self) -> str:
         return self.canonical_form
@@ -517,22 +520,29 @@ def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Dict[str, Type]:
     return {entry["name"]: dispatch_type(entry) for entry in abi_entry}
 
 
-def canonical_signature(types: Iterable[Type]) -> str:
-    return "(" + ",".join(tp.canonical_form for tp in types) + ")"
-
-
 def encode_args(*types_and_args: Tuple[Type, Any]) -> bytes:
     if types_and_args:
         types, args = zip(*types_and_args)
     else:
         types, args = (), ()
-    return encode_single(
-        canonical_signature(types), tuple(tp._normalize(arg) for tp, arg in zip(types, args))
+    return encode_typed(
+        [tp.canonical_form for tp in types],
+        tuple(tp._normalize(arg) for tp, arg in zip(types, args)),
     )
 
 
 def decode_args(types: Iterable[Type], data: bytes) -> Tuple[ABIType, ...]:
-    # Casting to tuple because we know that we decode it
-    # using the signature constructed from a tuple of types
-    values = cast(Tuple[Any], decode_abi(canonical_signature(types), data))
+
+    canonical_types = [tp.canonical_form for tp in types]
+    try:
+        values = decode_typed(canonical_types, data)
+    except DecodingError as exc:
+        # wrap possible `eth_abi` errors
+        signature = "(" + ",".join(canonical_types) + ")"
+        message = (
+            f"Could not decode the return value "
+            f"with the expected signature {signature}: {str(exc)}"
+        )
+        raise ABIDecodingError(message) from exc
+
     return tuple(tp._denormalize(value) for tp, value in zip(types, values))

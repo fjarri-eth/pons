@@ -7,9 +7,9 @@ authors = [
 ]
 dependencies = [
     "httpx>=0.22",
-    "eth-account>=0.5",
-    "eth-utils>=1.10",
-    "eth-abi>=2",
+    "eth-account>=0.6",
+    "eth-utils>=2",
+    "eth-abi>=3",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
 ]
@@ -28,10 +28,8 @@ tests = [
     "pytest-cov",
     "py-solc-x>=1",
     # eth-tester only has pre-releases, so we can't set a range.
-    # Another option is to pin it, but it has to be compatible
-    # with eth-* stuff in the main dependencies.
     # TODO: make our own mock around Pyevm.
-    "eth-tester[pyevm]",
+    "eth-tester[pyevm]==0.7.0b1",
     "starlette",
     "hypercorn",
 ]

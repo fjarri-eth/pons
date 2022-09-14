@@ -65,6 +65,7 @@ class ServerHandle:
         self._port = port
         self._provider = provider
         self._shutdown_event = trio.Event()
+        self._shutdown_finished = trio.Event()
         self.http_provider = HTTPProvider(f"http://{self._host}:{self._port}")
 
     async def __call__(self, *, task_status=trio.TASK_STATUS_IGNORED):
@@ -81,6 +82,8 @@ class ServerHandle:
         await serve(
             app, config, shutdown_trigger=self._shutdown_event.wait, task_status=task_status
         )
+        self._shutdown_finished.set()
 
-    def shutdown(self):
+    async def shutdown(self):
         self._shutdown_event.set()
+        await self._shutdown_finished.wait()
