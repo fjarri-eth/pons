@@ -186,5 +186,5 @@ Naturally, a mutating call requires a signer to be provided:
 
 ::
 
-    call = deployed_contract.read.setState(1)
-    await deployed_contract.transact(signer, call)
+    call = deployed_contract.write.setState(1)
+    await session.transact(signer, call)
