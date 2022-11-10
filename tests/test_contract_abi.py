@@ -118,6 +118,11 @@ def test_constructor_init():
     ctr_call = ctr(1, True)
     assert ctr_call.input_bytes == b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x01"
 
+    # A regression for a typo in argument passing.
+    # Check that keyword arguments are processed correctly.
+    ctr_call = ctr(1, b=True)
+    assert ctr_call.input_bytes == b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x01"
+
 
 def test_constructor_errors():
     with pytest.raises(
@@ -157,6 +162,11 @@ def _check_read_method(read):
 
     vals = read.decode_output(encoded_bytes)
     assert vals == (1, True)
+
+    # A regression for a typo in argument passing.
+    # Check that keyword arguments are processed correctly.
+    rcall = read(1, b=True)
+    assert rcall.data_bytes == read.selector + encoded_bytes
 
 
 def test_read_method_from_json_anonymous_outputs():
@@ -254,6 +264,11 @@ def _check_write_method(write):
     encoded_bytes = b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x01"
 
     wcall = write(1, True)
+    assert wcall.data_bytes == write.selector + encoded_bytes
+
+    # A regression for a typo in argument passing.
+    # Check that keyword arguments are processed correctly.
+    wcall = write(1, b=True)
     assert wcall.data_bytes == write.selector + encoded_bytes
 
 
