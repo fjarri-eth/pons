@@ -227,7 +227,7 @@ class Method(ABC):
         return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
 
     def _encode_call(self, *args: Any, **kwargs: Any) -> bytes:
-        input_bytes = self.inputs.encode(*args, *kwargs)
+        input_bytes = self.inputs.encode(*args, **kwargs)
         return self.selector + input_bytes
 
 
@@ -271,7 +271,7 @@ class Constructor:
         """
         Returns an encoded call with given arguments.
         """
-        input_bytes = self.inputs.encode(*args, *kwargs)
+        input_bytes = self.inputs.encode(*args, **kwargs)
         return ConstructorCall(input_bytes)
 
     def __str__(self) -> str:

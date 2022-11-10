@@ -5,7 +5,13 @@ Changelog
 Unreleased
 ~~~~~~~~~~
 
-Under construction.
+Fixed
+^^^^^
+
+- A bug in processing keyword arguments to contract calls. (PR_42_)
+
+
+.. _PR_42: https://github.com/fjarri/pons/pull/42
 
 
 0.5.0 (14-09-2022)
