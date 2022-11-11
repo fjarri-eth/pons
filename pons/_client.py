@@ -459,7 +459,7 @@ class ClientSession:
         Estimates the amount of gas required to deploy the contract with the given args.
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
-        or :py:class`ContractError` if a known error was caught during the dry run.
+        or :py:class:`ContractError` if a known error was caught during the dry run.
         If the error was unknown, falls back to :py:class:`ProviderError`.
         """
         tx = {
@@ -492,7 +492,7 @@ class ClientSession:
         Estimates the amount of gas required to transact with a contract.
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
-        or :py:class`ContractError` if a known error was caught during the dry run.
+        or :py:class:`ContractError` if a known error was caught during the dry run.
         If the error was unknown, falls back to :py:class:`ProviderError`.
         """
         tx = {
