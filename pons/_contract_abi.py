@@ -698,8 +698,7 @@ class ContractABI:
     """
     A wrapper for contract ABI.
 
-    Contract methods accessible as attributes of this object,
-    with the type :py:class:`~pons._contract_abi.Method`.
+    Contract methods are grouped by type and are accessible via the attributes below.
     """
 
     constructor: Constructor
