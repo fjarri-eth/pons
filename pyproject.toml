@@ -49,6 +49,19 @@ lint = [
 line-length = 100
 target-version = ['py38']
 
+[tool.pdm.build]
+source-includes = [
+    "tests/*.sol",
+    "tests/*.py",
+    "docs/*.rst",
+    "docs/*.py",
+    "docs/Makefile",
+    ".coveragerc",
+    ".mypy.ini",
+    ".readthedocs.yml",
+    "pytest.ini",
+]
+
 [tool.setuptools_scm]
 
 [build-system]

@@ -69,4 +69,4 @@ jobs:
         pdm sync -G tests -G docs
     - name: Doctests with sphinx
       run: |
-        pdm run sphinx-build -n docs/source build/sphinx -b doctest
+        pdm run sphinx-build -n docs build/sphinx -b doctest
