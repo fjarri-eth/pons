@@ -27,4 +27,4 @@ jobs:
         pdm sync -G docs
     - name: Run sphinx-build
       run: |
-        pdm run sphinx-build -n docs/source build/sphinx
+        pdm run sphinx-build -n docs build/sphinx

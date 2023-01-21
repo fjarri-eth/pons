@@ -49,9 +49,7 @@ lint = [
 line-length = 100
 target-version = ['py38']
 
-[tool]
-[tool.pdm]
-[tool.pdm.dev-dependencies]
+[tool.setuptools_scm]
 
 [build-system]
 requires = ["pdm-pep517"]
