@@ -25,12 +25,11 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    # Cannot use PDM because `mypy` does not handle the PEP582 `__pypackages__` directory well.
-    # See https://github.com/python/mypy/issues/10633
+    - name: Install PDM
+      run: curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install -e .[lint]
+        pdm sync -G lint
     - name: Run mypy
       run: |
-        mypy pons
+        pdm run mypy pons

@@ -34,7 +34,6 @@ jobs:
     - name: Install dependencies
       run: |
         pdm sync -G tests
-    # py-solc-x can do it too, but let's use standard system tools
     - name: Test with pytest
       run: |
         pdm run py.test --cov=pons --cov-report=xml tests
@@ -68,7 +67,6 @@ jobs:
     - name: Install dependencies
       run: |
         pdm sync -G tests -G docs
-    # py-solc-x can do it too, but let's use standard system tools
     - name: Doctests with sphinx
       run: |
         pdm run sphinx-build -n docs/source build/sphinx -b doctest

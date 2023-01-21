@@ -212,6 +212,11 @@ class EthereumTesterProvider(Provider):
             result = self._ethereum_tester.get_block_by_hash(
                 block_hash, full_transactions=with_transactions
             )
+            # TODO (#44): major providers still use "miner",
+            # but eth-tester is already using "coinbase". Replacing for now.
+            assert "miner" not in result
+            result["miner"] = result["coinbase"]
+            del result["coinbase"]
         except BlockNotFound:
             return None
         return normalize_return_value(result)
@@ -221,6 +226,11 @@ class EthereumTesterProvider(Provider):
             result = self._ethereum_tester.get_block_by_number(
                 rpc_decode_block(block), full_transactions=with_transactions
             )
+            # TODO (#44): major providers still use "miner",
+            # but eth-tester is already using "coinbase". Replacing for now.
+            assert "miner" not in result
+            result["miner"] = result["coinbase"]
+            del result["coinbase"]
         except BlockNotFound:
             return None
         return normalize_return_value(result)

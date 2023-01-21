@@ -29,7 +29,7 @@ tests = [
     "py-solc-x>=1",
     # eth-tester only has pre-releases, so we can't set a range.
     # TODO: make our own mock around Pyevm.
-    "eth-tester[pyevm]==0.7.0b1",
+    "eth-tester[pyevm]==0.8.0b3",
     "starlette",
     "hypercorn",
 ]
@@ -37,9 +37,10 @@ docs = [
     "sphinx>=4",
     "furo",
     "sphinxcontrib-trio",
+    "setuptools-scm",
 ]
 lint = [
-    "mypy>=0.941",
+    "mypy>=0.991",
     "trio-typing[mypy]>=0.7.0",
     "black",
 ]

@@ -14,15 +14,18 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+import os
+import setuptools_scm
+
 
 # -- Project information -----------------------------------------------------
 
 project = "pons"
-copyright = "2022, Bogdan Opanchuk"
+copyright = "2022-now, Bogdan Opanchuk"
 author = "Bogdan Opanchuk"
 
 # The full version, including alpha/beta/rc tags
-release = "0.5.1"
+release = setuptools_scm.get_version(relative_to=os.path.abspath("../pyproject.toml"))
 
 
 # -- General configuration ---------------------------------------------------
