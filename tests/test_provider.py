@@ -94,7 +94,6 @@ async def test_unexpected_response_type(
 
 
 async def test_missing_field(test_provider, session, monkeypatch, root_signer, another_signer):
-
     orig_eth_get_transaction_receipt = test_provider.eth_get_transaction_receipt
 
     def faulty_eth_get_transaction_receipt(tx_hash):

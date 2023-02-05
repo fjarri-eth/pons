@@ -318,7 +318,6 @@ class ReadMethod(Method):
         inputs: Union[Mapping[str, Type], Sequence[Type]],
         outputs: Union[Mapping[str, Type], Sequence[Type], Type],
     ):
-
         self._name = name
         self._inputs = Signature(inputs)
 
@@ -392,7 +391,6 @@ class WriteMethod(Method):
         inputs: Union[Mapping[str, Type], Sequence[Type]],
         payable: bool = False,
     ):
-
         self._name = name
         self._inputs = Signature(inputs)
         self.payable = payable
@@ -737,7 +735,6 @@ class ContractABI:
         errors = {}
 
         for entry in json_abi:
-
             if entry["type"] == "constructor":
                 if constructor:
                     raise ValueError("JSON ABI contains more than one constructor declarations")
@@ -804,7 +801,6 @@ class ContractABI:
         events: Optional[Iterable[Event]] = None,
         errors: Optional[Iterable[Error]] = None,
     ):
-
         if constructor is None:
             constructor = Constructor(inputs=[])
 

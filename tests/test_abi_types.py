@@ -228,7 +228,6 @@ def test_making_arrays():
 
 
 def test_normalization_roundtrip():
-
     struct = abi.struct(
         field1=abi.uint(8),
         field2=abi.uint(16)[2],
@@ -258,7 +257,6 @@ def check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=True):
 
 
 def test_encode_to_topic():
-
     # Simple types
 
     check_topic_encode_decode(
@@ -331,7 +329,6 @@ def test_encode_decode_args():
 
 
 def test_decoding_error():
-
     types = [abi.uint(256), abi.uint(256)]
     encoded_bytes = b"\x00" * 31 + b"\x01"  # Only one uint256
 

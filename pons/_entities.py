@@ -563,7 +563,6 @@ class LogEntry(NamedTuple):
 
     @classmethod
     def rpc_decode(cls, val: ResponseDict) -> "LogEntry":
-
         topics = val["topics"]
         if not isinstance(topics, Iterable):
             raise RPCDecodingError(f"`topics` in a log entry must be an iterable, got {topics}")

@@ -101,7 +101,6 @@ async def test_eth_get_balance(session, root_signer, another_signer):
 
 
 async def test_eth_get_transaction_receipt(test_provider, session, root_signer, another_signer):
-
     test_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
@@ -127,7 +126,6 @@ async def test_eth_get_transaction_count(session, root_signer, another_signer):
 async def test_wait_for_transaction_receipt(
     test_provider, session, root_signer, another_signer, autojump_clock
 ):
-
     to_transfer = Amount.ether(10)
     test_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
@@ -228,7 +226,6 @@ async def test_eth_gas_price(session):
 
 
 async def test_eth_block_number(session, root_signer, another_signer):
-
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     await session.transfer(root_signer, another_signer.address, Amount.ether(2))
     await session.transfer(root_signer, another_signer.address, Amount.ether(3))
@@ -239,7 +236,6 @@ async def test_eth_block_number(session, root_signer, another_signer):
 
 
 async def test_transfer(session, root_signer, another_signer):
-
     # Regular transfer
     root_balance = await session.eth_get_balance(root_signer.address)
     to_transfer = Amount.ether(10)
@@ -251,7 +247,6 @@ async def test_transfer(session, root_signer, another_signer):
 
 
 async def test_transfer_custom_gas(session, root_signer, another_signer):
-
     root_balance = await session.eth_get_balance(root_signer.address)
     to_transfer = Amount.ether(10)
 
@@ -269,7 +264,6 @@ async def test_transfer_custom_gas(session, root_signer, another_signer):
 
 
 async def test_transfer_failed(test_provider, session, root_signer, another_signer):
-
     # TODO: it would be nice to reproduce the actual situation where this could happen
     # (tranfer was accepted for mining, but failed in the process,
     # and the resulting receipt has a 0 status).
@@ -395,7 +389,6 @@ async def test_eth_get_transaction_by_hash(test_provider, session, root_signer, 
 
 
 async def test_block_filter(test_provider, session, root_signer, another_signer):
-
     to_transfer = Amount.ether(1)
 
     await session.transfer(root_signer, another_signer.address, to_transfer)
@@ -433,7 +426,6 @@ async def test_pending_transaction_filter(test_provider, session, root_signer, a
 
 
 async def test_log_filter_all(session, compiled_contracts, root_signer, another_signer):
-
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -459,7 +451,6 @@ async def test_log_filter_all(session, compiled_contracts, root_signer, another_
 
 
 async def test_log_filter_by_address(session, compiled_contracts, root_signer, another_signer):
-
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -503,7 +494,6 @@ async def test_log_filter_by_address(session, compiled_contracts, root_signer, a
 
 
 async def test_log_filter_by_topic(session, compiled_contracts, root_signer, another_signer):
-
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -558,7 +548,6 @@ async def test_log_filter_by_topic(session, compiled_contracts, root_signer, ano
 
 
 async def test_log_filter_by_block_num(session, compiled_contracts, root_signer, another_signer):
-
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -583,7 +572,6 @@ async def test_log_filter_by_block_num(session, compiled_contracts, root_signer,
 
 
 async def test_block_filter_high_level(autojump_clock, session, root_signer, another_signer):
-
     block_hashes = []
 
     async def observer():
@@ -613,7 +601,6 @@ async def test_block_filter_high_level(autojump_clock, session, root_signer, ano
 async def test_pending_transaction_filter_high_level(
     autojump_clock, session, root_signer, another_signer
 ):
-
     tx_hashes = []
 
     async def observer():
@@ -645,7 +632,6 @@ async def test_pending_transaction_filter_high_level(
 async def test_event_filter_high_level(
     autojump_clock, session, compiled_contracts, root_signer, another_signer
 ):
-
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -707,7 +693,6 @@ async def check_rpc_error(awaitable, expected_code, expected_message, expected_d
 
 
 async def test_contract_exceptions(session, root_signer, compiled_contracts):
-
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
@@ -756,7 +741,6 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
 
 
 async def test_contract_panics(session, root_signer, compiled_contracts):
-
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
@@ -778,7 +762,6 @@ async def test_contract_panics(session, root_signer, compiled_contracts):
 
 
 async def test_contract_exceptions_high_level(session, root_signer, compiled_contracts):
-
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
@@ -808,7 +791,6 @@ async def test_contract_exceptions_high_level(session, root_signer, compiled_con
 
 
 async def test_unknown_error_reasons(test_provider, session, compiled_contracts, root_signer):
-
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 

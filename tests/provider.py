@@ -33,7 +33,6 @@ def pyevm_errors_into_rpc_errors():
     try:
         yield
     except TransactionFailed as exc:
-
         assert len(exc.args) == 1  # sanity check in case eth-tester suddenly changes API
         reason = exc.args[0]
 

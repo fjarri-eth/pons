@@ -52,7 +52,6 @@ def test_event_signature():
 
 
 def test_event_signature_encode():
-
     sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
 
     # All indexed parameters provided
@@ -76,7 +75,6 @@ def test_event_signature_encode():
 
 
 def test_event_signature_decode():
-
     sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
 
     decoded = sig.decode_log_entry(
@@ -295,7 +293,6 @@ def test_write_method_init():
 
 
 def test_write_method_errors():
-
     with pytest.raises(
         ValueError,
         match="WriteMethod object must be created from a JSON entry with type='function'",
@@ -580,7 +577,6 @@ def test_event_init():
 
 
 def test_event_encode():
-
     event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4)), {"a", "b"})
     event_filter = event(b=Either(1, 2))
     assert event_filter.topics == (
@@ -601,7 +597,6 @@ def test_event_encode():
 
 
 def test_event_decode():
-
     # We only need a couple of fields
     fake_log_entry = namedtuple("fake_log_entry", ["topics", "data"])
 

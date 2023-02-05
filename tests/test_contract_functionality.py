@@ -36,7 +36,6 @@ async def test_empty_constructor(session, root_signer, compiled_contracts):
 
 
 async def test_basics(session, root_signer, another_signer, compiled_contracts):
-
     compiled_contract = compiled_contracts["Test"]
 
     # Deploy the contract
@@ -64,7 +63,6 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
 
 
 async def test_abi_declaration(session, root_signer, another_signer, compiled_contracts):
-
     compiled_contract = compiled_contracts["Test"]
 
     # Deploy the contract

@@ -79,7 +79,6 @@ def test_amount():
 
 
 def test_address():
-
     random_addr = b"dv\xbbCQ,\xfe\xd0\xbfF\x8aq\x07OK\xf9\xa1i\x88("
     random_addr_checksum = "0x6476Bb43512CFed0bF468a71074F4bF9A1698828"
 
@@ -145,7 +144,6 @@ def test_typed_data_lengths():
 
 
 def test_decode_tx_receipt():
-
     address = Address(os.urandom(20))
 
     tx_receipt_json = {
@@ -226,7 +224,6 @@ def test_decode_bool():
 
 
 def test_decode_block_info():
-
     json_result = {
         "baseFeePerGas": "0xbcdaf1db6",
         "difficulty": "0x2c72989f9145c8",

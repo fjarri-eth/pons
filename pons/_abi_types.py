@@ -532,7 +532,6 @@ def encode_args(*types_and_args: Tuple[Type, Any]) -> bytes:
 
 
 def decode_args(types: Iterable[Type], data: bytes) -> Tuple[ABIType, ...]:
-
     canonical_types = [tp.canonical_form for tp in types]
     try:
         values = decode_typed(canonical_types, data)

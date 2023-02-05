@@ -42,7 +42,7 @@ docs = [
 lint = [
     "mypy>=0.991",
     "trio-typing[mypy]>=0.7.0",
-    "black",
+    "black>=23",
 ]
 
 [tool.black]
