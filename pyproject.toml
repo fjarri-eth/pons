@@ -1,6 +1,6 @@
 [project]
 name = "pons"
-dynamic = ["version"]
+version = "0.5.2.dev"
 description = "Async RPC client for Ethereum"
 authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
@@ -60,15 +60,12 @@ source-includes = [
     "docs/*.py",
     "docs/Makefile",
     ".coveragerc",
-    ".mypy.ini",
+    "mypy.ini",
     "pytest.ini",
 ]
 
 [tool.setuptools_scm]
 
 [build-system]
-requires = [
-    "pdm-pep517",
-    "setuptools_scm[toml]>=7",
-]
+requires = ["pdm-pep517"]
 build-backend = "pdm.pep517.api"

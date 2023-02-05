@@ -15,6 +15,8 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 import os
+import importlib.metadata
+
 import setuptools_scm
 
 
@@ -25,7 +27,10 @@ copyright = "2022-now, Bogdan Opanchuk"
 author = "Bogdan Opanchuk"
 
 # The full version, including alpha/beta/rc tags
-release = setuptools_scm.get_version(relative_to=os.path.abspath("../pyproject.toml"))
+try:
+    release = importlib.metadata.version(project)
+except importlib.metadata.PackageNotFoundError:
+    release = setuptools_scm.get_version(relative_to=os.path.abspath("../pyproject.toml"))
 
 
 # -- General configuration ---------------------------------------------------
@@ -38,10 +43,14 @@ extensions = [
     "sphinxcontrib_trio",
     "sphinx.ext.intersphinx",
     "sphinx.ext.doctest",
+    "sphinx.ext.viewcode",
 ]
 
+autoclass_content = "both"
+autodoc_member_order = "groupwise"
+
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+templates_path = []
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -59,11 +68,12 @@ html_theme = "furo"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []
 
 # Do not prepend module to type names when it can be resolved.
 python_use_unqualified_type_names = True
 
 intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
     "eth_account": ("https://eth-account.readthedocs.io/en/stable/", None),
 }
