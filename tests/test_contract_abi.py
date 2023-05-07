@@ -286,6 +286,29 @@ def test_write_method_from_json():
     _check_write_method(write)
 
 
+def test_write_method_with_output():
+    # Mutating methods can have outputs (in case they are called by other mutating methods),
+    # but we cannot get that output from the outside.
+    # So if we see those in a JSON ABI, we can just ignore them.
+    write = WriteMethod.from_json(
+        dict(
+            type="function",
+            name="someMethod",
+            stateMutability="payable",
+            inputs=[
+                dict(type="uint8", name="a"),
+                dict(type="bool", name="b"),
+            ],
+            outputs=[
+                dict(type="uint8", name="a"),
+                dict(type="bool", name="b"),
+            ],
+        )
+    )
+
+    _check_write_method(write)
+
+
 def test_write_method_init():
     write = WriteMethod(name="someMethod", inputs=dict(a=abi.uint(8), b=abi.bool), payable=True)
 
@@ -298,30 +321,6 @@ def test_write_method_errors():
         match="WriteMethod object must be created from a JSON entry with type='function'",
     ):
         WriteMethod.from_json(dict(type="constructor"))
-
-    with pytest.raises(
-        ValueError, match="Mutating method's JSON entry cannot have non-empty `outputs`"
-    ):
-        WriteMethod.from_json(
-            dict(
-                type="function",
-                name="someMethod",
-                stateMutability="payable",
-                inputs=[dict(type="uint8", name="a")],
-                outputs=[dict(type="uint8", name="a")],
-            )
-        )
-
-    # This is fine
-    WriteMethod.from_json(
-        dict(
-            type="function",
-            name="someMethod",
-            stateMutability="payable",
-            inputs=[dict(type="uint8", name="a")],
-            outputs=[],
-        )
-    )
 
     with pytest.raises(
         ValueError,

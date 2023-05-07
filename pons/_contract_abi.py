@@ -405,8 +405,6 @@ class WriteMethod(Method):
 
         name = method_entry["name"]
         inputs = dispatch_types(method_entry["inputs"])
-        if "outputs" in method_entry and method_entry["outputs"]:
-            raise ValueError("Mutating method's JSON entry cannot have non-empty `outputs`")
         if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
                 "Mutating method's JSON entry state mutability must be `nonpayable` or `payable`"
