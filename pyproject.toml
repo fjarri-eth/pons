@@ -9,7 +9,7 @@ dependencies = [
     "httpx>=0.22",
     "eth-account>=0.6",
     "eth-utils>=2",
-    "eth-abi>=3.0.1",
+    "eth-abi>=4",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
 ]
@@ -32,6 +32,8 @@ tests = [
     "eth-tester[pyevm]==0.8.0b3",
     "starlette",
     "hypercorn",
+    # Temporarily lock until `pyevm` upgrades.
+    "mypy-extensions==0.4.4"
 ]
 docs = [
     "sphinx>=4",
@@ -40,7 +42,7 @@ docs = [
     "setuptools-scm",
 ]
 lint = [
-    "mypy>=0.991",
+    "mypy>=1",
     "trio-typing[mypy]>=0.7.0",
     "black>=23",
 ]
