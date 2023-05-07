@@ -439,8 +439,8 @@ def test_contract_abi_json():
         "    receive() payable\n"
         "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
-        "    event Deposit(address indexed from, bytes indexed foo, uint8 bar) anonymous\n"
-        "    error CustomError(address from, bytes foo, uint8 bar)\n"
+        "    event Deposit(address indexed from_, bytes indexed foo, uint8 bar) anonymous\n"
+        "    error CustomError(address from_, bytes foo, uint8 bar)\n"
         "}"
     )
 
@@ -560,7 +560,7 @@ def test_event_from_json():
     assert event.anonymous
     assert event.name == "Foo"
     assert event.indexed == {"from", "foo"}
-    assert str(event.fields) == "(address indexed from, bytes indexed foo, uint8 bar)"
+    assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
 
 
 def test_event_init():
@@ -692,7 +692,7 @@ def test_error_from_json():
         )
     )
     assert error.name == "Foo"
-    assert str(error.fields) == "(address from, bytes foo, uint8 bar)"
+    assert str(error.fields) == "(address from_, bytes foo, uint8 bar)"
 
     with pytest.raises(
         ValueError,
