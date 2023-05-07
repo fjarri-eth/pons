@@ -286,6 +286,29 @@ def test_write_method_from_json():
     _check_write_method(write)
 
 
+def test_write_method_with_output():
+    # Mutating methods can have outputs (in case they are called by other mutating methods),
+    # but we cannot get that output from the outside.
+    # So if we see those in a JSON ABI, we can just ignore them.
+    write = WriteMethod.from_json(
+        dict(
+            type="function",
+            name="someMethod",
+            stateMutability="payable",
+            inputs=[
+                dict(type="uint8", name="a"),
+                dict(type="bool", name="b"),
+            ],
+            outputs=[
+                dict(type="uint8", name="a"),
+                dict(type="bool", name="b"),
+            ],
+        )
+    )
+
+    _check_write_method(write)
+
+
 def test_write_method_init():
     write = WriteMethod(name="someMethod", inputs=dict(a=abi.uint(8), b=abi.bool), payable=True)
 
@@ -298,30 +321,6 @@ def test_write_method_errors():
         match="WriteMethod object must be created from a JSON entry with type='function'",
     ):
         WriteMethod.from_json(dict(type="constructor"))
-
-    with pytest.raises(
-        ValueError, match="Mutating method's JSON entry cannot have non-empty `outputs`"
-    ):
-        WriteMethod.from_json(
-            dict(
-                type="function",
-                name="someMethod",
-                stateMutability="payable",
-                inputs=[dict(type="uint8", name="a")],
-                outputs=[dict(type="uint8", name="a")],
-            )
-        )
-
-    # This is fine
-    WriteMethod.from_json(
-        dict(
-            type="function",
-            name="someMethod",
-            stateMutability="payable",
-            inputs=[dict(type="uint8", name="a")],
-            outputs=[],
-        )
-    )
 
     with pytest.raises(
         ValueError,
@@ -439,8 +438,8 @@ def test_contract_abi_json():
         "    receive() payable\n"
         "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
-        "    event Deposit(address indexed from, bytes indexed foo, uint8 bar) anonymous\n"
-        "    error CustomError(address from, bytes foo, uint8 bar)\n"
+        "    event Deposit(address indexed from_, bytes indexed foo, uint8 bar) anonymous\n"
+        "    error CustomError(address from_, bytes foo, uint8 bar)\n"
         "}"
     )
 
@@ -560,7 +559,7 @@ def test_event_from_json():
     assert event.anonymous
     assert event.name == "Foo"
     assert event.indexed == {"from", "foo"}
-    assert str(event.fields) == "(address indexed from, bytes indexed foo, uint8 bar)"
+    assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
 
 
 def test_event_init():
@@ -692,7 +691,7 @@ def test_error_from_json():
         )
     )
     assert error.name == "Foo"
-    assert str(error.fields) == "(address from, bytes foo, uint8 bar)"
+    assert str(error.fields) == "(address from_, bytes foo, uint8 bar)"
 
     with pytest.raises(
         ValueError,

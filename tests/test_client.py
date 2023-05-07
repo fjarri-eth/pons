@@ -666,9 +666,9 @@ async def test_event_filter_high_level(
             another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(3)
         )
 
-    assert events[0] == {"from": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
-    assert events[1] == {"from": another_signer.address, "id": b"1111", "value": 2, "value2": 3}
-    assert events[2] == {"from": another_signer.address, "id": b"1111", "value": 3, "value2": 4}
+    assert events[0] == {"from_": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
+    assert events[1] == {"from_": another_signer.address, "id": b"1111", "value": 2, "value2": 3}
+    assert events[2] == {"from_": another_signer.address, "id": b"1111", "value": 3, "value2": 4}
 
 
 async def test_unknown_rpc_status_code(test_provider, session, monkeypatch):

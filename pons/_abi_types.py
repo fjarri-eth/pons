@@ -30,15 +30,15 @@ def encode_typed(types: Iterable[str], args: Iterable[ABIType]) -> bytes:
     # ``eth_abi.encode()`` does not have type annotations.
     # This is a typed wrapper (easier than making custom stubs).
     # Remove when typing is added in ``eth_abi``.
-    encoded = eth_abi.encode(types, args)  # type: ignore
-    return cast(bytes, encoded)
+    encoded = eth_abi.encode(types, args)
+    return encoded
 
 
 def decode_typed(types: Iterable[str], data: bytes) -> Tuple[ABIType, ...]:
     # ``eth_abi.decode()`` does not have type annotations.
     # This is a typed wrapper (easier than making custom stubs).
     # Remove when typing is added in ``eth_abi``.
-    decoded = eth_abi.decode(types, data)  # type: ignore
+    decoded = eth_abi.decode(types, data)
     return cast(Tuple[ABIType, ...], decoded)
 
 

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 import inspect
 from itertools import chain
+from keyword import iskeyword
 from typing import (
     Any,
     AbstractSet,
@@ -24,6 +25,17 @@ from ._entities import LogTopic, LogEntry
 from ._provider import JSON
 
 
+# We are using the `inspect` machinery to bind arguments to parameters.
+# From Py3.11 on it does not allow parameter names to coincide with keywords,
+# so we have to escape them.
+# This can be avoided if we write our own `inspect.Signature` implementation.
+def make_name_safe(name: str) -> str:
+    if iskeyword(name):
+        return name + "_"
+    else:
+        return name
+
+
 class Signature:
     """
     Generalized signature of either inputs or outputs of a method.
@@ -33,7 +45,7 @@ class Signature:
         if isinstance(parameters, Mapping):
             self._signature = inspect.Signature(
                 parameters=[
-                    inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                    inspect.Parameter(make_name_safe(name), inspect.Parameter.POSITIONAL_OR_KEYWORD)
                     for name, tp in parameters.items()
                 ]
             )
@@ -103,6 +115,8 @@ class EventSignature:
     """
 
     def __init__(self, parameters: Mapping[str, Type], indexed: AbstractSet[str]):
+        parameters = {make_name_safe(name): val for name, val in parameters.items()}
+        indexed = {make_name_safe(name) for name in indexed}
         self._signature = inspect.Signature(
             parameters=[
                 inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
@@ -234,6 +248,11 @@ class Method(ABC):
 class Constructor:
     """
     Contract constructor.
+
+    .. note::
+
+       If the name of a parameter given to the constructor matches a Python keyword,
+       ``_`` will be appended to it.
     """
 
     inputs: Signature
@@ -281,6 +300,11 @@ class Constructor:
 class ReadMethod(Method):
     """
     A non-mutating contract method.
+
+    .. note::
+
+       If the name of a parameter (input or output) given to the constructor
+       matches a Python keyword, ``_`` will be appended to it.
     """
 
     outputs: Signature
@@ -359,6 +383,11 @@ class ReadMethod(Method):
 class WriteMethod(Method):
     """
     A mutating contract method.
+
+    .. note::
+
+       If the name of a parameter given to the constructor matches a Python keyword,
+       ``_`` will be appended to it.
     """
 
     payable: bool
@@ -376,8 +405,6 @@ class WriteMethod(Method):
 
         name = method_entry["name"]
         inputs = dispatch_types(method_entry["inputs"])
-        if "outputs" in method_entry and method_entry["outputs"]:
-            raise ValueError("Mutating method's JSON entry cannot have non-empty `outputs`")
         if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
                 "Mutating method's JSON entry state mutability must be `nonpayable` or `payable`"
@@ -416,6 +443,11 @@ class WriteMethod(Method):
 class Event:
     """
     A contract event.
+
+    .. note::
+
+       If the name of a field given to the constructor matches a Python keyword,
+       ``_`` will be appended to it.
     """
 
     @classmethod
