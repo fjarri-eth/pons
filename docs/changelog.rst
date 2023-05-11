@@ -2,23 +2,23 @@ Changelog
 ---------
 
 
-0.6.0 (Unreleased)
+0.6.0 (11-05-2023)
 ~~~~~~~~~~~~~~~~~~
 
 Changed
-~~~~~~~
+^^^^^^^
 
 - Parameter names and fields coinciding with Python keywords have ``_`` appended to them on the creation of ABI objects. (PR_47_)
 
 
 Added
-~~~~~
+^^^^^
 
 - Added support for Python 3.11. (PR_47_)
 
 
 Fixed
-~~~~~
+^^^^^
 
 - Support the existence of outputs in the JSON ABI of a mutating method. (PR_47_)
 
