@@ -2,6 +2,18 @@ Changelog
 ---------
 
 
+0.6.1 (in development)
+~~~~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+- `Block.SAFE` and `Block.FINALIZED` values. (PR_48_)
+
+
+.. _PR_48: https://github.com/fjarri/pons/pull/48
+
+
 0.6.0 (11-05-2023)
 ~~~~~~~~~~~~~~~~~~
 

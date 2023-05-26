@@ -209,6 +209,8 @@ def test_encode_decode_block():
     assert rpc_encode_block(Block.LATEST) == "latest"
     assert rpc_encode_block(Block.EARLIEST) == "earliest"
     assert rpc_encode_block(Block.PENDING) == "pending"
+    assert rpc_encode_block(Block.SAFE) == "safe"
+    assert rpc_encode_block(Block.FINALIZED) == "finalized"
     assert rpc_encode_block(123) == "0x7b"
     assert rpc_decode_block("latest") == "latest"
     assert rpc_decode_block("earliest") == "earliest"

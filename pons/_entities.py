@@ -239,6 +239,12 @@ class Block(Enum):
     PENDING = "pending"
     """Currently pending block"""
 
+    SAFE = "safe"
+    """The latest safe head block"""
+
+    FINALIZED = "finalized"
+    """The latest finalized block"""
+
 
 class BlockFilter(TypedQuantity):
     """
