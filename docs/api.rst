@@ -23,6 +23,25 @@ Providers
    :show-inheritance:
 
 
+Fallback providers
+------------------
+
+.. autoclass:: FallbackProvider
+   :show-inheritance:
+
+.. autoclass:: CycleFallback
+   :show-inheritance:
+
+.. autoclass:: PriorityFallback
+   :show-inheritance:
+
+.. autoclass:: FallbackStrategyFactory
+   :members:
+
+.. autoclass:: FallbackStrategy
+   :members:
+
+
 Errors
 ------
 
@@ -217,6 +236,11 @@ Entities
 
 .. autoclass:: pons._entities.LogEntry()
    :members:
+
+.. class:: JSON
+
+   A JSON-ifiable object (``bool``, ``int``, ``float``, ``str``, ``None``,
+   iterable of ``JSON``, or mapping of ``str`` to ``JSON``).
 
 
 Solidity types

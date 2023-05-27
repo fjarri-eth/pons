@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Dict, Optional, Union, cast, Iterable, Mapping
+from typing import Any, AsyncIterator, Dict, Optional, Union, cast, Iterable, Mapping, Tuple
 
 import httpx
 
 
+# TODO: the doc entry had to be written manually for this type because of Sphinx limitations.
 JSON = Union[bool, int, float, str, None, Iterable["JSON"], Mapping[str, "JSON"]]
 
 
@@ -64,13 +65,33 @@ class ProviderSession(ABC):
     """
 
     @abstractmethod
-    async def rpc(self, method: str, *args: JSON) -> Any:
+    async def rpc(self, method: str, *args: JSON) -> JSON:
         """
         Calls the given RPC method with the already json-ified arguments.
         """
         ...
 
+    async def rpc_and_pin(self, method: str, *args: JSON) -> Tuple[JSON, Tuple[int, ...]]:
+        """
+        Calls the given RPC method and returns the path to the provider it succeded on.
+        This method will be typically overriden by multi-provider implementations.
+        """
+        return await self.rpc(method, *args), ()
+
+    async def rpc_at_pin(self, path: Tuple[int, ...], method: str, *args: JSON) -> JSON:
+        """
+        Calls the given RPC method at the provider by the given path
+        (obtained previously from ``rpc_and_pin()``).
+        This method will be typically overriden by multi-provider implementations.
+        """
+        if path != ():
+            raise ValueError(f"Unexpected provider path: {path}")
+        return await self.rpc(method, *args)
+
     async def rpc_dict(self, method: str, *args: JSON) -> Optional[ResponseDict]:
+        """
+        Calls the given RPC method expecting to get a dictionary (or ``null``) in response.
+        """
         result = await self.rpc(method, *args)
         if result is None:
             return None
