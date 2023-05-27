@@ -16,13 +16,10 @@ class ABIDecodingError(Exception):
     """
 
 
-# TODO: currently mypy does not support recursive type aliases,
-# make it recursive when it's possible.
-# See https://github.com/python/mypy/issues/731
-ABIType = Any
+ABIType = Union[int, str, bytes, bool, List["ABIType"]]
 """
-Represents the type that can be received from ``eth_decode()``.
-``ABIType = Union[int, str, bytes, bool, List[ABIType]]``
+Represents the argument type that can be received from ``eth_abi.decode()``,
+or passed to ``eth_abi.encode()``.
 """
 
 
@@ -168,7 +165,7 @@ class UInt(Type):
     def _normalize(self, val: Any) -> int:
         return self._check_val(val)
 
-    def _denormalize(self, val: Any) -> int:
+    def _denormalize(self, val: ABIType) -> int:
         return self._check_val(val)
 
     def __eq__(self, other: Any) -> bool:
@@ -206,7 +203,7 @@ class Int(Type):
     def _normalize(self, val: Any) -> int:
         return self._check_val(val)
 
-    def _denormalize(self, val: Any) -> int:
+    def _denormalize(self, val: ABIType) -> int:
         return self._check_val(val)
 
     def __eq__(self, other: Any) -> bool:
@@ -240,7 +237,7 @@ class Bytes(Type):
     def _normalize(self, val: Any) -> bytes:
         return self._check_val(val)
 
-    def _denormalize(self, val: Any) -> bytes:
+    def _denormalize(self, val: ABIType) -> bytes:
         return self._check_val(val)
 
     def _encode_to_topic_outer(self, val: bytes) -> bytes:
@@ -278,15 +275,17 @@ class AddressType(Type):
     def canonical_form(self) -> str:
         return "address"
 
-    def _normalize(self, val: Any) -> bytes:
+    def _normalize(self, val: Any) -> str:
         if not isinstance(val, Address):
             raise TypeError(
                 f"`address` must correspond to an `Address`-type value, "
                 f"got {type(val).__name__}"
             )
-        return bytes(val)
+        return val.checksum
 
-    def _denormalize(self, val: str) -> Address:
+    def _denormalize(self, val: ABIType) -> Address:
+        if not isinstance(val, str):
+            raise TypeError(f"Expected a string to convert to `Address`, got {type(val).__name__}")
         return Address.from_hex(val)
 
     def __eq__(self, other: Any) -> bool:
@@ -312,7 +311,7 @@ class String(Type):
     def _normalize(self, val: Any) -> str:
         return self._check_val(val)
 
-    def _denormalize(self, val: Any) -> str:
+    def _denormalize(self, val: ABIType) -> str:
         return self._check_val(val)
 
     def _encode_to_topic_outer(self, val: str) -> bytes:
@@ -350,7 +349,7 @@ class Bool(Type):
     def _normalize(self, val: Any) -> bool:
         return self._check_val(val)
 
-    def _denormalize(self, val: Any) -> bool:
+    def _denormalize(self, val: ABIType) -> bool:
         return self._check_val(val)
 
     def __eq__(self, other: Any) -> bool:
@@ -382,7 +381,7 @@ class Array(Type):
     def _normalize(self, val: Any) -> List[ABIType]:
         return [self._element_type._normalize(item) for item in self._check_val(val)]
 
-    def _denormalize(self, val: Any) -> List[ABIType]:
+    def _denormalize(self, val: ABIType) -> List[ABIType]:
         return [self._element_type._denormalize(item) for item in self._check_val(val)]
 
     def _encode_to_topic_outer(self, val: Any) -> bytes:
@@ -432,7 +431,7 @@ class Struct(Type):
             tp._normalize(item) for item, tp in zip(self._check_val(val), self._fields.values())
         ]
 
-    def _denormalize(self, val: Any) -> Dict[str, ABIType]:
+    def _denormalize(self, val: ABIType) -> Dict[str, ABIType]:
         return {
             name: tp._denormalize(item)
             for item, (name, tp) in zip(self._check_val(val), self._fields.items())
