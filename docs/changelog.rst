@@ -8,10 +8,13 @@ Changelog
 Added
 ^^^^^
 
-- `Block.SAFE` and `Block.FINALIZED` values. (PR_48_)
+- ``Block.SAFE`` and ``Block.FINALIZED`` values. (PR_48_)
+- ``FallbackProvider``, two strategies for it (``CycleFallback`` and ``PriorityFallback``), and a framework for creating user-defined strategies (``FallbackStrategy`` and ``FallbackStrategyFactory``). (PR_49_)
 
 
 .. _PR_48: https://github.com/fjarri/pons/pull/48
+.. _PR_49: https://github.com/fjarri/pons/pull/49
+
 
 
 0.6.0 (11-05-2023)

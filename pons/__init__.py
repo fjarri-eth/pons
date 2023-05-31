@@ -28,5 +28,12 @@ from ._entities import (
     TxHash,
     BlockHash,
 )
-from ._provider import HTTPProvider, Unreachable
+from ._fallback_provider import (
+    FallbackProvider,
+    FallbackStrategy,
+    FallbackStrategyFactory,
+    CycleFallback,
+    PriorityFallback,
+)
+from ._provider import HTTPProvider, Unreachable, JSON
 from ._signer import Signer, AccountSigner

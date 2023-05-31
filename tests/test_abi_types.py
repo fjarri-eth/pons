@@ -95,11 +95,11 @@ def test_bytes():
 
 
 def test_address():
-    addr_bytes = b"\x01" * 20
+    addr_bytes = os.urandom(20)
     addr = Address(addr_bytes)
 
-    assert abi.address._normalize(addr) == addr_bytes
-    assert abi.address._denormalize(addr_bytes) == addr
+    assert abi.address._normalize(addr) == addr.checksum
+    assert abi.address._denormalize(addr.checksum) == addr
 
     assert abi.address.canonical_form == "address"
 
@@ -107,6 +107,9 @@ def test_address():
         TypeError, match="`address` must correspond to an `Address`-type value, got str"
     ):
         abi.address._normalize("0x" + "01" * 20)
+
+    with pytest.raises(TypeError, match="Expected a string to convert to `Address`, got bytes"):
+        abi.address._denormalize(addr_bytes)
 
 
 def test_string():
@@ -239,7 +242,7 @@ def test_normalization_roundtrip():
 
     value = dict(field1=1, field2=[2, 3], field3=addr, field4=dict(inner2="abcd", inner1=True))
 
-    expected_normalized = [1, [2, 3], bytes(addr), [True, "abcd"]]
+    expected_normalized = [1, [2, 3], addr.checksum, [True, "abcd"]]
 
     # normalize() loses info on struct field names
     assert struct._normalize(value) == expected_normalized

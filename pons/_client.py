@@ -54,6 +54,9 @@ from ._entities import (
     BlockFilter,
     PendingTransactionFilter,
     LogFilter,
+    BlockFilterId,
+    PendingTransactionFilterId,
+    LogFilterId,
     LogEntry,
     BlockHash,
     TxHash,
@@ -714,16 +717,20 @@ class ClientSession:
         """
         Calls the ``eth_newBlockFilter`` RPC method.
         """
-        result = await self._provider_session.rpc("eth_newBlockFilter")
-        return BlockFilter.rpc_decode(result)
+        result, provider_path = await self._provider_session.rpc_and_pin("eth_newBlockFilter")
+        filter_id = BlockFilterId.rpc_decode(result)
+        return BlockFilter(id=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_newPendingTransactionFilter")
     async def eth_new_pending_transaction_filter(self) -> PendingTransactionFilter:
         """
         Calls the ``eth_newPendingTransactionFilter`` RPC method.
         """
-        result = await self._provider_session.rpc("eth_newPendingTransactionFilter")
-        return PendingTransactionFilter.rpc_decode(result)
+        result, provider_path = await self._provider_session.rpc_and_pin(
+            "eth_newPendingTransactionFilter"
+        )
+        filter_id = PendingTransactionFilterId.rpc_decode(result)
+        return PendingTransactionFilter(id=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_newFilter")
     async def eth_new_filter(
@@ -753,8 +760,9 @@ class ClientSession:
                     encoded_topics.append([elem.rpc_encode() for elem in topic])
             params["topics"] = encoded_topics
 
-        result = await self._provider_session.rpc("eth_newFilter", params)
-        return LogFilter.rpc_decode(result)
+        result, provider_path = await self._provider_session.rpc_and_pin("eth_newFilter", params)
+        filter_id = LogFilterId.rpc_decode(result)
+        return LogFilter(id=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_getFilterChangers")
     async def eth_get_filter_changes(
@@ -765,7 +773,13 @@ class ClientSession:
         Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
         # TODO: split into separate functions wiht specific return types?
-        results = await self._provider_session.rpc("eth_getFilterChanges", filter_.rpc_encode())
+        results = await self._provider_session.rpc_at_pin(
+            filter_.provider_path, "eth_getFilterChanges", filter_.id.rpc_encode()
+        )
+
+        # TODO: this will go away with generalized RPC decoding.
+        if not isinstance(results, list):
+            raise UnexpectedResponse(f"Expected a list as a response, got {type(results).__name__}")
 
         if isinstance(filter_, BlockFilter):
             return tuple(BlockHash.rpc_decode(elem) for elem in results)

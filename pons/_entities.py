@@ -246,22 +246,37 @@ class Block(Enum):
     """The latest finalized block"""
 
 
-class BlockFilter(TypedQuantity):
+class BlockFilterId(TypedQuantity):
     """
     A block filter identifier (returned by ``eth_newBlockFilter``).
     """
 
 
-class PendingTransactionFilter(TypedQuantity):
+class PendingTransactionFilterId(TypedQuantity):
     """
     A pending transaction filter identifier (returned by ``eth_newPendingTransactionFilter``).
     """
 
 
-class LogFilter(TypedQuantity):
+class LogFilterId(TypedQuantity):
     """
     A log filter identifier (returned by ``eth_newFilter``).
     """
+
+
+class BlockFilter(NamedTuple):
+    id: BlockFilterId
+    provider_path: Tuple[int, ...]
+
+
+class PendingTransactionFilter(NamedTuple):
+    id: PendingTransactionFilterId
+    provider_path: Tuple[int, ...]
+
+
+class LogFilter(NamedTuple):
+    id: LogFilterId
+    provider_path: Tuple[int, ...]
 
 
 class LogTopic(TypedData):

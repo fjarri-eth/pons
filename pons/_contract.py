@@ -8,7 +8,6 @@ from ._contract_abi import (
     Event,
     EventFilter,
     Error,
-    Any,
 )
 from ._entities import Address, LogEntry, LogTopic
 from ._provider import JSON

@@ -388,6 +388,17 @@ async def test_eth_get_transaction_by_hash(test_provider, session, root_signer, 
     assert tx_info is None
 
 
+async def test_eth_get_filter_changes_bad_response(test_provider, session, monkeypatch):
+    monkeypatch.setattr(test_provider, "eth_get_filter_changes", lambda filter_id: {"foo": 1})
+
+    block_filter = await session.eth_new_block_filter()
+
+    with pytest.raises(
+        BadResponseFormat, match=r"eth_getFilterChangers: Expected a list as a response, got dict"
+    ):
+        await session.eth_get_filter_changes(block_filter)
+
+
 async def test_block_filter(test_provider, session, root_signer, another_signer):
     to_transfer = Amount.ether(1)
 

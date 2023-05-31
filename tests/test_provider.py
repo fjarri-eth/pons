@@ -1,9 +1,11 @@
+from contextlib import asynccontextmanager
+
 import trio
 import pytest
 
 from pons import Client, Amount, HTTPProvider, Unreachable
 from pons._client import ProviderError, BadResponseFormat
-from pons._provider import ResponseDict, UnexpectedResponse, RPCError
+from pons._provider import ResponseDict, UnexpectedResponse, RPCError, Provider, ProviderSession
 
 from .provider_server import ServerHandle
 from . import provider_server  # For monkeypatching purposes
@@ -182,3 +184,25 @@ async def test_unreachable_provider():
                 Unreachable, match=r"all attempts to connect to 127\.0\.0\.1:8889 failed"
             ):
                 await session.net_version()
+
+
+async def test_default_implementations():
+    class MockProvider(Provider):
+        @asynccontextmanager
+        async def session(self):
+            yield MockSession()
+
+    class MockSession(ProviderSession):
+        async def rpc(self, method, *args):
+            return method
+
+    provider = MockProvider()
+    async with provider.session() as session:
+        result = await session.rpc_and_pin("1")
+        assert result == ("1", ())
+
+        result = await session.rpc_at_pin((), "2")
+        assert result == "2"
+
+        with pytest.raises(ValueError, match=r"Unexpected provider path: \(1,\)"):
+            await session.rpc_at_pin((1,), "3")
