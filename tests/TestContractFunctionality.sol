@@ -29,6 +29,11 @@ contract Test {
         v2 = 2;
     }
 
+    function setStateAndReturn(uint256 _v1) public returns (uint256) {
+        v1 = v1 + _v1;
+        return v1;
+    }
+
     function setState(uint256 _v1) public {
         v1 = _v1;
     }

@@ -54,6 +54,37 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
     assert result == (inner, outer)
 
 
+async def test_read_only_mode(session, root_signer, compiled_contracts):
+    # Test that a "nonpayable" (that is, mutating) method can still be invoked
+    # via `eth_call`, and it will use the current state of the contract
+    # in a "copy-on-write" mode, where it will be able to make changes,
+    # but they will not be saved.
+
+    compiled_contract = compiled_contracts["Test"]
+
+    value = 12345
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(value, 0))
+
+    # check the state
+    result = await session.eth_call(deployed_contract.method.getState(0))
+    assert result == (value,)
+
+    # this method will not modify the state since it's invoked via `eth_call`,
+    # but it will return a value that reflects the ethereal "modified" state.
+    result = await session.eth_call(deployed_contract.method.setStateAndReturn(1))
+    assert result == (value + 1,)
+
+    result = await session.eth_call(deployed_contract.method.getState(0))
+    assert result == (value,)
+
+    # Now invoke it as a transaction, allowing it to modify the state
+    await session.transact(root_signer, deployed_contract.method.setStateAndReturn(1))
+
+    # The state is now modified
+    result = await session.eth_call(deployed_contract.method.getState(0))
+    assert result == (value + 1,)
+
+
 async def test_abi_declaration(session, root_signer, another_signer, compiled_contracts):
     compiled_contract = compiled_contracts["Test"]
 
