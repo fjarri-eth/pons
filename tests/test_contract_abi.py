@@ -6,8 +6,7 @@ import pytest
 from pons import (
     abi,
     Constructor,
-    ReadMethod,
-    WriteMethod,
+    Method,
     Fallback,
     Receive,
     ContractABI,
@@ -15,6 +14,7 @@ from pons import (
     Error,
     Either,
     ABIDecodingError,
+    Mutability,
 )
 from pons._abi_types import keccak, encode_args
 from pons._contract_abi import (
@@ -147,28 +147,28 @@ def test_constructor_errors():
         Constructor.from_json(dict(type="constructor", stateMutability="view"))
 
 
-def _check_read_method(read):
-    assert read.name == "someMethod"
-    assert read.inputs.canonical_form == "(uint8,bool)"
-    assert str(read.inputs) == "(uint8 a, bool b)"
-    assert read.outputs.canonical_form == "(uint8,bool)"
+def _check_method(method):
+    assert method.name == "someMethod"
+    assert method.inputs.canonical_form == "(uint8,bool)"
+    assert str(method.inputs) == "(uint8 a, bool b)"
+    assert method.outputs.canonical_form == "(uint8,bool)"
 
     encoded_bytes = b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x01"
 
-    rcall = read(1, True)
-    assert rcall.data_bytes == read.selector + encoded_bytes
+    call = method(1, True)
+    assert call.data_bytes == method.selector + encoded_bytes
 
-    vals = read.decode_output(encoded_bytes)
+    vals = method.decode_output(encoded_bytes)
     assert vals == (1, True)
 
     # A regression for a typo in argument passing.
     # Check that keyword arguments are processed correctly.
-    rcall = read(1, b=True)
-    assert rcall.data_bytes == read.selector + encoded_bytes
+    call = method(1, b=True)
+    assert call.data_bytes == method.selector + encoded_bytes
 
 
-def test_read_method_from_json_anonymous_outputs():
-    read = ReadMethod.from_json(
+def test_method_from_json_anonymous_outputs():
+    method = Method.from_json(
         dict(
             type="function",
             name="someMethod",
@@ -184,12 +184,12 @@ def test_read_method_from_json_anonymous_outputs():
         )
     )
 
-    assert str(read.outputs) == "(uint8, bool)"
-    _check_read_method(read)
+    assert str(method.outputs) == "(uint8, bool)"
+    _check_method(method)
 
 
-def test_read_method_from_json_named_outputs():
-    read = ReadMethod.from_json(
+def test_method_from_json_named_outputs():
+    method = Method.from_json(
         dict(
             type="function",
             name="someMethod",
@@ -205,135 +205,55 @@ def test_read_method_from_json_named_outputs():
         )
     )
 
-    assert str(read.outputs) == "(uint8 c, bool d)"
-    _check_read_method(read)
+    assert str(method.outputs) == "(uint8 c, bool d)"
+    _check_method(method)
 
 
-def test_read_method_init():
-    read = ReadMethod(
+def test_method_init():
+    method = Method(
         name="someMethod",
+        mutability=Mutability.VIEW,
         inputs=dict(a=abi.uint(8), b=abi.bool),
         outputs=dict(c=abi.uint(8), d=abi.bool),
     )
 
-    assert str(read.outputs) == "(uint8 c, bool d)"
-    _check_read_method(read)
+    assert str(method.outputs) == "(uint8 c, bool d)"
+    _check_method(method)
 
 
-def test_read_method_single_output():
-    read = ReadMethod(
-        name="someMethod", inputs=dict(a=abi.uint(8), b=abi.bool), outputs=abi.uint(8)
+def test_method_single_output():
+    method = Method(
+        name="someMethod",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8), b=abi.bool),
+        outputs=abi.uint(8),
     )
 
-    assert read.outputs.canonical_form == "(uint8)"
-    assert str(read.outputs) == "(uint8)"
+    assert method.outputs.canonical_form == "(uint8)"
+    assert str(method.outputs) == "(uint8)"
 
     encoded_bytes = b"\x00" * 31 + b"\x01"
-    assert read.decode_output(encoded_bytes) == 1
+    assert method.decode_output(encoded_bytes) == 1
 
 
-def test_read_method_errors():
+def test_method_errors():
     with pytest.raises(
-        ValueError, match="ReadMethod object must be created from a JSON entry with type='function'"
+        ValueError, match="Method object must be created from a JSON entry with type='function'"
     ):
-        ReadMethod.from_json(dict(type="constructor"))
+        Method.from_json(dict(type="constructor"))
 
-    with pytest.raises(
-        ValueError,
-        match="Non-mutating method's JSON entry state mutability must be `pure` or `view`",
-    ):
-        ReadMethod.from_json(
-            dict(
-                type="function",
-                name="someMethod",
-                stateMutability="nonpayable",
-                inputs=[dict(type="uint8", name="a")],
-                outputs=[dict(type="uint8", name="")],
-            )
-        )
-
-
-def _check_write_method(write):
-    assert write.name == "someMethod"
-    assert write.inputs.canonical_form == "(uint8,bool)"
-    assert str(write.inputs) == "(uint8 a, bool b)"
-    assert write.payable
-
-    encoded_bytes = b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x01"
-
-    wcall = write(1, True)
-    assert wcall.data_bytes == write.selector + encoded_bytes
-
-    # A regression for a typo in argument passing.
-    # Check that keyword arguments are processed correctly.
-    wcall = write(1, b=True)
-    assert wcall.data_bytes == write.selector + encoded_bytes
-
-
-def test_write_method_from_json():
-    write = WriteMethod.from_json(
-        dict(
-            type="function",
-            name="someMethod",
-            stateMutability="payable",
-            inputs=[
-                dict(type="uint8", name="a"),
-                dict(type="bool", name="b"),
-            ],
-        )
+    json = dict(
+        type="function",
+        name="someMethod",
+        stateMutability="invalid",
+        inputs=[
+            dict(type="uint8", name="a"),
+            dict(type="bool", name="b"),
+        ],
     )
 
-    _check_write_method(write)
-
-
-def test_write_method_with_output():
-    # Mutating methods can have outputs (in case they are called by other mutating methods),
-    # but we cannot get that output from the outside.
-    # So if we see those in a JSON ABI, we can just ignore them.
-    write = WriteMethod.from_json(
-        dict(
-            type="function",
-            name="someMethod",
-            stateMutability="payable",
-            inputs=[
-                dict(type="uint8", name="a"),
-                dict(type="bool", name="b"),
-            ],
-            outputs=[
-                dict(type="uint8", name="a"),
-                dict(type="bool", name="b"),
-            ],
-        )
-    )
-
-    _check_write_method(write)
-
-
-def test_write_method_init():
-    write = WriteMethod(name="someMethod", inputs=dict(a=abi.uint(8), b=abi.bool), payable=True)
-
-    _check_write_method(write)
-
-
-def test_write_method_errors():
-    with pytest.raises(
-        ValueError,
-        match="WriteMethod object must be created from a JSON entry with type='function'",
-    ):
-        WriteMethod.from_json(dict(type="constructor"))
-
-    with pytest.raises(
-        ValueError,
-        match="Mutating method's JSON entry state mutability must be `nonpayable` or `payable`",
-    ):
-        WriteMethod.from_json(
-            dict(
-                type="function",
-                name="someMethod",
-                stateMutability="view",
-                inputs=[dict(type="uint8", name="a")],
-            )
-        )
+    with pytest.raises(ValueError, match="Unknown mutability identifier: invalid"):
+        Method.from_json(json)
 
 
 def test_fallback():
@@ -436,7 +356,7 @@ def test_contract_abi_json():
         "    constructor(uint8 a, bool b) payable\n"
         "    fallback() payable\n"
         "    receive() payable\n"
-        "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
+        "    function readMethod(uint8 a, bool b) view returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
         "    event Deposit(address indexed from_, bytes indexed foo, uint8 bar) anonymous\n"
         "    error CustomError(address from_, bytes foo, uint8 bar)\n"
@@ -446,8 +366,8 @@ def test_contract_abi_json():
     assert isinstance(cabi.constructor, Constructor)
     assert isinstance(cabi.fallback, Fallback)
     assert isinstance(cabi.receive, Receive)
-    assert isinstance(cabi.read.readMethod, ReadMethod)
-    assert isinstance(cabi.write.writeMethod, WriteMethod)
+    assert isinstance(cabi.method.readMethod, Method)
+    assert isinstance(cabi.method.writeMethod, Method)
     assert isinstance(cabi.event.Deposit, Event)
     assert isinstance(cabi.error.CustomError, Error)
 
@@ -455,15 +375,18 @@ def test_contract_abi_json():
 def test_contract_abi_init():
     cabi = ContractABI(
         constructor=Constructor(inputs=dict(a=abi.uint(8), b=abi.bool), payable=True),
-        write=[
-            WriteMethod(name="writeMethod", inputs=dict(a=abi.uint(8), b=abi.bool), payable=True)
-        ],
-        read=[
-            ReadMethod(
+        methods=[
+            Method(
                 name="readMethod",
+                mutability=Mutability.VIEW,
                 inputs=dict(a=abi.uint(8), b=abi.bool),
                 outputs=[abi.uint(8), abi.bool],
-            )
+            ),
+            Method(
+                name="writeMethod",
+                mutability=Mutability.PAYABLE,
+                inputs=dict(a=abi.uint(8), b=abi.bool),
+            ),
         ],
         events=[
             Event(
@@ -488,7 +411,7 @@ def test_contract_abi_init():
         "    constructor(uint8 a, bool b) payable\n"
         "    fallback() payable\n"
         "    receive() payable\n"
-        "    function readMethod(uint8 a, bool b) returns (uint8, bool)\n"
+        "    function readMethod(uint8 a, bool b) view returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
         "    event Deposit(address indexed from_, bytes indexed foo, uint8 bar) anonymous\n"
         "    error CustomError(address from_, bytes foo, uint8 bar)\n"
@@ -498,8 +421,8 @@ def test_contract_abi_init():
     assert isinstance(cabi.constructor, Constructor)
     assert isinstance(cabi.fallback, Fallback)
     assert isinstance(cabi.receive, Receive)
-    assert isinstance(cabi.read.readMethod, ReadMethod)
-    assert isinstance(cabi.write.writeMethod, WriteMethod)
+    assert isinstance(cabi.method.readMethod, Method)
+    assert isinstance(cabi.method.writeMethod, Method)
 
 
 def test_no_constructor():

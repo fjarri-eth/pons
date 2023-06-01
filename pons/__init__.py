@@ -12,13 +12,13 @@ from ._client import (
 from ._contract_abi import (
     ContractABI,
     Constructor,
-    ReadMethod,
-    WriteMethod,
+    Method,
     Event,
     Error,
     Fallback,
     Receive,
     Either,
+    Mutability,
 )
 from ._contract import CompiledContract, DeployedContract
 from ._entities import (

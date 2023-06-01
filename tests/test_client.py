@@ -12,7 +12,7 @@ from pons import (
     Amount,
     ContractABI,
     DeployedContract,
-    ReadMethod,
+    Method,
     TxHash,
     BlockHash,
     Block,
@@ -20,6 +20,7 @@ from pons import (
     ContractPanic,
     ContractLegacyError,
     ContractError,
+    Mutability,
 )
 from pons._abi_types import keccak, encode_args
 from pons._contract_abi import PANIC_ERROR
@@ -159,7 +160,7 @@ async def test_wait_for_transaction_receipt(
 async def test_eth_call(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
-    result = await session.eth_call(deployed_contract.read.getState(456))
+    result = await session.eth_call(deployed_contract.method.getState(456))
     assert result == (123 + 456,)
 
 
@@ -172,9 +173,10 @@ async def test_eth_call_decoding_error(session, compiled_contracts, root_signer)
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
 
     wrong_abi = ContractABI(
-        read=[
-            ReadMethod(
+        methods=[
+            Method(
                 name="getState",
+                mutability=Mutability.VIEW,
                 inputs=[abi.uint(256)],
                 # the actual method in in BasicContract returns only one uint256
                 outputs=[abi.uint(256), abi.uint(256)],
@@ -189,7 +191,7 @@ async def test_eth_call_decoding_error(session, compiled_contracts, root_signer)
     )
 
     with pytest.raises(ABIDecodingError, match=expected_message):
-        await session.eth_call(wrong_contract.read.getState(456))
+        await session.eth_call(wrong_contract.method.getState(456))
 
 
 async def test_estimate_deploy(session, compiled_contracts):
@@ -216,7 +218,7 @@ async def test_estimate_transfer(session, root_signer, another_signer):
 async def test_estimate_transact(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(1))
-    gas = await session.estimate_transact(deployed_contract.write.setState(456))
+    gas = await session.estimate_transact(deployed_contract.method.setState(456))
     assert isinstance(gas, int) and gas > 0
 
 
@@ -286,7 +288,7 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
 
     # Normal deploy
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
-    result = await session.eth_call(deployed_contract.read.getState(456))
+    result = await session.eth_call(deployed_contract.method.getState(456))
     assert result == (123 + 456,)
 
     with pytest.raises(ValueError, match="This constructor does not accept an associated payment"):
@@ -331,26 +333,31 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
 
     # Normal transact
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
-    await session.transact(root_signer, deployed_contract.write.setState(456))
-    result = await session.eth_call(deployed_contract.read.getState(789))
+    await session.transact(root_signer, deployed_contract.method.setState(456))
+    result = await session.eth_call(deployed_contract.method.getState(789))
     assert result == (456 + 789,)
 
+    with pytest.raises(
+        ValueError, match="This method is non-mutating, use `eth_call` to invoke it"
+    ):
+        await session.transact(root_signer, deployed_contract.method.getState(456))
+
     with pytest.raises(ValueError, match="This method does not accept an associated payment"):
-        await session.transact(root_signer, deployed_contract.write.setState(456), Amount.ether(1))
+        await session.transact(root_signer, deployed_contract.method.setState(456), Amount.ether(1))
 
     # Explicit payment equal to zero is the same as no payment
-    await session.transact(root_signer, deployed_contract.write.setState(456), Amount.ether(0))
+    await session.transact(root_signer, deployed_contract.method.setState(456), Amount.ether(0))
 
     # Payable transact
     await session.transact(
-        root_signer, deployed_contract.write.payableSetState(456), Amount.ether(1)
+        root_signer, deployed_contract.method.payableSetState(456), Amount.ether(1)
     )
     balance = await session.eth_get_balance(deployed_contract.address)
     assert balance == Amount.ether(1)
 
     # Not enough gas
     with pytest.raises(TransactionFailed, match="Transact failed"):
-        await session.transact(root_signer, deployed_contract.write.faultySetState(0), gas=300000)
+        await session.transact(root_signer, deployed_contract.method.faultySetState(0), gas=300000)
 
 
 async def test_get_block(test_provider, session, root_signer, another_signer):
@@ -443,8 +450,8 @@ async def test_log_filter_all(session, compiled_contracts, root_signer, another_
     contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
 
     log_filter = await session.eth_new_filter()
-    await session.transact(root_signer, contract1.write.deposit(b"1234"))
-    await session.transact(another_signer, contract2.write.deposit2(b"4567"))
+    await session.transact(root_signer, contract1.method.deposit(b"1234"))
+    await session.transact(another_signer, contract2.method.deposit2(b"4567"))
 
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
@@ -470,8 +477,8 @@ async def test_log_filter_by_address(session, compiled_contracts, root_signer, a
     # Filter by a single address
 
     log_filter = await session.eth_new_filter(source=contract2.address)
-    await session.transact(root_signer, contract1.write.deposit(b"1234"))
-    await session.transact(root_signer, contract2.write.deposit2(b"4567"))
+    await session.transact(root_signer, contract1.method.deposit(b"1234"))
+    await session.transact(root_signer, contract2.method.deposit2(b"4567"))
 
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 1
@@ -486,9 +493,9 @@ async def test_log_filter_by_address(session, compiled_contracts, root_signer, a
     contract3 = await session.deploy(another_signer, basic_contract.constructor(123))
 
     log_filter = await session.eth_new_filter(source=[contract1.address, contract3.address])
-    await session.transact(root_signer, contract1.write.deposit(b"1111"))
-    await session.transact(root_signer, contract2.write.deposit(b"2222"))
-    await session.transact(root_signer, contract3.write.deposit(b"3333"))
+    await session.transact(root_signer, contract1.method.deposit(b"1111"))
+    await session.transact(root_signer, contract2.method.deposit(b"2222"))
+    await session.transact(root_signer, contract3.method.deposit(b"3333"))
 
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
@@ -514,13 +521,13 @@ async def test_log_filter_by_topic(session, compiled_contracts, root_signer, ano
 
     log_filter = await session.eth_new_filter(event_filter=contract2.abi.event.Deposit2(id=b"4567"))
     # filtered out, wrong event type
-    await session.transact(root_signer, contract1.write.deposit(b"4567"))
+    await session.transact(root_signer, contract1.method.deposit(b"4567"))
     # matches the filter
-    await session.transact(root_signer, contract1.write.deposit2(b"4567"))
+    await session.transact(root_signer, contract1.method.deposit2(b"4567"))
     # filtered out, wrong value
-    await session.transact(another_signer, contract2.write.deposit2(b"7890"))
+    await session.transact(another_signer, contract2.method.deposit2(b"7890"))
     # matches the filter
-    await session.transact(another_signer, contract2.write.deposit2(b"4567"))
+    await session.transact(another_signer, contract2.method.deposit2(b"4567"))
 
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
@@ -539,10 +546,10 @@ async def test_log_filter_by_topic(session, compiled_contracts, root_signer, ano
 
     event_filter = contract1.abi.event.Deposit(id=Either(b"1111", b"3333"))
     log_filter = await session.eth_new_filter(event_filter=event_filter)
-    await session.transact(root_signer, contract1.write.deposit(b"1111"))
-    await session.transact(root_signer, contract1.write.deposit2(b"1111"))  # filtered out
-    await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filtered out
-    await session.transact(another_signer, contract2.write.deposit(b"3333"))
+    await session.transact(root_signer, contract1.method.deposit(b"1111"))
+    await session.transact(root_signer, contract1.method.deposit2(b"1111"))  # filtered out
+    await session.transact(root_signer, contract1.method.deposit(b"2222"))  # filtered out
+    await session.transact(another_signer, contract2.method.deposit(b"3333"))
 
     entries = await session.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
@@ -563,12 +570,12 @@ async def test_log_filter_by_block_num(session, compiled_contracts, root_signer,
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
 
-    await session.transact(root_signer, contract1.write.deposit(b"1111"))
+    await session.transact(root_signer, contract1.method.deposit(b"1111"))
     block_num = await session.eth_block_number()
-    await session.transact(root_signer, contract1.write.deposit(b"2222"))  # filter will start here
-    await session.transact(root_signer, contract1.write.deposit(b"3333"))
-    await session.transact(root_signer, contract1.write.deposit(b"4444"))  # filter will stop here
-    await session.transact(root_signer, contract1.write.deposit(b"5555"))
+    await session.transact(root_signer, contract1.method.deposit(b"2222"))  # filter will start here
+    await session.transact(root_signer, contract1.method.deposit(b"3333"))
+    await session.transact(root_signer, contract1.method.deposit(b"4444"))  # filter will stop here
+    await session.transact(root_signer, contract1.method.deposit(b"5555"))
 
     log_filter = await session.eth_new_filter(from_block=block_num + 1, to_block=block_num + 3)
     entries = await session.eth_get_filter_changes(log_filter)
@@ -663,18 +670,20 @@ async def test_event_filter_high_level(
         await trio.sleep(2)
 
         # filtered out, wrong event type
-        await session.transact(root_signer, contract1.write.deposit(b"1111"))
+        await session.transact(root_signer, contract1.method.deposit(b"1111"))
         # filtered out, wrong contract address
-        await session.transact(root_signer, contract1.write.deposit2(b"1111"))
+        await session.transact(root_signer, contract1.method.deposit2(b"1111"))
         # filtered out, wrong value
-        await session.transact(another_signer, contract2.write.deposit2(b"7890"))
+        await session.transact(another_signer, contract2.method.deposit2(b"7890"))
         # matches the filter
-        await session.transact(root_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(1))
         await session.transact(
-            another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(2)
+            root_signer, contract2.method.deposit2(b"1111"), amount=Amount.wei(1)
         )
         await session.transact(
-            another_signer, contract2.write.deposit2(b"1111"), amount=Amount.wei(3)
+            another_signer, contract2.method.deposit2(b"1111"), amount=Amount.wei(2)
+        )
+        await session.transact(
+            another_signer, contract2.method.deposit2(b"1111"), amount=Amount.wei(3)
         )
 
     assert events[0] == {"from_": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
@@ -716,7 +725,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
         expected_message="execution reverted",
         expected_data=None,
     )
-    await check_rpc_error(session.eth_call(contract.read.viewError(0)), **kwargs)
+    await check_rpc_error(session.eth_call(contract.method.viewError(0)), **kwargs)
 
     # `require(condition, message)`
     kwargs = dict(
@@ -724,7 +733,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
         expected_message="execution reverted: require(string)",
         expected_data=error_selector + encode_args((abi.string, "require(string)")),
     )
-    await check_rpc_error(session.eth_call(contract.read.viewError(1)), **kwargs)
+    await check_rpc_error(session.eth_call(contract.method.viewError(1)), **kwargs)
 
     # `revert()`
     kwargs = dict(
@@ -732,7 +741,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
         expected_message="execution reverted",
         expected_data=None,
     )
-    await check_rpc_error(session.eth_call(contract.read.viewError(2)), **kwargs)
+    await check_rpc_error(session.eth_call(contract.method.viewError(2)), **kwargs)
 
     # `revert(message)`
     kwargs = dict(
@@ -740,7 +749,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
         expected_message="execution reverted: revert(string)",
         expected_data=error_selector + encode_args((abi.string, "revert(string)")),
     )
-    await check_rpc_error(session.eth_call(contract.read.viewError(3)), **kwargs)
+    await check_rpc_error(session.eth_call(contract.method.viewError(3)), **kwargs)
 
     # `revert CustomError(...)`
     kwargs = dict(
@@ -748,7 +757,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
         expected_message="execution reverted",
         expected_data=custom_error_selector + encode_args((abi.uint(256), 4)),
     )
-    await check_rpc_error(session.eth_call(contract.read.viewError(4)), **kwargs)
+    await check_rpc_error(session.eth_call(contract.method.viewError(4)), **kwargs)
 
 
 async def test_contract_panics(session, root_signer, compiled_contracts):
@@ -758,14 +767,14 @@ async def test_contract_panics(session, root_signer, compiled_contracts):
     panic_selector = keccak(b"Panic(uint256)")[:4]
 
     await check_rpc_error(
-        session.eth_call(contract.read.viewPanic(0)),
+        session.eth_call(contract.method.viewPanic(0)),
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=panic_selector + encode_args((abi.uint(256), 0x01)),
     )
 
     await check_rpc_error(
-        session.eth_call(contract.read.viewPanic(1)),
+        session.eth_call(contract.method.viewPanic(1)),
         expected_code=ProviderError.Code.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=panic_selector + encode_args((abi.uint(256), 0x11)),
@@ -777,19 +786,19 @@ async def test_contract_exceptions_high_level(session, root_signer, compiled_con
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
     with pytest.raises(ContractPanic) as exc:
-        await session.estimate_transact(contract.write.transactPanic(1))
+        await session.estimate_transact(contract.method.transactPanic(1))
     assert exc.value.reason == ContractPanic.Reason.OVERFLOW
 
     with pytest.raises(ContractLegacyError) as exc:
-        await session.estimate_transact(contract.write.transactError(0))
+        await session.estimate_transact(contract.method.transactError(0))
     assert exc.value.message == ""
 
     with pytest.raises(ContractLegacyError) as exc:
-        await session.estimate_transact(contract.write.transactError(1))
+        await session.estimate_transact(contract.method.transactError(1))
     assert exc.value.message == "require(string)"
 
     with pytest.raises(ContractError) as exc:
-        await session.estimate_transact(contract.write.transactError(4))
+        await session.estimate_transact(contract.method.transactError(4))
     assert exc.value.error == contract.error.CustomError
     assert exc.value.data == {"x": 4}
 
@@ -816,7 +825,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
-            await session.estimate_transact(contract.write.transactPanic(999))
+            await session.estimate_transact(contract.method.transactPanic(999))
 
     # Provider returns an unknown error (a selector not present in the ABI)
 
@@ -831,7 +840,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
         with pytest.raises(
             ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
         ):
-            await session.estimate_transact(contract.write.transactPanic(999))
+            await session.estimate_transact(contract.method.transactPanic(999))
 
     # Provider returns an error with an unknown RPC code
 
@@ -842,4 +851,4 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
-            await session.estimate_transact(contract.write.transactPanic(999))
+            await session.estimate_transact(contract.method.transactPanic(999))

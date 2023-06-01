@@ -2,15 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pons import (
-    Amount,
-    ContractABI,
-    abi,
-    Constructor,
-    ReadMethod,
-    WriteMethod,
-    DeployedContract,
-)
+from pons import Amount, ContractABI, abi, Constructor, Method, DeployedContract, Mutability
 
 from .compile import compile_file
 
@@ -30,7 +22,7 @@ async def test_empty_constructor(session, root_signer, compiled_contracts):
     compiled_contract = compiled_contracts["NoConstructor"]
 
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
-    call = deployed_contract.read.getState(123)
+    call = deployed_contract.method.getState(123)
     result = await session.eth_call(call)
     assert result == (1 + 123,)
 
@@ -44,21 +36,21 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
     deployed_contract = await session.deploy(another_signer, call)
 
     # Check the state
-    assert await session.eth_call(deployed_contract.read.v1()) == (12345,)
-    assert await session.eth_call(deployed_contract.read.v2()) == (56789,)
+    assert await session.eth_call(deployed_contract.method.v1()) == (12345,)
+    assert await session.eth_call(deployed_contract.method.v2()) == (56789,)
 
     # Transact with the contract
-    await session.transact(another_signer, deployed_contract.write.setState(111))
-    assert await session.eth_call(deployed_contract.read.v1()) == (111,)
+    await session.transact(another_signer, deployed_contract.method.setState(111))
+    assert await session.eth_call(deployed_contract.method.v1()) == (111,)
 
     # Call the contract
 
-    result = await session.eth_call(deployed_contract.read.getState(123))
+    result = await session.eth_call(deployed_contract.method.getState(123))
     assert result == (111 + 123,)
 
     inner = dict(inner1=1, inner2=2)
     outer = dict(inner=inner, outer1=3)
-    result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
+    result = await session.eth_call(deployed_contract.method.testStructs(inner, outer))
     assert result == (inner, outer)
 
 
@@ -75,11 +67,19 @@ async def test_abi_declaration(session, root_signer, another_signer, compiled_co
     outer_struct = abi.struct(inner=inner_struct, outer1=abi.uint(256))
     declared_abi = ContractABI(
         constructor=Constructor(inputs=dict(_v1=abi.uint(256), _v2=abi.uint(256))),
-        write=[WriteMethod(name="setState", inputs=dict(_v1=abi.uint(256)))],
-        read=[
-            ReadMethod(name="getState", inputs=dict(_x=abi.uint(256)), outputs=abi.uint(256)),
-            ReadMethod(
+        methods=[
+            Method(
+                name="setState", mutability=Mutability.NONPAYABLE, inputs=dict(_v1=abi.uint(256))
+            ),
+            Method(
+                name="getState",
+                mutability=Mutability.VIEW,
+                inputs=dict(_x=abi.uint(256)),
+                outputs=abi.uint(256),
+            ),
+            Method(
                 name="testStructs",
+                mutability=Mutability.VIEW,
                 inputs=dict(inner_in=inner_struct, outer_in=outer_struct),
                 outputs=dict(inner_out=inner_struct, outer_out=outer_struct),
             ),
@@ -90,16 +90,16 @@ async def test_abi_declaration(session, root_signer, another_signer, compiled_co
 
     # Transact with the contract
     await session.transfer(root_signer, another_signer.address, Amount.ether(10))
-    await session.transact(another_signer, deployed_contract.write.setState(111))
+    await session.transact(another_signer, deployed_contract.method.setState(111))
 
     # Call the contract
 
-    result = await session.eth_call(deployed_contract.read.getState(123))
+    result = await session.eth_call(deployed_contract.method.getState(123))
     assert result == 111 + 123  # Note the lack of `[]` - we declared outputs as a single value
 
     inner = dict(inner1=1, inner2=2)
     outer = dict(inner=inner, outer1=3)
-    result = await session.eth_call(deployed_contract.read.testStructs(inner, outer))
+    result = await session.eth_call(deployed_contract.method.testStructs(inner, outer))
     assert result == (inner, outer)
 
 
@@ -123,7 +123,7 @@ async def test_complicated_event(session, root_signer, compiled_contracts):
 
     log_filter1 = await session.eth_new_filter(event_filter=event_filter)  # filter by topics
     log_filter2 = await session.eth_new_filter()  # collect everything
-    await session.transact(root_signer, contract.write.emitComplicated())
+    await session.transact(root_signer, contract.method.emitComplicated())
     entries_filtered = await session.eth_get_filter_changes(log_filter1)
     entries_all = await session.eth_get_filter_changes(log_filter2)
 

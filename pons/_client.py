@@ -34,8 +34,7 @@ import anyio
 from ._contract import (
     DeployedContract,
     BoundConstructorCall,
-    BoundReadCall,
-    BoundWriteCall,
+    BoundMethodCall,
     BoundEventFilter,
 )
 from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI, Error
@@ -423,7 +422,7 @@ class ClientSession:
             await anyio.sleep(poll_latency)
 
     @rpc_call("eth_call")
-    async def eth_call(self, call: BoundReadCall, block: Union[int, Block] = Block.LATEST) -> Any:
+    async def eth_call(self, call: BoundMethodCall, block: Union[int, Block] = Block.LATEST) -> Any:
         """
         Sends a prepared contact method call to the provided address.
         Returns the decoded output.
@@ -490,7 +489,7 @@ class ClientSession:
         }
         return await self._estimate_gas(tx)
 
-    async def estimate_transact(self, call: BoundWriteCall, amount: Amount = Amount(0)) -> int:
+    async def estimate_transact(self, call: BoundMethodCall, amount: Amount = Amount(0)) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
 
@@ -661,10 +660,13 @@ class ClientSession:
     async def broadcast_transact(
         self,
         signer: Signer,
-        call: BoundWriteCall,
+        call: BoundMethodCall,
         amount: Amount = Amount(0),
         gas: Optional[int] = None,
     ) -> TxHash:
+        if not call.mutating:
+            raise ValueError("This method is non-mutating, use `eth_call` to invoke it")
+
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This method does not accept an associated payment")
 
@@ -692,7 +694,7 @@ class ClientSession:
     async def transact(
         self,
         signer: Signer,
-        call: BoundWriteCall,
+        call: BoundMethodCall,
         amount: Amount = Amount(0),
         gas: Optional[int] = None,
     ) -> None:

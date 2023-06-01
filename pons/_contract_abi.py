@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from functools import cached_property
 import inspect
 from itertools import chain
@@ -60,6 +61,10 @@ class Signature:
             )
             self._types = list(parameters)
             self._named_parameters = False
+
+    @property
+    def empty(self) -> bool:
+        return not bool(self._types)
 
     @cached_property
     def canonical_form(self) -> str:
@@ -212,39 +217,6 @@ class EventSignature:
         return "(" + ", ".join(params) + ")"
 
 
-class Method(ABC):
-    """
-    An abstract type for a method (mutating or non-mutating).
-    """
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """
-        Method name.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def inputs(self) -> Signature:
-        """
-        Method's input signature.
-        """
-        ...
-
-    @cached_property
-    def selector(self) -> bytes:
-        """
-        Method's selector.
-        """
-        return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
-
-    def _encode_call(self, *args: Any, **kwargs: Any) -> bytes:
-        input_bytes = self.inputs.encode(*args, **kwargs)
-        return self.selector + input_bytes
-
-
 class Constructor:
     """
     Contract constructor.
@@ -297,7 +269,45 @@ class Constructor:
         return f"constructor{self.inputs} " + ("payable" if self.payable else "nonpayable")
 
 
-class ReadMethod(Method):
+class Mutability(Enum):
+    """
+    Possible states of a contract's method mutability.
+    """
+
+    PURE = "pure"
+    """Solidity's ``pure`` (does not read or write the contract state)."""
+    VIEW = "view"
+    """Solidity's ``view`` (may read the contract state)."""
+    NONPAYABLE = "nonpayable"
+    """Solidity's ``nonpayable`` (may write the contract state)."""
+    PAYABLE = "payable"
+    """
+    Solidity's ``payable`` (may write the contract state
+    and accept associated funds with transactions).
+    """
+
+    @classmethod
+    def from_json(cls, entry: str) -> "Mutability":
+        values = dict(
+            pure=Mutability.PURE,
+            view=Mutability.VIEW,
+            nonpayable=Mutability.NONPAYABLE,
+            payable=Mutability.PAYABLE,
+        )
+        if entry not in values:
+            raise ValueError(f"Unknown mutability identifier: {entry}")
+        return values[entry]
+
+    @property
+    def payable(self) -> bool:
+        return self == Mutability.PAYABLE
+
+    @property
+    def mutating(self) -> bool:
+        return self == Mutability.PAYABLE or self == Mutability.NONPAYABLE
+
+
+class Method:
     """
     A non-mutating contract method.
 
@@ -310,40 +320,51 @@ class ReadMethod(Method):
     outputs: Signature
     """Method's output signature."""
 
+    payable: bool
+    """Whether this method is marked as payable."""
+
+    mutating: bool
+    """Whether this method may mutate the contract state."""
+
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> "ReadMethod":
+    def from_json(cls, method_entry: Dict[str, Any]) -> "Method":
         """
         Creates this object from a JSON ABI method entry.
         """
         if method_entry["type"] != "function":
-            raise ValueError(
-                "ReadMethod object must be created from a JSON entry with type='function'"
-            )
+            raise ValueError("Method object must be created from a JSON entry with type='function'")
 
         name = method_entry["name"]
         inputs = dispatch_types(method_entry["inputs"])
-        if method_entry["stateMutability"] not in ("pure", "view"):
-            raise ValueError(
-                "Non-mutating method's JSON entry state mutability must be `pure` or `view`"
-            )
+
+        mutability = Mutability.from_json(method_entry["stateMutability"])
 
         # Outputs can be anonymous
         outputs: Union[Dict[str, Type], List[Type]]
-        if all(entry["name"] == "" for entry in method_entry["outputs"]):
+        if "outputs" not in method_entry:
+            outputs = []
+        elif all(entry["name"] == "" for entry in method_entry["outputs"]):
             outputs = [dispatch_type(entry) for entry in method_entry["outputs"]]
         else:
             outputs = dispatch_types(method_entry["outputs"])
 
-        return cls(name=name, inputs=inputs, outputs=outputs)
+        return cls(name=name, inputs=inputs, outputs=outputs, mutability=mutability)
 
     def __init__(
         self,
         name: str,
+        mutability: Mutability,
         inputs: Union[Mapping[str, Type], Sequence[Type]],
-        outputs: Union[Mapping[str, Type], Sequence[Type], Type],
+        outputs: Union[Mapping[str, Type], Sequence[Type], Type, None] = None,
     ):
         self._name = name
         self._inputs = Signature(inputs)
+        self._mutability = mutability
+        self.payable = mutability.payable
+        self.mutating = mutability.mutating
+
+        if outputs is None:
+            outputs = []
 
         if isinstance(outputs, Type):
             outputs = [outputs]
@@ -361,11 +382,22 @@ class ReadMethod(Method):
     def inputs(self) -> Signature:
         return self._inputs
 
-    def __call__(self, *args: Any, **kwargs: Any) -> "ReadCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "MethodCall":
         """
         Returns an encoded call with given arguments.
         """
-        return ReadCall(self._encode_call(*args, **kwargs))
+        return MethodCall(self._encode_call(*args, **kwargs))
+
+    @cached_property
+    def selector(self) -> bytes:
+        """
+        Method's selector.
+        """
+        return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
+
+    def _encode_call(self, *args: Any, **kwargs: Any) -> bytes:
+        input_bytes = self.inputs.encode(*args, **kwargs)
+        return self.selector + input_bytes
 
     def decode_output(self, output_bytes: bytes) -> Any:
         """
@@ -377,67 +409,11 @@ class ReadMethod(Method):
         return results
 
     def __str__(self) -> str:
-        return f"function {self.name}{self.inputs} returns {self.outputs}"
-
-
-class WriteMethod(Method):
-    """
-    A mutating contract method.
-
-    .. note::
-
-       If the name of a parameter given to the constructor matches a Python keyword,
-       ``_`` will be appended to it.
-    """
-
-    payable: bool
-    """Whether this method is marked as payable"""
-
-    @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> "WriteMethod":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
-        if method_entry["type"] != "function":
-            raise ValueError(
-                "WriteMethod object must be created from a JSON entry with type='function'"
-            )
-
-        name = method_entry["name"]
-        inputs = dispatch_types(method_entry["inputs"])
-        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
-            raise ValueError(
-                "Mutating method's JSON entry state mutability must be `nonpayable` or `payable`"
-            )
-        payable = method_entry["stateMutability"] == "payable"
-        return cls(name=name, inputs=inputs, payable=payable)
-
-    def __init__(
-        self,
-        name: str,
-        inputs: Union[Mapping[str, Type], Sequence[Type]],
-        payable: bool = False,
-    ):
-        self._name = name
-        self._inputs = Signature(inputs)
-        self.payable = payable
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def inputs(self) -> Signature:
-        return self._inputs
-
-    def __call__(self, *args: Any, **kwargs: Any) -> "WriteCall":
-        """
-        Returns an encoded call with given arguments.
-        """
-        return WriteCall(self._encode_call(*args, **kwargs))
-
-    def __str__(self) -> str:
-        return f"function {self.name}{self.inputs} " + ("payable" if self.payable else "nonpayable")
+        if self.outputs.empty:
+            returns = ""
+        else:
+            returns = f" returns {self.outputs}"
+        return f"function {self.name}{self.inputs} {self._mutability.value}{returns}"
 
 
 class Event:
@@ -656,21 +632,9 @@ class ConstructorCall:
         self.input_bytes = input_bytes
 
 
-class ReadCall:
+class MethodCall:
     """
-    A call to a contract's non-mutating method.
-    """
-
-    data_bytes: bytes
-    """Encoded call arguments with the selector."""
-
-    def __init__(self, data_bytes: bytes):
-        self.data_bytes = data_bytes
-
-
-class WriteCall:
-    """
-    A call to a contract's mutating method.
+    A call to a contract's regular method.
     """
 
     data_bytes: bytes
@@ -740,11 +704,8 @@ class ContractABI:
     receive: Optional[Receive]
     """Contract's receive method."""
 
-    read: Methods[ReadMethod]
-    """Contract's non-mutating methods."""
-
-    write: Methods[WriteMethod]
-    """Contract's mutating methods."""
+    method: Methods[Method]
+    """Contract's regular methods."""
 
     event: Methods[Event]
     """Contract's events."""
@@ -760,9 +721,7 @@ class ContractABI:
         constructor = None
         fallback = None
         receive = None
-        read = []
-        write = []
-        methods = set()
+        methods = {}
         events = {}
         errors = {}
 
@@ -778,13 +737,7 @@ class ContractABI:
                     raise ValueError(
                         f"JSON ABI contains more than one declarations of `{entry['name']}`"
                     )
-
-                methods.add(entry["name"])
-
-                if entry["stateMutability"] in ("pure", "view"):
-                    read.append(ReadMethod.from_json(entry))
-                else:
-                    write.append(WriteMethod.from_json(entry))
+                methods[entry["name"]] = Method.from_json(entry)
 
             elif entry["type"] == "fallback":
                 if fallback:
@@ -817,8 +770,7 @@ class ContractABI:
             constructor=constructor,
             fallback=fallback,
             receive=receive,
-            read=read,
-            write=write,
+            methods=methods.values(),
             events=events.values(),
             errors=errors.values(),
         )
@@ -828,8 +780,7 @@ class ContractABI:
         constructor: Optional[Constructor] = None,
         fallback: Optional[Fallback] = None,
         receive: Optional[Receive] = None,
-        read: Optional[Iterable[ReadMethod]] = None,
-        write: Optional[Iterable[WriteMethod]] = None,
+        methods: Optional[Iterable[Method]] = None,
         events: Optional[Iterable[Event]] = None,
         errors: Optional[Iterable[Error]] = None,
     ):
@@ -839,8 +790,7 @@ class ContractABI:
         self.fallback = fallback
         self.receive = receive
         self.constructor = constructor
-        self.read = Methods({method.name: method for method in (read or [])})
-        self.write = Methods({method.name: method for method in (write or [])})
+        self.method = Methods({method.name: method for method in (methods or [])})
         self.event = Methods({event.name: event for event in (events or [])})
         self.error = Methods({error.name: error for error in (errors or [])})
 
@@ -866,14 +816,11 @@ class ContractABI:
         raise UnknownError(f"Could not find an error with selector {selector.hex()} in the ABI")
 
     def __str__(self) -> str:
-        all_methods: Iterable[
-            Union[Constructor, Fallback, Receive, ReadMethod, WriteMethod, Event, Error]
-        ] = chain(
+        all_methods: Iterable[Union[Constructor, Fallback, Receive, Method, Event, Error]] = chain(
             [self.constructor] if self.constructor else [],
             [self.fallback] if self.fallback else [],
             [self.receive] if self.receive else [],
-            self.read,
-            self.write,
+            self.method,
             self.event,
             self.error,
         )
