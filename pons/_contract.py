@@ -3,8 +3,7 @@ from typing import Any, Dict, Tuple, Optional, List
 from ._contract_abi import (
     ContractABI,
     Methods,
-    ReadMethod,
-    WriteMethod,
+    Method,
     Event,
     EventFilter,
     Error,
@@ -52,69 +51,29 @@ class BoundConstructorCall:
         self.data_bytes = data_bytes
 
 
-class BoundReadMethod:
+class BoundMethod:
     """
-    A non-mutating method bound to a specific contract's address.
-    """
-
-    def __init__(self, contract_address: Address, method: ReadMethod):
-        self._contract_address = contract_address
-        self._method = method
-
-    def __call__(self, *args: Any, **kwargs: Any) -> "BoundReadCall":
-        """
-        Returns a contract call with encoded arguments bound to a specific address.
-        """
-        call = self._method(*args, **kwargs)
-        return BoundReadCall(self._method, self._contract_address, call.data_bytes)
-
-
-class BoundReadCall:
-    """
-    A non-mutating method call with encoded arguments bound to a specific contract address.
+    A regular method bound to a specific contract's address.
     """
 
-    contract_address: Address
-    """The contract address."""
-
-    data_bytes: bytes
-    """Encoded call arguments with the selector."""
-
-    def __init__(self, method: ReadMethod, contract_address: Address, data_bytes: bytes):
-        self._method = method
-        self.contract_address = contract_address
-        self.data_bytes = data_bytes
-
-    def decode_output(self, output_bytes: bytes) -> Any:
-        """
-        Decodes contract output packed into the bytestring.
-        """
-        return self._method.decode_output(output_bytes)
-
-
-class BoundWriteMethod:
-    """
-    A mutating method bound to a specific contract's address.
-    """
-
-    def __init__(self, contract_abi: ContractABI, contract_address: Address, method: WriteMethod):
+    def __init__(self, contract_abi: ContractABI, contract_address: Address, method: Method):
         self._contract_abi = contract_abi
         self._contract_address = contract_address
         self._method = method
 
-    def __call__(self, *args: Any, **kwargs: Any) -> "BoundWriteCall":
+    def __call__(self, *args: Any, **kwargs: Any) -> "BoundMethodCall":
         """
         Returns a contract call with encoded arguments bound to a specific address.
         """
         call = self._method(*args, **kwargs)
-        return BoundWriteCall(
-            self._contract_abi, self._contract_address, call.data_bytes, self._method.payable
+        return BoundMethodCall(
+            self._contract_abi, self._method, self._contract_address, call.data_bytes
         )
 
 
-class BoundWriteCall:
+class BoundMethodCall:
     """
-    A mutating method call with encoded arguments bound to a specific contract address.
+    A regular method call with encoded arguments bound to a specific contract address.
     """
 
     contract_abi: ContractABI
@@ -123,19 +82,34 @@ class BoundWriteCall:
     contract_address: Address
     """The contract address."""
 
-    payable: bool
-    """Whether this call is payable."""
-
     data_bytes: bytes
     """Encoded call arguments with the selector."""
 
+    payable: bool
+    """Whether this method is marked as ``payable``."""
+
+    mutating: bool
+    """Whether this method is marked as ``payable`` or ``nonpayable``."""
+
     def __init__(
-        self, contract_abi: ContractABI, contract_address: Address, data_bytes: bytes, payable: bool
+        self,
+        contract_abi: ContractABI,
+        method: Method,
+        contract_address: Address,
+        data_bytes: bytes,
     ):
+        self._method = method
         self.contract_abi = contract_abi
-        self.payable = payable
         self.contract_address = contract_address
         self.data_bytes = data_bytes
+        self.payable = self._method.payable
+        self.mutating = self._method.mutating
+
+    def decode_output(self, output_bytes: bytes) -> Any:
+        """
+        Decodes contract output packed into the bytestring.
+        """
+        return self._method.decode_output(output_bytes)
 
 
 class BoundEvent:
@@ -220,11 +194,8 @@ class DeployedContract:
     address: Address
     """Contract's address."""
 
-    read: Methods[BoundReadMethod]
-    """Contract's non-mutating methods bound to the address."""
-
-    write: Methods[BoundWriteMethod]
-    """Contract's mutating methods bound to the address."""
+    method: Methods[BoundMethod]
+    """Contract's regular methods bound to the address."""
 
     event: Methods[BoundEvent]
     """Contract's events bound to the address."""
@@ -236,14 +207,8 @@ class DeployedContract:
         self.abi = abi
         self.address = address
 
-        self.read = Methods(
-            {method.name: BoundReadMethod(self.address, method) for method in self.abi.read}
-        )
-        self.write = Methods(
-            {
-                method.name: BoundWriteMethod(self.abi, self.address, method)
-                for method in self.abi.write
-            }
+        self.method = Methods(
+            {method.name: BoundMethod(self.abi, self.address, method) for method in self.abi.method}
         )
         self.event = Methods(
             {event.name: BoundEvent(self.address, event) for event in self.abi.event}

@@ -50,7 +50,7 @@ def pyevm_errors_into_rpc_errors():
                 # raises ValueError if it is not a Python literal
                 reason_data = ast.literal_eval(reason)
                 assert isinstance(reason_data, bytes)  # sanity check
-            except ValueError:
+            except (ValueError, SyntaxError):
                 assert isinstance(reason, str)  # sanity check
                 # Bring `reason_data` to what a `Revert` instance would contain in this case
                 reason_data = _ERROR_SELECTOR + encode_args((abi.string, reason))

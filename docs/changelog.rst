@@ -2,18 +2,26 @@ Changelog
 ---------
 
 
-0.6.1 (in development)
+0.7.0 (in development)
 ~~~~~~~~~~~~~~~~~~~~~~
+
+Changed
+^^^^^^^
+
+- ``ReadMethod`` and ``WriteMethod`` were merged into ``Method`` (with the corresponding merge of ``ContractABI`` routing objects and various bound calls). (PR_50_)
+
 
 Added
 ^^^^^
 
 - ``Block.SAFE`` and ``Block.FINALIZED`` values. (PR_48_)
 - ``FallbackProvider``, two strategies for it (``CycleFallback`` and ``PriorityFallback``), and a framework for creating user-defined strategies (``FallbackStrategy`` and ``FallbackStrategyFactory``). (PR_49_)
+- ``Mutability`` enum for defining contract method mutability. (PR_50_)
 
 
 .. _PR_48: https://github.com/fjarri/pons/pull/48
 .. _PR_49: https://github.com/fjarri/pons/pull/49
+.. _PR_50: https://github.com/fjarri/pons/pull/50
 
 
 

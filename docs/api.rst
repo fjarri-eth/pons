@@ -92,17 +92,14 @@ Contract ABI
 .. autoclass:: ContractABI
    :members:
 
+.. autoclass:: Mutability
+   :members:
+
 .. autoclass:: Constructor
    :members:
    :special-members: __call__
 
-.. autoclass:: ReadMethod
-   :show-inheritance:
-   :members:
-   :special-members: __call__
-
-.. autoclass:: WriteMethod
-   :show-inheritance:
+.. autoclass:: Method
    :members:
    :special-members: __call__
 
@@ -125,10 +122,7 @@ Secondary classes
 .. autoclass:: pons._contract_abi.ConstructorCall()
    :members:
 
-.. autoclass:: pons._contract_abi.ReadCall()
-   :members:
-
-.. autoclass:: pons._contract_abi.WriteCall()
+.. autoclass:: pons._contract_abi.MethodCall()
    :members:
 
 .. autoclass:: pons._contract_abi.EventFilter()
@@ -141,18 +135,11 @@ Secondary classes
 .. autoclass:: pons._contract.BoundConstructorCall()
    :members:
 
-.. autoclass:: pons._contract.BoundReadMethod()
+.. autoclass:: pons._contract.BoundMethod()
    :members:
    :special-members: __call__
 
-.. autoclass:: pons._contract.BoundReadCall()
-   :members:
-
-.. autoclass:: pons._contract.BoundWriteMethod()
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundWriteCall()
+.. autoclass:: pons._contract.BoundMethodCall()
    :members:
 
 .. autoclass:: pons._contract.BoundEvent()

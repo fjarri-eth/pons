@@ -58,10 +58,10 @@ This will show a brief summary of the ABI in a C-like code.
         constructor(uint256 _v1, uint256 _v2) nonpayable
         fallback() nonpayable
         receive() payable
-        function getState(uint256 _x) returns (uint256)
-        function testStructs((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in) returns ((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)
-        function v1() returns (uint256)
-        function v2() returns (uint256)
+        function getState(uint256 _x) view returns (uint256)
+        function testStructs((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in) view returns ((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)
+        function v1() view returns (uint256)
+        function v2() view returns (uint256)
         function setState(uint256 _v1) nonpayable
     }
 
@@ -69,19 +69,25 @@ Alternatively, one can define only the methods they need directly in Python code
 
 ::
 
-    from pons import ContractABI, abi, Constructor, WriteMethod, ReadMethod
+    from pons import ContractABI, abi, Constructor, Method, Mutability
 
     inner_struct = abi.struct(inner1=abi.uint(256), inner2=abi.uint(256))
     outer_struct = abi.struct(inner=inner_struct, outer1=abi.uint(256))
     cabi = ContractABI(
         constructor=Constructor(inputs=dict(_v1=abi.uint(256), _v2=abi.uint(256))),
-        write=[
-            WriteMethod(name='setState', inputs=dict(_v1=abi.uint(256)))
-        ],
-        read=[
-            ReadMethod(name='getState', inputs=dict(_x=abi.uint(256)), outputs=abi.uint(256)),
-            ReadMethod(
+        methods=[
+            Method(
+                name='setState',
+                mutability=Mutability.NONPAYABLE,
+                inputs=dict(_v1=abi.uint(256)))
+            Method(
+                name='getState',
+                mutability=Mutability.VIEW,
+                inputs=dict(_x=abi.uint(256)),
+                outputs=abi.uint(256)),
+            Method(
                 name='testStructs',
+                mutability=Mutability.VIEW,
                 inputs=dict(inner_in=inner_struct, outer_in=outer_struct),
                 outputs=dict(inner_out=inner_struct, outer_out=outer_struct),
                 )
@@ -94,8 +100,8 @@ Alternatively, one can define only the methods they need directly in Python code
 
     {
         constructor(uint256 _v1, uint256 _v2) nonpayable
-        function getState(uint256 _x) returns (uint256)
-        function testStructs((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in) returns ((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)
+        function getState(uint256 _x) view returns (uint256)
+        function testStructs((uint256,uint256) inner_in, ((uint256,uint256),uint256) outer_in) view returns ((uint256,uint256) inner_out, ((uint256,uint256),uint256) outer_out)
         function setState(uint256 _v1) nonpayable
     }
 
@@ -108,25 +114,25 @@ For example,
 
 ::
 
-    print(cabi.read.getState)
+    print(cabi.method.getState)
 
 ::
 
-    function getState(uint256 _x) returns (uint256)
+    function getState(uint256 _x) view returns (uint256)
 
 With a specific method object one can create a contract call by, naturally, calling the object.
 The arguments are processed the same as in Python functions, so one can either use positional arguments, keyword ones (if the parameter names are present in the contract ABI), or mix the two.
 
 ::
 
-    call = cabi.read.getState(1)
-    call = cabi.read.getState(_x=1)
+    call = cabi.method.getState(1)
+    call = cabi.method.getState(_x=1)
 
 Note that the arguments are checked and encoded on call creation, so any inconsistency will result in a raised exception:
 
 ::
 
-    call = cabi.read.getState(1, 2)
+    call = cabi.method.getState(1, 2)
 
 ::
 
@@ -136,7 +142,7 @@ Note that the arguments are checked and encoded on call creation, so any inconsi
 
 ::
 
-    call = cabi.read.getState("a")
+    call = cabi.method.getState("a")
 
 ::
 
@@ -176,7 +182,7 @@ For example, to call a non-mutating contract method via :py:meth:`~pons._client.
 
 ::
 
-    call = deployed_contract.read.getState(1)
+    call = deployed_contract.method.getState(1)
     result = await session.eth_call(call)
 
 Note that when the :py:class:`~pons.ContractABI` object is created from the JSON ABI, even if the method returns a single value, it is still represented as a list of one element in the JSON, so the ``result`` will be a list too.
@@ -186,5 +192,5 @@ Naturally, a mutating call requires a signer to be provided:
 
 ::
 
-    call = deployed_contract.write.setState(1)
+    call = deployed_contract.method.setState(1)
     await session.transact(signer, call)
