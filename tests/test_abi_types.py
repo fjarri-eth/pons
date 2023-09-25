@@ -352,7 +352,7 @@ def test_decoding_error():
 
     expected_message = (
         r"Could not decode the return value with the expected signature \(uint256,uint256\): "
-        r"Tried to read 32 bytes.  Only got 0 bytes"
+        r"Tried to read 32 bytes, only got 0 bytes"
     )
 
     with pytest.raises(ABIDecodingError, match=expected_message):
