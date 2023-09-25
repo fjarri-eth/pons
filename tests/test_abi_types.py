@@ -212,14 +212,29 @@ def test_dispatch_types():
         dict(name="param2", type="uint8"),
         dict(name="param1", type="uint16[2]"),
     ]
+
+    assert dispatch_types(entries) == dict(param2=abi.uint(8), param1=abi.uint(16)[2])
+
     # Check that the order is preserved, too
     assert list(dispatch_types(entries).items()) == [
         ("param2", abi.uint(8)),
         ("param1", abi.uint(16)[2]),
     ]
 
+    # Note that if all the names are empty, it is treated as a list of positional arguments
+    assert dispatch_types([dict(name="", type="uint8"), dict(name="", type="uint16[2]")]) == [
+        abi.uint(8),
+        abi.uint(16)[2],
+    ]
+
+    # For an empty argument list we choose to resolve it as an empty dictionary, for certainty.
+    assert dispatch_types([]) == {}
+
+    with pytest.raises(ValueError, match="Arguments must be either all named or all unnamed"):
+        dispatch_types([dict(name="foo", type="uint8"), dict(name="", type="uint16[2]")])
+
     with pytest.raises(ValueError, match="All ABI entries must have distinct names"):
-        dispatch_types([dict(name="", type="uint8"), dict(name="", type="uint16[2]")])
+        dispatch_types([dict(name="foo", type="uint8"), dict(name="foo", type="uint16[2]")])
 
 
 def test_making_arrays():

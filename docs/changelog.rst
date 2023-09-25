@@ -2,6 +2,18 @@ Changelog
 ---------
 
 
+0.7.1 (unreleased)
+~~~~~~~~~~~~~~~~~~
+
+Fixed
+^^^^^
+
+- Process unnamed arguments in JSON entries correctly (as positional arguments). (PR_51_)
+
+
+.. _PR_51: https://github.com/fjarri/pons/pull/51
+
+
 0.7.0 (09-07-2023)
 ~~~~~~~~~~~~~~~~~~
 
