@@ -436,6 +436,9 @@ class Event:
 
         name = event_entry["name"]
         fields = dispatch_types(event_entry["inputs"])
+        if isinstance(fields, list):
+            raise ValueError("Event fields must be named")
+
         indexed = {input_["name"] for input_ in event_entry["inputs"] if input_["indexed"]}
 
         return cls(name=name, fields=fields, indexed=indexed, anonymous=event_entry["anonymous"])
@@ -530,6 +533,8 @@ class Error:
 
         name = error_entry["name"]
         fields = dispatch_types(error_entry["inputs"])
+        if isinstance(fields, list):
+            raise ValueError("Error fields must be named")
 
         return cls(name=name, fields=fields)
 

@@ -511,9 +511,17 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
         return type_from_abi_string(element_type_name)
 
 
-def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Dict[str, Type]:
-    # Since we are returning a dictionary, need to be sure we don't silently merge entries
+def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Union[List[Type], Dict[str, Type]]:
     names = [entry["name"] for entry in abi_entry]
+
+    # Unnamed arguments; treat as positional arguments
+    if names and all(not name for name in names):
+        return [dispatch_type(entry) for entry in abi_entry]
+
+    if any(not name for name in names):
+        raise ValueError("Arguments must be either all named or all unnamed")
+
+    # Since we are returning a dictionary, need to be sure we don't silently merge entries
     if len(names) != len(set(names)):
         raise ValueError("All ABI entries must have distinct names")
     return {entry["name"]: dispatch_type(entry) for entry in abi_entry}
