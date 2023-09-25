@@ -10,6 +10,7 @@ from typing import (
     Dict,
     List,
     Tuple,
+    Sequence,
     Callable,
     Mapping,
     TypeVar,
@@ -36,6 +37,7 @@ from ._contract import (
     BoundConstructorCall,
     BoundMethodCall,
     BoundEventFilter,
+    BoundEvent,
 )
 from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI, Error
 from ._provider import (
@@ -697,12 +699,18 @@ class ClientSession:
         call: BoundMethodCall,
         amount: Amount = Amount(0),
         gas: Optional[int] = None,
-    ) -> None:
+        return_events: Optional[Sequence[BoundEvent]] = None,
+    ) -> Dict[BoundEvent, List[Dict[str, Any]]]:
         """
         Transacts with the contract using a prepared method call.
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+
+        If any bound events are given in `return_events`, the provider will be queried
+        for any firing of these events originating from the hash of the completed transaction
+        (from the contract addresses the events are bound to),
+        and the results will be returned as a dictionary keyed by the corresponding event object.
 
         Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
         but could not be processed.
@@ -713,6 +721,35 @@ class ClientSession:
         receipt = await self.wait_for_transaction_receipt(tx_hash)
         if not receipt.succeeded:
             raise TransactionFailed(f"Transact failed (receipt: {receipt})")
+
+        if return_events is None:
+            return {}
+
+        results = {}
+        for event in return_events:
+            event_filter = event()
+            log_filter = await self.eth_new_filter(
+                source=event_filter.contract_address,
+                event_filter=EventFilter(event_filter.topics),
+                from_block=receipt.block_number,
+                to_block=receipt.block_number,
+            )
+            log_entries = await self.eth_get_filter_changes(log_filter)
+            event_results = []
+            for log_entry in log_entries:
+                # We can't ensure it statically, since `eth_getFilterChanges` return type depends
+                # on the filter passed to it.
+                log_entry = cast(LogEntry, log_entry)
+
+                if log_entry.transaction_hash != receipt.transaction_hash:
+                    continue
+
+                decoded = event_filter.decode_log_entry(log_entry)
+                event_results.append(decoded)
+
+            results[event] = event_results
+
+        return results
 
     @rpc_call("eth_newBlockFilter")
     async def eth_new_block_filter(self) -> BlockFilter:

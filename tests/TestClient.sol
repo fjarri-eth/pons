@@ -47,8 +47,22 @@ contract BasicContract {
     function deposit2(bytes4 id) public payable {
         emit Deposit2(msg.sender, id, msg.value, msg.value + 1);
     }
-}
 
+    event Event1(
+        uint32 indexed value
+    );
+
+    event Event2(
+        uint32 value
+    );
+
+    function emitMultipleEvents(uint32 x) public {
+        emit Event1(x);
+        emit Event1(x + 1);
+        emit Event2(x + 2);
+        emit Event2(x + 3);
+    }
+}
 
 contract PayableConstructor {
     uint256 public state;
