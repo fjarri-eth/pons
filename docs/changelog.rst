@@ -5,6 +5,12 @@ Changelog
 0.7.1 (unreleased)
 ~~~~~~~~~~~~~~~~~~
 
+Added
+^^^^^
+
+- `Client.transact()` takes an optional `return_events` argument, allowing one to get "return values" from the transaction via events. (PR_52_)
+
+
 Fixed
 ^^^^^
 
@@ -12,6 +18,7 @@ Fixed
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
+.. _PR_52: https://github.com/fjarri/pons/pull/52
 
 
 0.7.0 (09-07-2023)

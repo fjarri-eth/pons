@@ -360,6 +360,61 @@ async def test_transact(test_provider, session, compiled_contracts, root_signer)
         await session.transact(root_signer, deployed_contract.method.faultySetState(0), gas=300000)
 
 
+async def test_transact_and_return_events(
+    autojump_clock, test_provider, session, compiled_contracts, root_signer, another_signer
+):
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    basic_contract = compiled_contracts["BasicContract"]
+
+    deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
+
+    Event1 = deployed_contract.event.Event1
+    Event2 = deployed_contract.event.Event2
+
+    results_for = lambda x: {
+        Event1: [{"value": x}, {"value": x + 1}],
+        Event2: [{"value": x + 2}, {"value": x + 3}],
+    }
+
+    # Normal operation: one relevant transaction in the block
+
+    x = 1
+    result = await session.transact(
+        root_signer,
+        deployed_contract.method.emitMultipleEvents(x),
+        return_events=[Event1, Event2],
+    )
+    assert result == results_for(x)
+
+    # Two transactions for the same method in the same block -
+    # we need to be able to only pick up the results from the relevant transaction receipt
+
+    test_provider.disable_auto_mine_transactions()
+
+    results = {}
+
+    async def transact(signer, x):
+        result = await session.transact(
+            signer, deployed_contract.method.emitMultipleEvents(x), return_events=[Event1, Event2]
+        )
+        results[x] = result
+
+    async def delayed_enable_mining():
+        await trio.sleep(5)
+        test_provider.enable_auto_mine_transactions()
+
+    x1 = 1
+    x2 = 2
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(transact, root_signer, x1)
+        nursery.start_soon(transact, another_signer, x2)
+        nursery.start_soon(delayed_enable_mining)
+
+    assert results[x1] == results_for(x1)
+    assert results[x2] == results_for(x2)
+
+
 async def test_get_block(test_provider, session, root_signer, another_signer):
     to_transfer = Amount.ether(10)
     await session.transfer(root_signer, another_signer.address, to_transfer)
