@@ -21,20 +21,19 @@ from pons import (
     Mutability,
     TxHash,
     abi,
+    compile_contract_file,
 )
 from pons._abi_types import encode_args, keccak
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
-from pons._entities import rpc_encode_data
+from pons._entities import rpc_decode_block, rpc_encode_data
 from pons._provider import RPCError
-
-from .compile import compile_file
 
 
 @pytest.fixture
 def compiled_contracts():
     path = Path(__file__).resolve().parent / "TestClient.sol"
-    yield compile_file(path)
+    yield compile_contract_file(path)
 
 
 @contextmanager
@@ -785,7 +784,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     # `require(condition, message)`
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
-        expected_message="execution reverted: require(string)",
+        expected_message="execution reverted: 'require(string)'",
         expected_data=error_selector + encode_args((abi.string, "require(string)")),
     )
     await check_rpc_error(session.eth_call(contract.method.viewError(1)), **kwargs)
@@ -801,7 +800,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     # `revert(message)`
     kwargs = dict(
         expected_code=ProviderError.Code.EXECUTION_ERROR,
-        expected_message="execution reverted: revert(string)",
+        expected_message="execution reverted: 'revert(string)'",
         expected_data=error_selector + encode_args((abi.string, "revert(string)")),
     )
     await check_rpc_error(session.eth_call(contract.method.viewError(3)), **kwargs)

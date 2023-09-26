@@ -3,18 +3,25 @@ from pathlib import Path
 
 import pytest
 
-from pons import Address, Constructor, Event, Fallback, Method, Receive, abi
+from pons import (
+    Address,
+    Constructor,
+    Event,
+    Fallback,
+    Method,
+    Receive,
+    abi,
+    compile_contract_file,
+)
 from pons._abi_types import encode_args, keccak
 from pons._contract import BoundMethod, DeployedContract
 from pons._entities import LogTopic
-
-from .compile import compile_file
 
 
 @pytest.fixture
 def compiled_contracts():
     path = Path(__file__).resolve().parent / "TestContract.sol"
-    yield compile_file(path)
+    yield compile_contract_file(path)
 
 
 def test_abi_declaration(compiled_contracts):

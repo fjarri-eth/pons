@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 import pytest
 import trio
 
-from pons import Amount, Client, HTTPProvider, Unreachable
+from pons import _test_rpc_provider  # For monkeypatching purposes
+from pons import Amount, Client, HTTPProvider, ServerHandle, Unreachable
 from pons._client import BadResponseFormat, ProviderError
 from pons._provider import (
     Provider,
@@ -12,9 +13,6 @@ from pons._provider import (
     RPCError,
     UnexpectedResponse,
 )
-
-from . import provider_server  # For monkeypatching purposes
-from .provider_server import ServerHandle
 
 
 @pytest.fixture
@@ -155,14 +153,14 @@ async def test_neither_result_nor_error_field(test_provider, session, monkeypatc
     # without either "error" or "result" fields.
     # Unfortunately we can't achieve that by just patching the provider, have to patch the server
 
-    orig_process_request = provider_server.process_request
+    orig_process_request = _test_rpc_provider.process_request
 
     async def faulty_process_request(*args, **kwargs):
         result = await orig_process_request(*args, **kwargs)
         del result["result"]
         return result
 
-    monkeypatch.setattr(provider_server, "process_request", faulty_process_request)
+    monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
 
     with pytest.raises(BadResponseFormat, match="`result` is not present in the response"):
         await session.net_version()
@@ -175,7 +173,7 @@ async def test_result_is_not_a_dict(test_provider, session, monkeypatch):
     async def faulty_process_request(*args, **kwargs):
         return 1
 
-    monkeypatch.setattr(provider_server, "process_request", faulty_process_request)
+    monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
 
     with pytest.raises(BadResponseFormat, match="RPC response must be a dictionary, got: 1"):
         await session.net_version()

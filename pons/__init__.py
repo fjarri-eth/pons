@@ -12,6 +12,7 @@ from ._client import (
     RemoteError,
     TransactionFailed,
 )
+from ._compiler import compile_contract_file
 from ._contract import (
     BoundConstructor,
     BoundConstructorCall,
@@ -47,6 +48,8 @@ from ._fallback_provider import (
 )
 from ._provider import JSON, HTTPProvider, Unreachable
 from ._signer import AccountSigner, Signer
+from ._test_provider import EthereumTesterProvider
+from ._test_rpc_provider import ServerHandle
 
 __all__ = [
     "ABIDecodingError",
@@ -74,6 +77,7 @@ __all__ = [
     "DeployedContract",
     "Either",
     "Error",
+    "EthereumTesterProvider",
     "Event",
     "EventFilter",
     "Fallback",
@@ -90,9 +94,11 @@ __all__ = [
     "ProviderError",
     "Receive",
     "RemoteError",
+    "ServerHandle",
     "Signer",
     "TransactionFailed",
     "TxHash",
     "Unreachable",
     "abi",
+    "compile_contract_file",
 ]

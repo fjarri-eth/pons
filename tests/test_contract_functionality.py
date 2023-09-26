@@ -11,14 +11,13 @@ from pons import (
     Mutability,
     abi,
 )
-
-from .compile import compile_file
+from pons._compiler import compile_contract_file
 
 
 @pytest.fixture
 def compiled_contracts():
     path = Path(__file__).resolve().parent / "TestContractFunctionality.sol"
-    yield compile_file(path)
+    yield compile_contract_file(path)
 
 
 async def test_empty_constructor(session, root_signer, compiled_contracts):

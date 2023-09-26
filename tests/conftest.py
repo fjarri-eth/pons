@@ -1,9 +1,7 @@
 import pytest
 from eth_account import Account
 
-from pons import AccountSigner, Client
-
-from .provider import EthereumTesterProvider
+from pons import AccountSigner, Client, EthereumTesterProvider
 
 
 @pytest.fixture
