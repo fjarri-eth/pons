@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager, AsyncExitStack
-from typing import Any, AsyncIterator, Optional, Iterable, List, Tuple, Union
+from typing import AsyncIterator, Optional, Iterable, List, Tuple
 
 from ._provider import Provider, ProviderSession, JSON, RPCError, UnexpectedResponse
 

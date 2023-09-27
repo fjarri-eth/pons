@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
 import inspect
@@ -309,7 +308,7 @@ class Mutability(Enum):
 
 class Method:
     """
-    A non-mutating contract method.
+    A contract method.
 
     .. note::
 
