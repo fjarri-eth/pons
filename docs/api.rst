@@ -10,7 +10,7 @@ Clients
 .. autoclass:: Client
    :members:
 
-.. autoclass:: pons._client.ClientSession()
+.. autoclass:: ClientSession()
    :members:
 
 
@@ -119,34 +119,37 @@ Contract ABI
 Secondary classes
 -----------------
 
-.. autoclass:: pons._contract_abi.ConstructorCall()
+The instances of these classes are not created by the user directly, but rather found as return values, or attributes of other objects.
+
+
+.. autoclass:: ConstructorCall()
    :members:
 
-.. autoclass:: pons._contract_abi.MethodCall()
+.. autoclass:: MethodCall()
    :members:
 
-.. autoclass:: pons._contract_abi.EventFilter()
+.. autoclass:: EventFilter()
    :members:
 
-.. autoclass:: pons._contract.BoundConstructor()
-   :members:
-   :special-members: __call__
-
-.. autoclass:: pons._contract.BoundConstructorCall()
-   :members:
-
-.. autoclass:: pons._contract.BoundMethod()
+.. autoclass:: BoundConstructor()
    :members:
    :special-members: __call__
 
-.. autoclass:: pons._contract.BoundMethodCall()
+.. autoclass:: BoundConstructorCall()
    :members:
 
-.. autoclass:: pons._contract.BoundEvent()
+.. autoclass:: BoundMethod()
    :members:
    :special-members: __call__
 
-.. autoclass:: pons._contract.BoundEventFilter()
+.. autoclass:: BoundMethodCall()
+   :members:
+
+.. autoclass:: BoundEvent()
+   :members:
+   :special-members: __call__
+
+.. autoclass:: BoundEventFilter()
    :members:
 
 

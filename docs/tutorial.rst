@@ -17,7 +17,7 @@ All calls to the provider in ``pons`` happen within a session.
 It translates to the usage of a single session in the backend HTTP request library, so the details are implementation-dependent, but in general it means that multiple requests will happen faster.
 For example, in a session an SSL handshake only happens once, and it is a somewhat slow process.
 
-Correspondingly, all the main functionality of the library is concentrated in the :py:class:`~pons._client.ClientSession` class.
+Correspondingly, all the main functionality of the library is concentrated in the :py:class:`~pons.ClientSession` class.
 
 
 Signers
@@ -156,7 +156,7 @@ Deploying contracts
 
 In order to deploy a contract one needs its ABI and bytecode.
 At the moment ``pons`` does not expose the compiler interface, so it has to come from a third party library, for example `py-solcx <https://solcx.readthedocs.io/en/latest/>`_.
-With that, create a :py:class:`~pons.CompiledContract` object and use :py:meth:`~pons._client.ClientSession.deploy`:
+With that, create a :py:class:`~pons.CompiledContract` object and use :py:meth:`~pons.ClientSession.deploy`:
 
 ::
 
@@ -178,7 +178,7 @@ Interacting with deployed contracts
 A :py:class:`~pons.DeployedContract` object wraps all ABI method objects into "bound" state, similarly to how Python methods are bound to class instances.
 It means that all the method calls created from this object have the contract address inside them, so that it does not need to be provided every time.
 
-For example, to call a non-mutating contract method via :py:meth:`~pons._client.ClientSession.eth_call`:
+For example, to call a non-mutating contract method via :py:meth:`~pons.ClientSession.eth_call`:
 
 ::
 
