@@ -24,7 +24,7 @@ homepage = "https://github.com/fjarri/pons"
 
 [project.optional-dependencies]
 compiler = [
-    "py-solc-x>=1",
+    "py-solc-x>=2",
 ]
 test-rpc-provider = [
     # eth-tester only has pre-releases, so we can't set a range.
@@ -40,7 +40,7 @@ tests = [
     "pytest-cov",
     "mypy-extensions>=1",
     # from `compiler` feature
-    "py-solc-x>=1",
+    "py-solc-x>=2",
     # from `test-rpc-provider` feature
     "eth-tester[pyevm]==0.10.0-beta.1",
     "starlette",

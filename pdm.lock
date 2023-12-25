@@ -5,7 +5,7 @@
 groups = ["default", "compiler", "docs", "lint", "test-rpc-provider", "tests"]
 strategy = ["cross_platform"]
 lock_version = "4.4.1"
-content_hash = "sha256:82efa8f706b8135292989f1e0f03d819ce9607413459f22c2a4b0c47b9d99cb9"
+content_hash = "sha256:ea61af909824b60031076558d2ede29d8f679898acf1d6b52e723c2a685cd55a"
 
 [[package]]
 name = "alabaster"
