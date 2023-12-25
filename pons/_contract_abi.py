@@ -44,9 +44,7 @@ def make_name_safe(name: str) -> str:
 
 
 class Signature:
-    """
-    Generalized signature of either inputs or outputs of a method.
-    """
+    """Generalized signature of either inputs or outputs of a method."""
 
     def __init__(self, parameters: Union[Mapping[str, Type], Sequence[Type]]):
         if isinstance(parameters, Mapping):
@@ -74,9 +72,7 @@ class Signature:
 
     @cached_property
     def canonical_form(self) -> str:
-        """
-        Returns the signature serialized in the canonical form as a string.
-        """
+        """Returns the signature serialized in the canonical form as a string."""
         return "(" + ",".join(tp.canonical_form for tp in self._types) + ")"
 
     def encode(self, *args: Any, **kwargs: Any) -> bytes:
@@ -88,15 +84,11 @@ class Signature:
         return encode_args(*zip(self._types, bound_args.args))
 
     def decode_into_tuple(self, value_bytes: bytes) -> Tuple[Any, ...]:
-        """
-        Decodes the packed bytestring into a list of values.
-        """
+        """Decodes the packed bytestring into a list of values."""
         return decode_args(self._types, value_bytes)
 
     def decode_into_dict(self, value_bytes: bytes) -> Dict[str, Any]:
-        """
-        Decodes the packed bytestring into a dict of values.
-        """
+        """Decodes the packed bytestring into a dict of values."""
         decoded = self.decode_into_tuple(value_bytes)
         return dict(zip(self._signature.parameters, decoded))
 
@@ -112,18 +104,14 @@ class Signature:
 
 
 class Either:
-    """
-    Denotes an `OR` operation when filtering events.
-    """
+    """Denotes an `OR` operation when filtering events."""
 
     def __init__(self, *items: Any):
         self.items = items
 
 
 class EventSignature:
-    """
-    A signature representing the constructor of an event (that is, its fields).
-    """
+    """A signature representing the constructor of an event (that is, its fields)."""
 
     def __init__(self, parameters: Mapping[str, Type], indexed: AbstractSet[str]):
         parameters = {make_name_safe(name): val for name, val in parameters.items()}
@@ -175,9 +163,7 @@ class EventSignature:
         return tuple(encoded_topics)
 
     def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> Dict[str, Any]:
-        """
-        Decodes the event fields from the given log entry data.
-        """
+        """Decodes the event fields from the given log entry data."""
         if len(topics) != len(self._indexed):
             raise ValueError(
                 f"The number of topics in the log entry ({len(topics)}) does not match "
@@ -203,16 +189,12 @@ class EventSignature:
 
     @cached_property
     def canonical_form(self) -> str:
-        """
-        Returns the signature serialized in the canonical form as a string.
-        """
+        """Returns the signature serialized in the canonical form as a string."""
         return "(" + ",".join(tp.canonical_form for tp in self._types.values()) + ")"
 
     @cached_property
     def canonical_form_nonindexed(self) -> str:
-        """
-        Returns the signature serialized in the canonical form as a string.
-        """
+        """Returns the signature serialized in the canonical form as a string."""
         return "(" + ",".join(tp.canonical_form for tp in self._types_nonindexed.values()) + ")"
 
     def __str__(self) -> str:
@@ -241,9 +223,7 @@ class Constructor:
 
     @classmethod
     def from_json(cls, method_entry: Dict[str, Any]) -> "Constructor":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
+        """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "constructor":
             raise ValueError(
                 "Constructor object must be created from a JSON entry with type='constructor'"
@@ -265,9 +245,7 @@ class Constructor:
         self.payable = payable
 
     def __call__(self, *args: Any, **kwargs: Any) -> "ConstructorCall":
-        """
-        Returns an encoded call with given arguments.
-        """
+        """Returns an encoded call with given arguments."""
         input_bytes = self.inputs.encode(*args, **kwargs)
         return ConstructorCall(input_bytes)
 
@@ -276,9 +254,7 @@ class Constructor:
 
 
 class Mutability(Enum):
-    """
-    Possible states of a contract's method mutability.
-    """
+    """Possible states of a contract's method mutability."""
 
     PURE = "pure"
     """Solidity's ``pure`` (does not read or write the contract state)."""
@@ -334,9 +310,7 @@ class Method:
 
     @classmethod
     def from_json(cls, method_entry: Dict[str, Any]) -> "Method":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
+        """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "function":
             raise ValueError("Method object must be created from a JSON entry with type='function'")
 
@@ -389,16 +363,12 @@ class Method:
         return self._inputs
 
     def __call__(self, *args: Any, **kwargs: Any) -> "MethodCall":
-        """
-        Returns an encoded call with given arguments.
-        """
+        """Returns an encoded call with given arguments."""
         return MethodCall(self._encode_call(*args, **kwargs))
 
     @cached_property
     def selector(self) -> bytes:
-        """
-        Method's selector.
-        """
+        """Method's selector."""
         return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
 
     def _encode_call(self, *args: Any, **kwargs: Any) -> bytes:
@@ -406,9 +376,7 @@ class Method:
         return self.selector + input_bytes
 
     def decode_output(self, output_bytes: bytes) -> Any:
-        """
-        Decodes the output from ABI-packed bytes.
-        """
+        """Decodes the output from ABI-packed bytes."""
         results = self.outputs.decode_into_tuple(output_bytes)
         if self._single_output:
             results = results[0]
@@ -434,9 +402,7 @@ class Event:
 
     @classmethod
     def from_json(cls, event_entry: Dict[str, Any]) -> "Event":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
+        """Creates this object from a JSON ABI method entry."""
         if event_entry["type"] != "event":
             raise ValueError("Event object must be created from a JSON entry with type='event'")
 
@@ -468,9 +434,7 @@ class Event:
 
     @cached_property
     def _topic(self) -> LogTopic:
-        """
-        The topic representing this event's signature.
-        """
+        """The topic representing this event's signature."""
         return LogTopic(keccak(self.name.encode() + self.fields.canonical_form.encode()))
 
     def __call__(self, *args: Any, **kwargs: Any) -> "EventFilter":
@@ -514,9 +478,7 @@ class Event:
 
 
 class EventFilter:
-    """
-    A filter for events coming from any contract address.
-    """
+    """A filter for events coming from any contract address."""
 
     topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]
 
@@ -525,15 +487,11 @@ class EventFilter:
 
 
 class Error:
-    """
-    A custom contract error.
-    """
+    """A custom contract error."""
 
     @classmethod
     def from_json(cls, error_entry: Dict[str, Any]) -> "Error":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
+        """Creates this object from a JSON ABI method entry."""
         if error_entry["type"] != "error":
             raise ValueError("Error object must be created from a JSON entry with type='error'")
 
@@ -554,15 +512,11 @@ class Error:
 
     @cached_property
     def selector(self) -> bytes:
-        """
-        Error's selector.
-        """
+        """Error's selector."""
         return keccak(self.name.encode() + self.fields.canonical_form.encode())[:4]
 
     def decode_fields(self, data_bytes: bytes) -> Dict[str, Any]:
-        """
-        Decodes the error fields from the given packed data.
-        """
+        """Decodes the error fields from the given packed data."""
         return self.fields.decode_into_dict(data_bytes)
 
     def __str__(self) -> str:
@@ -570,18 +524,14 @@ class Error:
 
 
 class Fallback:
-    """
-    A fallback method.
-    """
+    """A fallback method."""
 
     payable: bool
     """Whether this method is marked as payable"""
 
     @classmethod
     def from_json(cls, method_entry: Dict[str, Any]) -> "Fallback":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
+        """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "fallback":
             raise ValueError(
                 "Fallback object must be created from a JSON entry with type='fallback'"
@@ -601,18 +551,14 @@ class Fallback:
 
 
 class Receive:
-    """
-    A receive method.
-    """
+    """A receive method."""
 
     payable: bool
     """Whether this method is marked as payable"""
 
     @classmethod
     def from_json(cls, method_entry: Dict[str, Any]) -> "Receive":
-        """
-        Creates this object from a JSON ABI method entry.
-        """
+        """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "receive":
             raise ValueError(
                 "Receive object must be created from a JSON entry with type='fallback'"
@@ -632,9 +578,7 @@ class Receive:
 
 
 class ConstructorCall:
-    """
-    A call to the contract's constructor.
-    """
+    """A call to the contract's constructor."""
 
     input_bytes: bytes
     """Encoded call arguments."""
@@ -644,9 +588,7 @@ class ConstructorCall:
 
 
 class MethodCall:
-    """
-    A call to a contract's regular method.
-    """
+    """A call to a contract's regular method."""
 
     data_bytes: bytes
     """Encoded call arguments with the selector."""
@@ -677,15 +619,11 @@ class Methods(Generic[MethodType]):
         self._methods_dict = methods_dict
 
     def __getattr__(self, method_name: str) -> MethodType:
-        """
-        Returns the method by name.
-        """
+        """Returns the method by name."""
         return self._methods_dict[method_name]
 
     def __iter__(self) -> Iterator[MethodType]:
-        """
-        Returns the iterator over all methods.
-        """
+        """Returns the iterator over all methods."""
         return iter(self._methods_dict.values())
 
 
@@ -726,9 +664,7 @@ class ContractABI:
 
     @classmethod
     def from_json(cls, json_abi: List[Dict[str, JSON]]) -> "ContractABI":  # noqa: C901
-        """
-        Creates this object from a JSON ABI (e.g. generated by a Solidity compiler).
-        """
+        """Creates this object from a JSON ABI (e.g. generated by a Solidity compiler)."""
         constructor = None
         fallback = None
         receive = None

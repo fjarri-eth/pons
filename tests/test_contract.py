@@ -18,9 +18,7 @@ def compiled_contracts():
 
 
 def test_abi_declaration(compiled_contracts):
-    """
-    Checks that the compiler output is parsed correctly.
-    """
+    """Checks that the compiler output is parsed correctly."""
 
     compiled_contract = compiled_contracts["JsonAbiTest"]
 
@@ -64,9 +62,7 @@ def test_abi_declaration(compiled_contracts):
 
 
 def test_api_binding(compiled_contracts):
-    """
-    Checks that the methods are bound correctly on deploy.
-    """
+    """Checks that the methods are bound correctly on deploy."""
 
     compiled_contract = compiled_contracts["JsonAbiTest"]
 

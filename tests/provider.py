@@ -1,6 +1,4 @@
-"""
-PyEVM-based provider for tests.
-"""
+"""PyEVM-based provider for tests."""
 
 import ast
 from contextlib import asynccontextmanager, contextmanager

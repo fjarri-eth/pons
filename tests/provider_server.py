@@ -36,9 +36,7 @@ async def entry_point(request):
 
 
 def make_app(provider):
-    """
-    Creates and returns an ASGI app.
-    """
+    """Creates and returns an ASGI app."""
 
     # Since we need to use an externally passed context in the app (``ursula_server``),
     # we have to create the app inside a function.

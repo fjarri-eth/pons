@@ -73,9 +73,7 @@ from ._signer import Signer
 
 
 class Client:
-    """
-    An Ethereum RPC client.
-    """
+    """An Ethereum RPC client."""
 
     def __init__(self, provider: Provider):
         self._provider = provider
@@ -84,9 +82,7 @@ class Client:
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator["ClientSession"]:
-        """
-        Opens a session to the client allowing the backend to optimize sequential requests.
-        """
+        """Opens a session to the client allowing the backend to optimize sequential requests."""
         async with self._provider.session() as provider_session:
             client_session = ClientSession(provider_session)
             yield client_session
@@ -102,9 +98,7 @@ class RemoteError(Exception):
 
 
 class BadResponseFormat(RemoteError):
-    """
-    Raised if the RPC provider returned an unexpectedly formatted response.
-    """
+    """Raised if the RPC provider returned an unexpectedly formatted response."""
 
 
 class TransactionFailed(RemoteError):
@@ -115,9 +109,7 @@ class TransactionFailed(RemoteError):
 
 
 class ProviderErrorCode(Enum):
-    """
-    Known RPC error codes returned by providers.
-    """
+    """Known RPC error codes returned by providers."""
 
     # This is our placeholder value, shouldn't be encountered in a remote server response
     UNKNOWN_REASON = 0
@@ -138,9 +130,7 @@ class ProviderErrorCode(Enum):
 
 
 class ProviderError(RemoteError):
-    """
-    A general problem with fulfilling the request at the provider's side.
-    """
+    """A general problem with fulfilling the request at the provider's side."""
 
     Code = ProviderErrorCode
 
@@ -186,9 +176,7 @@ RetType = TypeVar("RetType")
 def rpc_call(
     method_name: str,
 ) -> Callable[[Callable[Param, Awaitable[RetType]]], Callable[Param, Awaitable[RetType]]]:
-    """
-    Catches various response formatting errors and returns them in a unified way.
-    """
+    """Catches various response formatting errors and returns them in a unified way."""
 
     def _wrapper(func: Callable[Param, Awaitable[RetType]]) -> Callable[Param, Awaitable[RetType]]:
         @wraps(func)
@@ -207,9 +195,7 @@ def rpc_call(
 
 
 class ContractPanicReason(Enum):
-    """
-    Reasons leading to a contract call panicking.
-    """
+    """Reasons leading to a contract call panicking."""
 
     UNKNOWN = -1
     """Unknown panic code."""
@@ -259,9 +245,7 @@ class ContractPanicReason(Enum):
 
 
 class ContractPanic(RemoteError):
-    """
-    A panic raised in a contract call.
-    """
+    """A panic raised in a contract call."""
 
     Reason = ContractPanicReason
 
@@ -278,9 +262,7 @@ class ContractPanic(RemoteError):
 
 
 class ContractLegacyError(RemoteError):
-    """
-    A raised Solidity legacy error (from ``require()`` or ``revert()``).
-    """
+    """A raised Solidity legacy error (from ``require()`` or ``revert()``)."""
 
     message: str
     """The error message."""
@@ -291,9 +273,7 @@ class ContractLegacyError(RemoteError):
 
 
 class ContractError(RemoteError):
-    """
-    A raised Solidity error (from ``revert SomeError(...)``).
-    """
+    """A raised Solidity error (from ``revert SomeError(...)``)."""
 
     error: Error
     """The recognized ABI Error object."""
@@ -330,9 +310,7 @@ def decode_contract_error(
 
 
 class ClientSession:
-    """
-    An open session to the provider.
-    """
+    """An open session to the provider."""
 
     def __init__(self, provider_session: ProviderSession):
         self._provider_session = provider_session
@@ -341,9 +319,7 @@ class ClientSession:
 
     @rpc_call("net_version")
     async def net_version(self) -> str:
-        """
-        Calls the ``net_version`` RPC method.
-        """
+        """Calls the ``net_version`` RPC method."""
         if self._net_version is None:
             result = await self._provider_session.rpc("net_version")
             if not isinstance(result, str):
@@ -353,9 +329,7 @@ class ClientSession:
 
     @rpc_call("eth_chainId")
     async def eth_chain_id(self) -> int:
-        """
-        Calls the ``eth_chainId`` RPC method.
-        """
+        """Calls the ``eth_chainId`` RPC method."""
         if self._chain_id is None:
             result = await self._provider_session.rpc("eth_chainId")
             self._chain_id = rpc_decode_quantity(result)
@@ -365,9 +339,7 @@ class ClientSession:
     async def eth_get_balance(
         self, address: Address, block: Union[int, Block] = Block.LATEST
     ) -> Amount:
-        """
-        Calls the ``eth_getBalance`` RPC method.
-        """
+        """Calls the ``eth_getBalance`` RPC method."""
         result = await self._provider_session.rpc(
             "eth_getBalance", address.rpc_encode(), rpc_encode_block(block)
         )
@@ -375,9 +347,7 @@ class ClientSession:
 
     @rpc_call("eth_getTransactionByHash")
     async def eth_get_transaction_by_hash(self, tx_hash: TxHash) -> Optional[TxInfo]:
-        """
-        Calls the ``eth_getTransactionByHash`` RPC method.
-        """
+        """Calls the ``eth_getTransactionByHash`` RPC method."""
         result = await self._provider_session.rpc_dict(
             "eth_getTransactionByHash", tx_hash.rpc_encode()
         )
@@ -387,9 +357,7 @@ class ClientSession:
 
     @rpc_call("eth_getTransactionReceipt")
     async def eth_get_transaction_receipt(self, tx_hash: TxHash) -> Optional[TxReceipt]:
-        """
-        Calls the ``eth_getTransactionReceipt`` RPC method.
-        """
+        """Calls the ``eth_getTransactionReceipt`` RPC method."""
         result = await self._provider_session.rpc_dict(
             "eth_getTransactionReceipt", tx_hash.rpc_encode()
         )
@@ -401,9 +369,7 @@ class ClientSession:
     async def eth_get_transaction_count(
         self, address: Address, block: Union[int, Block] = Block.LATEST
     ) -> int:
-        """
-        Calls the ``eth_getTransactionCount`` RPC method.
-        """
+        """Calls the ``eth_getTransactionCount`` RPC method."""
         result = await self._provider_session.rpc(
             "eth_getTransactionCount", address.rpc_encode(), rpc_encode_block(block)
         )
@@ -412,9 +378,7 @@ class ClientSession:
     async def wait_for_transaction_receipt(
         self, tx_hash: TxHash, poll_latency: float = 1.0
     ) -> TxReceipt:
-        """
-        Queries the transaction receipt waiting for ``poll_latency`` between each attempt.
-        """
+        """Queries the transaction receipt waiting for ``poll_latency`` between each attempt."""
         while True:
             receipt = await self.eth_get_transaction_receipt(tx_hash)
             if receipt is not None:
@@ -441,9 +405,7 @@ class ClientSession:
 
     @rpc_call("eth_sendRawTransaction")
     async def _eth_send_raw_transaction(self, tx_bytes: bytes) -> TxHash:
-        """
-        Sends a signed and serialized transaction.
-        """
+        """Sends a signed and serialized transaction."""
         result = await self._provider_session.rpc(
             "eth_sendRawTransaction", rpc_encode_data(tx_bytes)
         )
@@ -522,17 +484,13 @@ class ClientSession:
 
     @rpc_call("eth_gasPrice")
     async def eth_gas_price(self) -> Amount:
-        """
-        Calls the ``eth_gasPrice`` RPC method.
-        """
+        """Calls the ``eth_gasPrice`` RPC method."""
         result = await self._provider_session.rpc("eth_gasPrice")
         return Amount.rpc_decode(result)
 
     @rpc_call("eth_blockNumber")
     async def eth_block_number(self) -> int:
-        """
-        Calls the ``eth_blockNumber`` RPC method.
-        """
+        """Calls the ``eth_blockNumber`` RPC method."""
         result = await self._provider_session.rpc("eth_blockNumber")
         return rpc_decode_quantity(result)
 
@@ -540,9 +498,7 @@ class ClientSession:
     async def eth_get_block_by_hash(
         self, block_hash: BlockHash, with_transactions: bool = False
     ) -> Optional[BlockInfo]:
-        """
-        Calls the ``eth_getBlockByHash`` RPC method.
-        """
+        """Calls the ``eth_getBlockByHash`` RPC method."""
         result = await self._provider_session.rpc_dict(
             "eth_getBlockByHash", block_hash.rpc_encode(), with_transactions
         )
@@ -554,9 +510,7 @@ class ClientSession:
     async def eth_get_block_by_number(
         self, block: Union[int, Block] = Block.LATEST, with_transactions: bool = False
     ) -> Optional[BlockInfo]:
-        """
-        Calls the ``eth_getBlockByNumber`` RPC method.
-        """
+        """Calls the ``eth_getBlockByNumber`` RPC method."""
         result = await self._provider_session.rpc_dict(
             "eth_getBlockByNumber", rpc_encode_block(block), with_transactions
         )
@@ -776,18 +730,14 @@ class ClientSession:
 
     @rpc_call("eth_newBlockFilter")
     async def eth_new_block_filter(self) -> BlockFilter:
-        """
-        Calls the ``eth_newBlockFilter`` RPC method.
-        """
+        """Calls the ``eth_newBlockFilter`` RPC method."""
         result, provider_path = await self._provider_session.rpc_and_pin("eth_newBlockFilter")
         filter_id = BlockFilterId.rpc_decode(result)
         return BlockFilter(id=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_newPendingTransactionFilter")
     async def eth_new_pending_transaction_filter(self) -> PendingTransactionFilter:
-        """
-        Calls the ``eth_newPendingTransactionFilter`` RPC method.
-        """
+        """Calls the ``eth_newPendingTransactionFilter`` RPC method."""
         result, provider_path = await self._provider_session.rpc_and_pin(
             "eth_newPendingTransactionFilter"
         )
@@ -802,9 +752,7 @@ class ClientSession:
         from_block: Union[int, Block] = Block.LATEST,
         to_block: Union[int, Block] = Block.LATEST,
     ) -> LogFilter:
-        """
-        Calls the ``eth_newFilter`` RPC method.
-        """
+        """Calls the ``eth_newFilter`` RPC method."""
         params: Dict[str, Any] = {
             "fromBlock": rpc_encode_block(from_block),
             "toBlock": rpc_encode_block(to_block),
@@ -850,9 +798,7 @@ class ClientSession:
         return tuple(LogEntry.rpc_decode(ResponseDict(elem)) for elem in results)
 
     async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
-        """
-        Yields hashes of new blocks being mined.
-        """
+        """Yields hashes of new blocks being mined."""
         block_filter = await self.eth_new_block_filter()
         while True:
             block_hashes = await self.eth_get_filter_changes(block_filter)
@@ -863,9 +809,7 @@ class ClientSession:
             await anyio.sleep(poll_interval)
 
     async def iter_pending_transactions(self, poll_interval: int = 1) -> AsyncIterator[TxHash]:
-        """
-        Yields hashes of new transactions being submitted.
-        """
+        """Yields hashes of new transactions being submitted."""
         tx_filter = await self.eth_new_pending_transaction_filter()
         while True:
             tx_hashes = await self.eth_get_filter_changes(tx_filter)

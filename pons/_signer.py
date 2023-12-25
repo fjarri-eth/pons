@@ -9,16 +9,12 @@ from ._provider import JSON
 
 
 class Signer(ABC):
-    """
-    The base class for transaction signers.
-    """
+    """The base class for transaction signers."""
 
     @property
     @abstractmethod
     def address(self) -> Address:
-        """
-        Returns the address corresponding to the signer's private key.
-        """
+        """Returns the address corresponding to the signer's private key."""
 
     @abstractmethod
     def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
@@ -29,9 +25,7 @@ class Signer(ABC):
 
 
 class AccountSigner(Signer):
-    """
-    A signer wrapper for ``eth_account.BaseAccount`` implementors.
-    """
+    """A signer wrapper for ``eth_account.BaseAccount`` implementors."""
 
     def __init__(self, account: BaseAccount):
         self._account = account

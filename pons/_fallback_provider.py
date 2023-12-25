@@ -6,9 +6,7 @@ from ._provider import JSON, Provider, ProviderSession, RPCError, UnexpectedResp
 
 
 class FallbackStrategy(ABC):
-    """
-    An abstract class defining a fallback strategy for multiple providers.
-    """
+    """An abstract class defining a fallback strategy for multiple providers."""
 
     @abstractmethod
     def get_provider_order(self) -> List[int]:
@@ -27,9 +25,7 @@ class FallbackStrategyFactory(ABC):
 
     @abstractmethod
     def make_strategy(self, num_providers: int) -> FallbackStrategy:
-        """
-        Returns a strategy object.
-        """
+        """Returns a strategy object."""
 
 
 class CycleFallbackStrategy(FallbackStrategy):

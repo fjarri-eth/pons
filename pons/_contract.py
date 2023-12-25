@@ -6,9 +6,7 @@ from ._provider import JSON
 
 
 class BoundConstructor:
-    """
-    A constructor bound to a specific contract's bytecode.
-    """
+    """A constructor bound to a specific contract's bytecode."""
 
     def __init__(self, compiled_contract: "CompiledContract"):
         self._bytecode = compiled_contract.bytecode
@@ -16,18 +14,14 @@ class BoundConstructor:
         self._constructor = compiled_contract.abi.constructor
 
     def __call__(self, *args: Any, **kwargs: Any) -> "BoundConstructorCall":
-        """
-        Returns a constructor call with encoded arguments and bytecode.
-        """
+        """Returns a constructor call with encoded arguments and bytecode."""
         call = self._constructor(*args, **kwargs)
         data_bytes = self._bytecode + call.input_bytes
         return BoundConstructorCall(self._contract_abi, data_bytes, self._constructor.payable)
 
 
 class BoundConstructorCall:
-    """
-    A constructor call with encoded arguments and bytecode.
-    """
+    """A constructor call with encoded arguments and bytecode."""
 
     contract_abi: ContractABI
     """The corresponding contract's ABI"""
@@ -45,9 +39,7 @@ class BoundConstructorCall:
 
 
 class BoundMethod:
-    """
-    A regular method bound to a specific contract's address.
-    """
+    """A regular method bound to a specific contract's address."""
 
     def __init__(self, contract_abi: ContractABI, contract_address: Address, method: Method):
         self._contract_abi = contract_abi
@@ -55,9 +47,7 @@ class BoundMethod:
         self._method = method
 
     def __call__(self, *args: Any, **kwargs: Any) -> "BoundMethodCall":
-        """
-        Returns a contract call with encoded arguments bound to a specific address.
-        """
+        """Returns a contract call with encoded arguments bound to a specific address."""
         call = self._method(*args, **kwargs)
         return BoundMethodCall(
             self._contract_abi, self._method, self._contract_address, call.data_bytes
@@ -65,9 +55,7 @@ class BoundMethod:
 
 
 class BoundMethodCall:
-    """
-    A regular method call with encoded arguments bound to a specific contract address.
-    """
+    """A regular method call with encoded arguments bound to a specific contract address."""
 
     contract_abi: ContractABI
     """The corresponding contract's ABI"""
@@ -99,32 +87,24 @@ class BoundMethodCall:
         self.mutating = self._method.mutating
 
     def decode_output(self, output_bytes: bytes) -> Any:
-        """
-        Decodes contract output packed into the bytestring.
-        """
+        """Decodes contract output packed into the bytestring."""
         return self._method.decode_output(output_bytes)
 
 
 class BoundEvent:
-    """
-    An event creation call with encoded topics bound to a specific contract address.
-    """
+    """An event creation call with encoded topics bound to a specific contract address."""
 
     def __init__(self, contract_address: Address, event: Event):
         self.contract_address = contract_address
         self.event = event
 
     def __call__(self, *args: Any, **kwargs: Any) -> "BoundEventFilter":
-        """
-        Returns an event filter with encoded arguments bound to a specific address.
-        """
+        """Returns an event filter with encoded arguments bound to a specific address."""
         return BoundEventFilter(self.contract_address, self.event, self.event(*args, **kwargs))
 
 
 class BoundEventFilter:
-    """
-    An event filter bound to a specific contract address.
-    """
+    """An event filter bound to a specific contract address."""
 
     contract_address: Address
     """The contract address."""
@@ -144,9 +124,7 @@ class BoundEventFilter:
 
 
 class CompiledContract:
-    """
-    A compiled contract (ABI and bytecode).
-    """
+    """A compiled contract (ABI and bytecode)."""
 
     abi: ContractABI
     """Contract's ABI."""
@@ -158,9 +136,7 @@ class CompiledContract:
     def from_compiler_output(
         cls, json_abi: List[Dict[str, JSON]], bytecode: bytes
     ) -> "CompiledContract":
-        """
-        Creates a compiled contract object from the output of a Solidity compiler.
-        """
+        """Creates a compiled contract object from the output of a Solidity compiler."""
         abi = ContractABI.from_json(json_abi)
         return cls(abi, bytecode)
 
@@ -170,16 +146,12 @@ class CompiledContract:
 
     @property
     def constructor(self) -> BoundConstructor:
-        """
-        Returns the constructor bound to this contract's bytecode.
-        """
+        """Returns the constructor bound to this contract's bytecode."""
         return BoundConstructor(self)
 
 
 class DeployedContract:
-    """
-    A deployed contract (ABI and address).
-    """
+    """A deployed contract (ABI and address)."""
 
     abi: ContractABI
     """Contract's ABI."""

@@ -20,9 +20,7 @@ JSON = Union[bool, int, float, str, None, Iterable["JSON"], Mapping[str, "JSON"]
 
 
 class Provider(ABC):
-    """
-    The base class for JSON RPC providers.
-    """
+    """The base class for JSON RPC providers."""
 
     @abstractmethod
     @asynccontextmanager
@@ -35,9 +33,7 @@ class Provider(ABC):
 
 
 class UnexpectedResponse(Exception):
-    """
-    Raised when the remote server's response is not of an expected format.
-    """
+    """Raised when the remote server's response is not of an expected format."""
 
 
 class ResponseDict:
@@ -69,15 +65,11 @@ class ResponseDict:
 
 
 class ProviderSession(ABC):
-    """
-    The base class for provider sessions.
-    """
+    """The base class for provider sessions."""
 
     @abstractmethod
     async def rpc(self, method: str, *args: JSON) -> JSON:
-        """
-        Calls the given RPC method with the already json-ified arguments.
-        """
+        """Calls the given RPC method with the already json-ified arguments."""
         ...
 
     async def rpc_and_pin(self, method: str, *args: JSON) -> Tuple[JSON, Tuple[int, ...]]:
@@ -98,9 +90,7 @@ class ProviderSession(ABC):
         return await self.rpc(method, *args)
 
     async def rpc_dict(self, method: str, *args: JSON) -> Optional[ResponseDict]:
-        """
-        Calls the given RPC method expecting to get a dictionary (or ``null``) in response.
-        """
+        """Calls the given RPC method expecting to get a dictionary (or ``null``) in response."""
         result = await self.rpc(method, *args)
         if result is None:
             return None
@@ -108,9 +98,7 @@ class ProviderSession(ABC):
 
 
 class HTTPProvider(Provider):
-    """
-    A provider for RPC via HTTP(S).
-    """
+    """A provider for RPC via HTTP(S)."""
 
     def __init__(self, url: str):
         self._url = url
@@ -166,9 +154,7 @@ class RPCError(Exception):
 
 
 class Unreachable(Exception):
-    """
-    Raised when there is a problem connecting to the provider.
-    """
+    """Raised when there is a problem connecting to the provider."""
 
 
 class HTTPSession(ProviderSession):

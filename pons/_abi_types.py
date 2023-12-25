@@ -22,9 +22,7 @@ from ._entities import Address
 
 
 class ABIDecodingError(Exception):
-    """
-    Raised on an error when decoding a value in an Eth ABI encoded bytestring.
-    """
+    """Raised on an error when decoding a value in an Eth ABI encoded bytestring."""
 
 
 ABIType = Union[int, str, bytes, bool, List["ABIType"]]
@@ -56,9 +54,7 @@ class Type(ABC):
     @property
     @abstractmethod
     def canonical_form(self) -> str:
-        """
-        Returns the type as a string in the canonical form (for ``eth_abi`` consumption).
-        """
+        """Returns the type as a string in the canonical form (for ``eth_abi`` consumption)."""
         ...
 
     @abstractmethod
@@ -78,15 +74,11 @@ class Type(ABC):
         ...
 
     def encode(self, val: Any) -> bytes:
-        """
-        Encodes the given value in the contract ABI format.
-        """
+        """Encodes the given value in the contract ABI format."""
         return encode_typed([self.canonical_form], [val])
 
     def encode_to_topic(self, val: Any) -> bytes:
-        """
-        Encodes the given value as an event topic.
-        """
+        """Encodes the given value as an event topic."""
         # EVM uses a simpler encoding scheme for encoding values into event topics
         # because objects of reference types are just hashed,
         # and there is no need to unpack them later
@@ -99,17 +91,13 @@ class Type(ABC):
         return self._encode_to_topic_outer(self._normalize(val))
 
     def _encode_to_topic_outer(self, val: Any) -> bytes:
-        """
-        Encodes a value of the outer indexed type.
-        """
+        """Encodes a value of the outer indexed type."""
         # By default it's just the encoding of the value type.
         # May be overridden.
         return self.encode(val)
 
     def _encode_to_topic_inner(self, val: Any) -> bytes:
-        """
-        Encodes a value contained within an indexed array or struct.
-        """
+        """Encodes a value contained within an indexed array or struct."""
         # By default it's just the encoding of the value type.
         # May be overridden.
         return self.encode(val)
@@ -142,9 +130,7 @@ class Type(ABC):
 
 
 class UInt(Type):
-    """
-    Corresponds to the Solidity ``uint<bits>`` type.
-    """
+    """Corresponds to the Solidity ``uint<bits>`` type."""
 
     def __init__(self, bits: int):
         if bits <= 0 or bits > 256 or bits % 8 != 0:
@@ -184,9 +170,7 @@ class UInt(Type):
 
 
 class Int(Type):
-    """
-    Corresponds to the Solidity ``int<bits>`` type.
-    """
+    """Corresponds to the Solidity ``int<bits>`` type."""
 
     def __init__(self, bits: int):
         if bits <= 0 or bits > 256 or bits % 8 != 0:
@@ -222,9 +206,7 @@ class Int(Type):
 
 
 class Bytes(Type):
-    """
-    Corresponds to the Solidity ``bytes<size>`` type.
-    """
+    """Corresponds to the Solidity ``bytes<size>`` type."""
 
     def __init__(self, size: Optional[int] = None):
         if size is not None and (size <= 0 or size > 32):
@@ -304,9 +286,7 @@ class AddressType(Type):
 
 
 class String(Type):
-    """
-    Corresponds to the Solidity ``string`` type.
-    """
+    """Corresponds to the Solidity ``string`` type."""
 
     @property
     def canonical_form(self) -> str:
@@ -342,9 +322,7 @@ class String(Type):
 
 
 class Bool(Type):
-    """
-    Corresponds to the Solidity ``bool`` type.
-    """
+    """Corresponds to the Solidity ``bool`` type."""
 
     @property
     def canonical_form(self) -> str:
@@ -368,9 +346,7 @@ class Bool(Type):
 
 
 class Array(Type):
-    """
-    Corresponds to the Solidity array (``[<size>]``) type.
-    """
+    """Corresponds to the Solidity array (``[<size>]``) type."""
 
     def __init__(self, element_type: Type, size: Optional[int] = None):
         self._element_type = element_type
@@ -413,9 +389,7 @@ class Array(Type):
 
 
 class Struct(Type):
-    """
-    Corresponds to the Solidity struct type.
-    """
+    """Corresponds to the Solidity struct type."""
 
     def __init__(self, fields: Mapping[str, Type]):
         self._fields = fields
