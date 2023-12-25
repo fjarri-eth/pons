@@ -1,10 +1,19 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Dict, Optional, Union, cast, Iterable, Mapping, Tuple
+from typing import (
+    Any,
+    AsyncIterator,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 import httpx
-
 
 # TODO: the doc entry had to be written manually for this type because of Sphinx limitations.
 JSON = Union[bool, int, float, str, None, Iterable["JSON"], Mapping[str, "JSON"]]

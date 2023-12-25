@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager, AsyncExitStack
-from typing import AsyncIterator, Optional, Iterable, List, Tuple
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import AsyncIterator, Iterable, List, Optional, Tuple
 
-from ._provider import Provider, ProviderSession, JSON, RPCError, UnexpectedResponse
+from ._provider import JSON, Provider, ProviderSession, RPCError, UnexpectedResponse
 
 
 class FallbackStrategy(ABC):

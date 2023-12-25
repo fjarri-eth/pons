@@ -1,27 +1,27 @@
-from collections import namedtuple
 import re
+from collections import namedtuple
 
 import pytest
 
 from pons import (
-    abi,
-    Constructor,
-    Method,
-    Fallback,
-    Receive,
-    ContractABI,
-    Event,
-    Error,
-    Either,
     ABIDecodingError,
+    Constructor,
+    ContractABI,
+    Either,
+    Error,
+    Event,
+    Fallback,
+    Method,
     Mutability,
+    Receive,
+    abi,
 )
-from pons._abi_types import keccak, encode_args
+from pons._abi_types import encode_args, keccak
 from pons._contract_abi import (
-    Signature,
-    EventSignature,
-    PANIC_ERROR,
     LEGACY_ERROR,
+    PANIC_ERROR,
+    EventSignature,
+    Signature,
     UnknownError,
 )
 from pons._entities import LogTopic

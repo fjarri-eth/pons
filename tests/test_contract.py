@@ -3,17 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from pons import (
-    abi,
-    Address,
-    Constructor,
-    Method,
-    Fallback,
-    Receive,
-    Event,
-)
-from pons._abi_types import keccak, encode_args
-from pons._contract import DeployedContract, BoundMethod
+from pons import Address, Constructor, Event, Fallback, Method, Receive, abi
+from pons._abi_types import encode_args, keccak
+from pons._contract import BoundMethod, DeployedContract
 from pons._entities import LogTopic
 
 from .compile import compile_file

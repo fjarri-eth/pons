@@ -1,14 +1,20 @@
 from contextlib import asynccontextmanager
 
-import trio
 import pytest
+import trio
 
-from pons import Client, Amount, HTTPProvider, Unreachable
-from pons._client import ProviderError, BadResponseFormat
-from pons._provider import ResponseDict, UnexpectedResponse, RPCError, Provider, ProviderSession
+from pons import Amount, Client, HTTPProvider, Unreachable
+from pons._client import BadResponseFormat, ProviderError
+from pons._provider import (
+    Provider,
+    ProviderSession,
+    ResponseDict,
+    RPCError,
+    UnexpectedResponse,
+)
 
-from .provider_server import ServerHandle
 from . import provider_server  # For monkeypatching purposes
+from .provider_server import ServerHandle
 
 
 @pytest.fixture

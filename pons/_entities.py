@@ -1,9 +1,20 @@
 from abc import ABC, abstractmethod
-from functools import cached_property
 from enum import Enum
-from typing import NamedTuple, Union, Optional, Tuple, Type, TypeVar, Any, Sequence, Iterable, cast
+from functools import cached_property
+from typing import (
+    Any,
+    Iterable,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
-from eth_utils import to_checksum_address, to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 from ._provider import ResponseDict
 

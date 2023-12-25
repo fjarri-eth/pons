@@ -1,13 +1,6 @@
-from typing import Any, Dict, Tuple, Optional, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from ._contract_abi import (
-    ContractABI,
-    Methods,
-    Method,
-    Event,
-    EventFilter,
-    Error,
-)
+from ._contract_abi import ContractABI, Error, Event, EventFilter, Method, Methods
 from ._entities import Address, LogEntry, LogTopic
 from ._provider import JSON
 

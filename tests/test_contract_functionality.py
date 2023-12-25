@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from pons import Amount, ContractABI, abi, Constructor, Method, DeployedContract, Mutability
+from pons import (
+    Amount,
+    Constructor,
+    ContractABI,
+    DeployedContract,
+    Method,
+    Mutability,
+    abi,
+)
 
 from .compile import compile_file
 

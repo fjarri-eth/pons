@@ -1,10 +1,21 @@
+import re
 from abc import ABC, abstractmethod
 from functools import cached_property
-import re
-from typing import Optional, Any, Union, Iterable, Mapping, Dict, Tuple, Sequence, List, cast
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
-from eth_abi.exceptions import DecodingError
 import eth_abi
+from eth_abi.exceptions import DecodingError
 from eth_utils import keccak
 
 from ._entities import Address

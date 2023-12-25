@@ -1,12 +1,11 @@
 import http
 
+import trio
+from hypercorn.config import Config
+from hypercorn.trio import serve
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
-
-from hypercorn.config import Config
-from hypercorn.trio import serve
-import trio
 
 from pons import HTTPProvider
 from pons._provider import RPCError

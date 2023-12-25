@@ -1,13 +1,19 @@
-from enum import Enum
-from contextlib import asynccontextmanager
-from typing import Optional, List, AsyncIterator
 import os
+from contextlib import asynccontextmanager
+from enum import Enum
+from typing import AsyncIterator, List, Optional
 
 import pytest
 
-from pons import FallbackProvider, FallbackStrategy, CycleFallback, PriorityFallback, Unreachable
-from pons._provider import Provider, ProviderSession, JSON, UnexpectedResponse, RPCError
+from pons import (
+    CycleFallback,
+    FallbackProvider,
+    FallbackStrategy,
+    PriorityFallback,
+    Unreachable,
+)
 from pons._fallback_provider import PriorityFallbackStrategy
+from pons._provider import JSON, Provider, ProviderSession, RPCError, UnexpectedResponse
 
 
 def random_request():

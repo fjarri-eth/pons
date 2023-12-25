@@ -2,19 +2,19 @@ from contextlib import asynccontextmanager
 from enum import Enum
 from functools import wraps
 from typing import (
-    Union,
     Any,
-    Optional,
     AsyncIterator,
-    Iterable,
-    Dict,
-    List,
-    Tuple,
-    Sequence,
-    Callable,
-    Mapping,
-    TypeVar,
     Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
     cast,
 )
 
@@ -24,45 +24,52 @@ import anyio
 from typing_extensions import ParamSpec
 
 from ._contract import (
-    DeployedContract,
     BoundConstructorCall,
-    BoundMethodCall,
-    BoundEventFilter,
     BoundEvent,
+    BoundEventFilter,
+    BoundMethodCall,
+    DeployedContract,
 )
-from ._contract_abi import EventFilter, PANIC_ERROR, LEGACY_ERROR, UnknownError, ContractABI, Error
-from ._provider import (
-    Provider,
-    ProviderSession,
-    UnexpectedResponse,
-    RPCError,
-    ResponseDict,
+from ._contract_abi import (
+    LEGACY_ERROR,
+    PANIC_ERROR,
+    ContractABI,
+    Error,
+    EventFilter,
+    UnknownError,
 )
-from ._signer import Signer
 from ._entities import (
     Address,
     Amount,
     Block,
     BlockFilter,
-    PendingTransactionFilter,
-    LogFilter,
     BlockFilterId,
-    PendingTransactionFilterId,
-    LogFilterId,
-    LogEntry,
     BlockHash,
-    TxHash,
     BlockInfo,
-    TxReceipt,
-    TxInfo,
-    rpc_encode_quantity,
-    rpc_encode_data,
-    rpc_encode_block,
-    rpc_decode_quantity,
-    rpc_decode_data,
+    LogEntry,
+    LogFilter,
+    LogFilterId,
+    PendingTransactionFilter,
+    PendingTransactionFilterId,
     RPCDecodingError,
+    TxHash,
+    TxInfo,
+    TxReceipt,
+    rpc_decode_data,
+    rpc_decode_quantity,
+    rpc_encode_block,
+    rpc_encode_data,
+    rpc_encode_quantity,
 )
-from ._provider import JSON
+from ._provider import (
+    JSON,
+    Provider,
+    ProviderSession,
+    ResponseDict,
+    RPCError,
+    UnexpectedResponse,
+)
+from ._signer import Signer
 
 
 class Client:

@@ -4,8 +4,8 @@ from typing import Mapping
 
 from eth_account.signers.base import BaseAccount
 
-from ._provider import JSON
 from ._entities import Address
+from ._provider import JSON
 
 
 class Signer(ABC):
