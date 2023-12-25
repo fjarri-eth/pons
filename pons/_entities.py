@@ -66,7 +66,7 @@ class TypedData(ABC):
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
         return cast(TypedDataLike, other)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self._value == self._check_type(other)._value
 
     def __repr__(self) -> str:
@@ -101,7 +101,7 @@ class TypedQuantity:
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
         return cast(TypedQuantityLike, other)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self._value == self._check_type(other)._value
 
     def __repr__(self) -> str:
@@ -130,12 +130,12 @@ class Amount(TypedQuantity):
         return cls(value)
 
     @classmethod
-    def gwei(cls: Type[CustomAmount], value: Union[int, float]) -> CustomAmount:
+    def gwei(cls: Type[CustomAmount], value: float) -> CustomAmount:
         """Creates a sum from the amount in gwei (``10^(-9)`` of the main unit)."""
         return cls(int(10**9 * value))
 
     @classmethod
-    def ether(cls: Type[CustomAmount], value: Union[int, float]) -> CustomAmount:
+    def ether(cls: Type[CustomAmount], value: float) -> CustomAmount:
         """Creates a sum from the amount in the main currency unit."""
         return cls(int(10**18 * value))
 
@@ -250,17 +250,17 @@ class LogFilterId(TypedQuantity):
 
 
 class BlockFilter(NamedTuple):
-    id: BlockFilterId
+    id_: BlockFilterId
     provider_path: Tuple[int, ...]
 
 
 class PendingTransactionFilter(NamedTuple):
-    id: PendingTransactionFilterId
+    id_: PendingTransactionFilterId
     provider_path: Tuple[int, ...]
 
 
 class LogFilter(NamedTuple):
-    id: LogFilterId
+    id_: LogFilterId
     provider_path: Tuple[int, ...]
 
 
@@ -289,10 +289,10 @@ class TxInfo(NamedTuple):
     """Transaction info."""
 
     # TODO: make an enum?
-    type: int
+    type_: int
     """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
 
-    hash: TxHash
+    hash_: TxHash
     """Transaction hash."""
 
     block_hash: BlockHash
@@ -343,8 +343,8 @@ class TxInfo(NamedTuple):
             else None
         )
         return cls(
-            type=rpc_decode_quantity(val["type"]),
-            hash=TxHash.rpc_decode(val["hash"]),
+            type_=rpc_decode_quantity(val["type"]),
+            hash_=TxHash.rpc_decode(val["hash"]),
             block_hash=BlockHash.rpc_decode(val["blockHash"]),
             block_number=rpc_decode_quantity(val["blockNumber"]),
             transaction_index=rpc_decode_quantity(val["transactionIndex"]),
@@ -365,7 +365,7 @@ class BlockInfo(NamedTuple):
     number: int
     """Block number."""
 
-    hash: BlockHash
+    hash_: BlockHash
     """Block hash."""
 
     parent_hash: BlockHash
@@ -426,11 +426,11 @@ class BlockInfo(NamedTuple):
             transactions = tuple(
                 TxInfo.rpc_decode(ResponseDict(tx_info)) for tx_info in transactions_raw
             )
-            transaction_hashes = tuple(tx.hash for tx in transactions)
+            transaction_hashes = tuple(tx.hash_ for tx in transactions)
 
         return cls(
             number=rpc_decode_quantity(val["number"]),
-            hash=BlockHash.rpc_decode(val["hash"]),
+            hash_=BlockHash.rpc_decode(val["hash"]),
             parent_hash=BlockHash.rpc_decode(val["parentHash"]),
             nonce=rpc_decode_quantity(val["nonce"]),
             difficulty=rpc_decode_quantity(val["difficulty"]),
@@ -486,7 +486,7 @@ class TxReceipt(NamedTuple):
     """Integer of the transaction's index position in the block."""
 
     # TODO: make an enum?
-    type: int
+    type_: int
     """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
 
     succeeded: bool
@@ -506,7 +506,7 @@ class TxReceipt(NamedTuple):
             to=Address.rpc_decode(val["to"]) if val["to"] else None,
             transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
             transaction_index=rpc_decode_quantity(val["transactionIndex"]),
-            type=rpc_decode_quantity(val["type"]),
+            type_=rpc_decode_quantity(val["type"]),
             succeeded=(rpc_decode_quantity(val["status"]) == 1),
         )
 

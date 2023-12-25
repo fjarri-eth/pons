@@ -1,3 +1,6 @@
+# We need to have some module-private members in `Type`.
+# ruff: noqa: SLF001
+
 import re
 from abc import ABC, abstractmethod
 from functools import cached_property

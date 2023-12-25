@@ -1,3 +1,8 @@
+# This is the whole point of this module.
+# ruff: noqa: A001
+
+"""Aliases for various Solidity types."""
+
 from typing import Optional
 
 from ._abi_types import AddressType, Bool, Bytes, Int, String, Struct, Type, UInt

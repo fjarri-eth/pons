@@ -302,10 +302,9 @@ def decode_contract_error(
 
         if error == PANIC_ERROR:
             return ContractPanic.from_code(decoded_data["code"])
-        elif error == LEGACY_ERROR:
+        if error == LEGACY_ERROR:
             return ContractLegacyError(decoded_data["message"])
-        else:
-            return ContractError(error, decoded_data)
+        return ContractError(error, decoded_data)
     return exc
 
 
@@ -496,7 +495,7 @@ class ClientSession:
 
     @rpc_call("eth_getBlockByHash")
     async def eth_get_block_by_hash(
-        self, block_hash: BlockHash, with_transactions: bool = False
+        self, block_hash: BlockHash, *, with_transactions: bool = False
     ) -> Optional[BlockInfo]:
         """Calls the ``eth_getBlockByHash`` RPC method."""
         result = await self._provider_session.rpc_dict(
@@ -508,7 +507,7 @@ class ClientSession:
 
     @rpc_call("eth_getBlockByNumber")
     async def eth_get_block_by_number(
-        self, block: Union[int, Block] = Block.LATEST, with_transactions: bool = False
+        self, block: Union[int, Block] = Block.LATEST, *, with_transactions: bool = False
     ) -> Optional[BlockInfo]:
         """Calls the ``eth_getBlockByNumber`` RPC method."""
         result = await self._provider_session.rpc_dict(
@@ -733,7 +732,7 @@ class ClientSession:
         """Calls the ``eth_newBlockFilter`` RPC method."""
         result, provider_path = await self._provider_session.rpc_and_pin("eth_newBlockFilter")
         filter_id = BlockFilterId.rpc_decode(result)
-        return BlockFilter(id=filter_id, provider_path=provider_path)
+        return BlockFilter(id_=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_newPendingTransactionFilter")
     async def eth_new_pending_transaction_filter(self) -> PendingTransactionFilter:
@@ -742,7 +741,7 @@ class ClientSession:
             "eth_newPendingTransactionFilter"
         )
         filter_id = PendingTransactionFilterId.rpc_decode(result)
-        return PendingTransactionFilter(id=filter_id, provider_path=provider_path)
+        return PendingTransactionFilter(id_=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_newFilter")
     async def eth_new_filter(
@@ -772,7 +771,7 @@ class ClientSession:
 
         result, provider_path = await self._provider_session.rpc_and_pin("eth_newFilter", params)
         filter_id = LogFilterId.rpc_decode(result)
-        return LogFilter(id=filter_id, provider_path=provider_path)
+        return LogFilter(id_=filter_id, provider_path=provider_path)
 
     @rpc_call("eth_getFilterChangers")
     async def eth_get_filter_changes(
@@ -784,7 +783,7 @@ class ClientSession:
         """
         # TODO: split into separate functions with specific return types?
         results = await self._provider_session.rpc_at_pin(
-            filter_.provider_path, "eth_getFilterChanges", filter_.id.rpc_encode()
+            filter_.provider_path, "eth_getFilterChanges", filter_.id_.rpc_encode()
         )
 
         # TODO: this will go away with generalized RPC decoding.

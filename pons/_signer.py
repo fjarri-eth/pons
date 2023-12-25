@@ -36,4 +36,4 @@ class AccountSigner(Signer):
 
     def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
         # Ignoring the type since BaseAccount.sign_transaction is untyped
-        return bytes(self._account.sign_transaction(tx_dict).rawTransaction)  # type: ignore
+        return bytes(self._account.sign_transaction(tx_dict).rawTransaction)  # type: ignore[no-untyped-call]

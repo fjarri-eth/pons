@@ -29,7 +29,9 @@ class Provider(ABC):
         Opens a session to the provider
         (allowing the backend to perform multiple operations faster).
         """
-        yield  # type: ignore
+        # mypy does not work with abstract generators correctly.
+        # See https://github.com/python/mypy/issues/5070
+        yield  # type: ignore[misc]
 
 
 class UnexpectedResponse(Exception):
@@ -166,7 +168,7 @@ class HTTPSession(ProviderSession):
         json = {"jsonrpc": "2.0", "method": method, "params": args, "id": 0}
         try:
             response = await self._client.post(self._url, json=json)
-        except Exception as exc:
+        except httpx.ConnectError as exc:
             raise Unreachable(str(exc)) from exc
         if response.status_code != HTTPStatus.OK:
             raise RPCError(response.status_code, response.content.decode())

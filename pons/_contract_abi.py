@@ -31,6 +31,15 @@ from ._abi_types import (
 from ._entities import LogEntry, LogTopic
 from ._provider import JSON
 
+# Anonymous events can have at most 4 indexed fields
+ANONYMOUS_EVENT_INDEXED_FIELDS = 4
+
+# Anonymous events can have at most 4 indexed fields
+EVENT_INDEXED_FIELDS = 3
+
+# The number of bytes in a function selector.
+SELECTOR_LENGTH = 4
+
 
 # We are using the `inspect` machinery to bind arguments to parameters.
 # From Py3.11 on it does not allow parameter names to coincide with keywords,
@@ -39,8 +48,7 @@ from ._provider import JSON
 def make_name_safe(name: str) -> str:
     if iskeyword(name):
         return name + "_"
-    else:
-        return name
+    return name
 
 
 class Signature:
@@ -136,7 +144,6 @@ class EventSignature:
         Binds given arguments to event's indexed parameters
         and encodes them as log topics.
         """
-
         bound_args = self._signature.bind_partial(*args, **kwargs)
 
         encoded_topics: List[Optional[Tuple[bytes, ...]]] = []
@@ -240,7 +247,7 @@ class Constructor:
         payable = method_entry["stateMutability"] == "payable"
         return cls(inputs, payable=payable)
 
-    def __init__(self, inputs: Union[Mapping[str, Type], Sequence[Type]], payable: bool = False):
+    def __init__(self, inputs: Union[Mapping[str, Type], Sequence[Type]], *, payable: bool = False):
         self.inputs = Signature(inputs)
         self.payable = payable
 
@@ -286,7 +293,7 @@ class Mutability(Enum):
 
     @property
     def mutating(self) -> bool:
-        return self == Mutability.PAYABLE or self == Mutability.NONPAYABLE
+        return self in {Mutability.PAYABLE, Mutability.NONPAYABLE}
 
 
 class Method:
@@ -369,7 +376,7 @@ class Method:
     @cached_property
     def selector(self) -> bytes:
         """Method's selector."""
-        return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:4]
+        return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:SELECTOR_LENGTH]
 
     def _encode_call(self, *args: Any, **kwargs: Any) -> bytes:
         input_bytes = self.inputs.encode(*args, **kwargs)
@@ -383,10 +390,7 @@ class Method:
         return results
 
     def __str__(self) -> str:
-        if self.outputs.empty:
-            returns = ""
-        else:
-            returns = f" returns {self.outputs}"
+        returns = "" if self.outputs.empty else f" returns {self.outputs}"
         return f"function {self.name}{self.inputs} {self._mutability.value}{returns}"
 
 
@@ -409,7 +413,7 @@ class Event:
         name = event_entry["name"]
         fields = dispatch_types(event_entry["inputs"])
         if isinstance(fields, list):
-            raise ValueError("Event fields must be named")
+            raise TypeError("Event fields must be named")
 
         indexed = {input_["name"] for input_ in event_entry["inputs"] if input_["indexed"]}
 
@@ -420,12 +424,17 @@ class Event:
         name: str,
         fields: Mapping[str, Type],
         indexed: AbstractSet[str],
+        *,
         anonymous: bool = False,
     ):
-        if anonymous and len(indexed) > 4:
-            raise ValueError("Anonymous events can have at most 4 indexed fields")
-        if not anonymous and len(indexed) > 3:
-            raise ValueError("Non-anonymous events can have at most 3 indexed fields")
+        if anonymous and len(indexed) > ANONYMOUS_EVENT_INDEXED_FIELDS:
+            raise ValueError(
+                f"Anonymous events can have at most {ANONYMOUS_EVENT_INDEXED_FIELDS} indexed fields"
+            )
+        if not anonymous and len(indexed) > EVENT_INDEXED_FIELDS:
+            raise ValueError(
+                f"Non-anonymous events can have at most {EVENT_INDEXED_FIELDS} indexed fields"
+            )
 
         self.name = name
         self.indexed = indexed
@@ -445,7 +454,6 @@ class Event:
         :py:class:`Either` can be used to denote an OR operation and match
         either of several values of a parameter.
         """
-
         encoded_topics = self.fields.encode_to_topics(*args, **kwargs)
 
         log_topics: List[Optional[Tuple[LogTopic, ...]]] = []
@@ -498,7 +506,7 @@ class Error:
         name = error_entry["name"]
         fields = dispatch_types(error_entry["inputs"])
         if isinstance(fields, list):
-            raise ValueError("Error fields must be named")
+            raise TypeError("Error fields must be named")
 
         return cls(name=name, fields=fields)
 
@@ -513,7 +521,7 @@ class Error:
     @cached_property
     def selector(self) -> bytes:
         """Error's selector."""
-        return keccak(self.name.encode() + self.fields.canonical_form.encode())[:4]
+        return keccak(self.name.encode() + self.fields.canonical_form.encode())[:SELECTOR_LENGTH]
 
     def decode_fields(self, data_bytes: bytes) -> Dict[str, Any]:
         """Decodes the error fields from the given packed data."""
@@ -541,9 +549,9 @@ class Fallback:
                 "Fallback method's JSON entry state mutability must be `nonpayable` or `payable`"
             )
         payable = method_entry["stateMutability"] == "payable"
-        return cls(payable)
+        return cls(payable=payable)
 
-    def __init__(self, payable: bool = False):
+    def __init__(self, *, payable: bool = False):
         self.payable = payable
 
     def __str__(self) -> str:
@@ -568,9 +576,9 @@ class Receive:
                 "Receive method's JSON entry state mutability must be `nonpayable` or `payable`"
             )
         payable = method_entry["stateMutability"] == "payable"
-        return cls(payable)
+        return cls(payable=payable)
 
-    def __init__(self, payable: bool = False):
+    def __init__(self, *, payable: bool = False):
         self.payable = payable
 
     def __str__(self) -> str:
@@ -605,7 +613,7 @@ MethodType = TypeVar("MethodType")
 
 class Methods(Generic[MethodType]):
     """
-    Bases: ``Generic`` [``MethodType``]
+    Bases: ``Generic`` [``MethodType``].
 
     A holder for named methods which can be accessed as attributes,
     or iterated over.
@@ -663,7 +671,7 @@ class ContractABI:
     """Contract's errors."""
 
     @classmethod
-    def from_json(cls, json_abi: List[Dict[str, JSON]]) -> "ContractABI":  # noqa: C901
+    def from_json(cls, json_abi: List[Dict[str, JSON]]) -> "ContractABI":  # noqa: C901, PLR0912
         """Creates this object from a JSON ABI (e.g. generated by a Solidity compiler)."""
         constructor = None
         fallback = None
@@ -750,10 +758,10 @@ class ContractABI:
         Given the packed error data, attempts to find the error in the ABI
         and decode the data into its fields.
         """
-        if len(error_data) < 4:
+        if len(error_data) < SELECTOR_LENGTH:
             raise ValueError("Error data too short to contain a selector")
 
-        selector, data = error_data[:4], error_data[4:]
+        selector, data = error_data[:SELECTOR_LENGTH], error_data[SELECTOR_LENGTH:]
 
         if selector in self._error_by_selector:
             error = self._error_by_selector[selector]

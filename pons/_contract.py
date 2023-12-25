@@ -17,7 +17,9 @@ class BoundConstructor:
         """Returns a constructor call with encoded arguments and bytecode."""
         call = self._constructor(*args, **kwargs)
         data_bytes = self._bytecode + call.input_bytes
-        return BoundConstructorCall(self._contract_abi, data_bytes, self._constructor.payable)
+        return BoundConstructorCall(
+            self._contract_abi, data_bytes, payable=self._constructor.payable
+        )
 
 
 class BoundConstructorCall:
@@ -32,7 +34,7 @@ class BoundConstructorCall:
     data_bytes: bytes
     """Encoded arguments and the contract's bytecode."""
 
-    def __init__(self, contract_abi: ContractABI, data_bytes: bytes, payable: bool):
+    def __init__(self, contract_abi: ContractABI, data_bytes: bytes, *, payable: bool):
         self.contract_abi = contract_abi
         self.payable = payable
         self.data_bytes = data_bytes

@@ -600,7 +600,7 @@ def test_event_errors():
     # This works
     Event("Foo", dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8), indexed={"a", "b", "c"})
 
-    with pytest.raises(ValueError, match="Event fields must be named"):
+    with pytest.raises(TypeError, match="Event fields must be named"):
         Event.from_json(
             dict(
                 anonymous=True,
@@ -635,7 +635,7 @@ def test_error_from_json():
     ):
         Error.from_json(dict(type="constructor"))
 
-    with pytest.raises(ValueError, match="Error fields must be named"):
+    with pytest.raises(TypeError, match="Error fields must be named"):
         Error.from_json(
             dict(
                 inputs=[

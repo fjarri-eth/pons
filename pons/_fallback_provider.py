@@ -61,10 +61,7 @@ class CycleFallback(FallbackStrategyFactory):
             self._weights = None
 
     def make_strategy(self, num_providers: int) -> CycleFallbackStrategy:
-        if not self._weights:
-            weights = [1] * num_providers
-        else:
-            weights = self._weights
+        weights = self._weights or [1] * num_providers
 
         if len(weights) != num_providers:
             raise ValueError(
@@ -110,6 +107,7 @@ class FallbackProvider(Provider):
         self,
         providers: Iterable[Provider],
         strategy: FallbackStrategyFactory = PriorityFallback(),
+        *,
         same_provider: bool = False,
     ):
         self._providers = list(providers)
@@ -119,15 +117,17 @@ class FallbackProvider(Provider):
     @asynccontextmanager
     async def session(self) -> AsyncIterator["ProviderSession"]:
         async with AsyncExitStack() as stack:
-            sessions = []
-            for provider in self._providers:
-                sessions.append(await stack.enter_async_context(provider.session()))
-            yield FallbackProviderSession(sessions, self._strategy, self._same_provider)
+            sessions = [
+                await stack.enter_async_context(provider.session()) for provider in self._providers
+            ]
+            yield FallbackProviderSession(
+                sessions, self._strategy, same_provider=self._same_provider
+            )
 
 
 class FallbackProviderSession(ProviderSession):
     def __init__(
-        self, sessions: List[ProviderSession], strategy: FallbackStrategy, same_provider: bool
+        self, sessions: List[ProviderSession], strategy: FallbackStrategy, *, same_provider: bool
     ):
         self._sessions = sessions
         self._strategy = strategy
@@ -139,10 +139,12 @@ class FallbackProviderSession(ProviderSession):
         for provider_idx in provider_idxs:
             try:
                 result, sub_idx = await self._sessions[provider_idx].rpc_and_pin(method, *args)
-            except Exception as exc:
+            # PERF203: There won't be a lot of providers, and we need to collect errors from each.
+            # BLE001: it's just a middleware, collecting all errors.
+            except Exception as exc:  # noqa: PERF203, BLE001
                 exceptions.append(exc)
             else:
-                return result, (provider_idx,) + sub_idx
+                return result, (provider_idx, *sub_idx)
 
         # Here we may have a list with each element being
         # `RPCError`, `UnexpectedResponse`, or `Unreachable`.
