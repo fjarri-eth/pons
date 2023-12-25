@@ -12,6 +12,7 @@ dependencies = [
     "eth-abi>=4",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
+    "typing_extensions>=4.2"
 ]
 requires-python = ">=3.8"
 license = "MIT"
@@ -29,7 +30,7 @@ tests = [
     "py-solc-x>=1",
     # eth-tester only has pre-releases, so we can't set a range.
     # TODO: make our own mock around Pyevm.
-    "eth-tester[pyevm]==0.9.1b1",
+    "eth-tester[pyevm]==0.10.0-beta.1",
     "starlette",
     "hypercorn",
     "mypy-extensions>=1"

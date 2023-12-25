@@ -17,20 +17,11 @@ from typing import (
     Awaitable,
     cast,
 )
-import sys
-
-# This is the only thing we need from 3.10, and it's only used for `mypy`,
-# and is not exposed to the user.
-# We could use `typing_extensions`, but currently has an upper bound (<4.0) set by some of `pyevm`
-# dependencies, and `ParamSpec` is beyound that bound (introduced in 4.2).
-# So just gate it here for now and wait until the minimum Python version for the package
-# can be reaised to 3.10 safely.
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    ParamSpec = lambda _: [Any]  # pragma: no cover
 
 import anyio
+
+# Can be imported from `typing` when we require Python >= 3.10
+from typing_extensions import ParamSpec
 
 from ._contract import (
     DeployedContract,
