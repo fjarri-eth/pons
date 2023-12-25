@@ -86,7 +86,7 @@ class Client:
         async with self._provider.session() as provider_session:
             client_session = ClientSession(provider_session)
             yield client_session
-            # TODO: incorporate cached values from the session back into the client
+            # TODO (#58): incorporate cached values from the session back into the client
 
 
 class RemoteError(Exception):
@@ -533,7 +533,7 @@ class ClientSession:
         chain_id = await self.eth_chain_id()
         if gas is None:
             gas = await self.estimate_transfer(signer.address, destination_address, amount)
-        # TODO: implement gas strategies
+        # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
@@ -599,7 +599,7 @@ class ClientSession:
         chain_id = await self.eth_chain_id()
         if gas is None:
             gas = await self.estimate_deploy(call, amount=amount)
-        # TODO: implement gas strategies
+        # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
@@ -651,7 +651,7 @@ class ClientSession:
         chain_id = await self.eth_chain_id()
         if gas is None:
             gas = await self.estimate_transact(call, amount=amount)
-        # TODO: implement gas strategies
+        # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
@@ -782,7 +782,7 @@ class ClientSession:
         Calls the ``eth_getFilterChangers`` RPC method.
         Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
-        # TODO: split into separate functions wiht specific return types?
+        # TODO: split into separate functions with specific return types?
         results = await self._provider_session.rpc_at_pin(
             filter_.provider_path, "eth_getFilterChanges", filter_.id.rpc_encode()
         )

@@ -680,7 +680,7 @@ class ContractABI:
 
             elif entry["type"] == "function":
                 if entry["name"] in methods:
-                    # TODO: add support for overloaded methods
+                    # TODO (#21): add support for overloaded methods
                     raise ValueError(
                         f"JSON ABI contains more than one declarations of `{entry['name']}`"
                     )
