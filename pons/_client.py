@@ -449,14 +449,20 @@ class ClientSession:
         )
         return rpc_decode_quantity(result)
 
-    async def estimate_deploy(self, call: BoundConstructorCall, amount: Amount = Amount(0)) -> int:
+    async def estimate_deploy(
+        self, call: BoundConstructorCall, amount: Optional[Amount] = None
+    ) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
+        Use with the same `amount` argument you would use to deploy the contract in production.
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
         or :py:class:`ContractError` if a known error was caught during the dry run.
         If the error was unknown, falls back to :py:class:`ProviderError`.
         """
+        if amount is None:
+            amount = Amount(0)
+
         tx = {
             "data": rpc_encode_data(call.data_bytes),
             "value": amount.rpc_encode(),
@@ -482,14 +488,21 @@ class ClientSession:
         }
         return await self._estimate_gas(tx)
 
-    async def estimate_transact(self, call: BoundMethodCall, amount: Amount = Amount(0)) -> int:
+    async def estimate_transact(
+        self, call: BoundMethodCall, amount: Optional[Amount] = None
+    ) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
+        Use with the same `amount` argument you would use to transact
+        with the contract in production.
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
         or :py:class:`ContractError` if a known error was caught during the dry run.
         If the error was unknown, falls back to :py:class:`ProviderError`.
         """
+        if amount is None:
+            amount = Amount(0)
+
         tx = {
             "to": call.contract_address.rpc_encode(),
             "data": rpc_encode_data(call.data_bytes),
@@ -601,7 +614,7 @@ class ClientSession:
         self,
         signer: Signer,
         call: BoundConstructorCall,
-        amount: Amount = Amount(0),
+        amount: Optional[Amount] = None,
         gas: Optional[int] = None,
     ) -> DeployedContract:
         """
@@ -609,12 +622,16 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+        ``amount`` denotes the amount of currency to send to the constructor.
 
         Raises :py:class:`TransactionFailed` if the transaction was submitted successfully,
         but could not be processed.
         If gas estimation is run, see the additional errors that may be raised in the docs for
         :py:meth:`~ClientSession.estimate_deploy`.
         """
+        if amount is None:
+            amount = Amount(0)
+
         if not call.payable and amount.as_wei() != 0:
             raise ValueError("This constructor does not accept an associated payment")
 
@@ -654,9 +671,16 @@ class ClientSession:
         self,
         signer: Signer,
         call: BoundMethodCall,
-        amount: Amount = Amount(0),
+        amount: Optional[Amount] = None,
         gas: Optional[int] = None,
     ) -> TxHash:
+        """
+        Broadcasts the transaction without waiting for it to be finalized.
+        See :py:meth:`~ClientSession.transact` for the information on the parameters.
+        """
+        if amount is None:
+            amount = Amount(0)
+
         if not call.mutating:
             raise ValueError("This method is non-mutating, use `eth_call` to invoke it")
 
@@ -688,7 +712,7 @@ class ClientSession:
         self,
         signer: Signer,
         call: BoundMethodCall,
-        amount: Amount = Amount(0),
+        amount: Optional[Amount] = None,
         gas: Optional[int] = None,
         return_events: Optional[Sequence[BoundEvent]] = None,
     ) -> Dict[BoundEvent, List[Dict[str, Any]]]:
@@ -697,6 +721,7 @@ class ClientSession:
         If ``gas`` is ``None``, the required amount of gas is estimated first,
         otherwise the provided value is used.
         Waits for the transaction to be confirmed.
+        ``amount`` denotes the amount of currency to send with the transaction.
 
         If any bound events are given in `return_events`, the provider will be queried
         for any firing of these events originating from the hash of the completed transaction
