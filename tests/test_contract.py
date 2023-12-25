@@ -3,17 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from pons import (
-    abi,
-    Address,
-    Constructor,
-    Method,
-    Fallback,
-    Receive,
-    Event,
-)
-from pons._abi_types import keccak, encode_args
-from pons._contract import DeployedContract, BoundMethod
+from pons import Address, Constructor, Event, Fallback, Method, Receive, abi
+from pons._abi_types import encode_args, keccak
+from pons._contract import BoundMethod, DeployedContract
 from pons._entities import LogTopic
 
 from .compile import compile_file
@@ -26,9 +18,7 @@ def compiled_contracts():
 
 
 def test_abi_declaration(compiled_contracts):
-    """
-    Checks that the compiler output is parsed correctly.
-    """
+    """Checks that the compiler output is parsed correctly."""
 
     compiled_contract = compiled_contracts["JsonAbiTest"]
 
@@ -72,9 +62,7 @@ def test_abi_declaration(compiled_contracts):
 
 
 def test_api_binding(compiled_contracts):
-    """
-    Checks that the methods are bound correctly on deploy.
-    """
+    """Checks that the methods are bound correctly on deploy."""
 
     compiled_contract = compiled_contracts["JsonAbiTest"]
 

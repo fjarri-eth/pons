@@ -1,19 +1,26 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Dict, Optional, Union, cast, Iterable, Mapping, Tuple
+from typing import (
+    Any,
+    AsyncIterator,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 import httpx
-
 
 # TODO: the doc entry had to be written manually for this type because of Sphinx limitations.
 JSON = Union[bool, int, float, str, None, Iterable["JSON"], Mapping[str, "JSON"]]
 
 
 class Provider(ABC):
-    """
-    The base class for JSON RPC providers.
-    """
+    """The base class for JSON RPC providers."""
 
     @abstractmethod
     @asynccontextmanager
@@ -22,13 +29,13 @@ class Provider(ABC):
         Opens a session to the provider
         (allowing the backend to perform multiple operations faster).
         """
-        yield  # type: ignore
+        # mypy does not work with abstract generators correctly.
+        # See https://github.com/python/mypy/issues/5070
+        yield  # type: ignore[misc]
 
 
 class UnexpectedResponse(Exception):
-    """
-    Raised when the remote server's response is not of an expected format.
-    """
+    """Raised when the remote server's response is not of an expected format."""
 
 
 class ResponseDict:
@@ -60,15 +67,11 @@ class ResponseDict:
 
 
 class ProviderSession(ABC):
-    """
-    The base class for provider sessions.
-    """
+    """The base class for provider sessions."""
 
     @abstractmethod
     async def rpc(self, method: str, *args: JSON) -> JSON:
-        """
-        Calls the given RPC method with the already json-ified arguments.
-        """
+        """Calls the given RPC method with the already json-ified arguments."""
         ...
 
     async def rpc_and_pin(self, method: str, *args: JSON) -> Tuple[JSON, Tuple[int, ...]]:
@@ -89,9 +92,7 @@ class ProviderSession(ABC):
         return await self.rpc(method, *args)
 
     async def rpc_dict(self, method: str, *args: JSON) -> Optional[ResponseDict]:
-        """
-        Calls the given RPC method expecting to get a dictionary (or ``null``) in response.
-        """
+        """Calls the given RPC method expecting to get a dictionary (or ``null``) in response."""
         result = await self.rpc(method, *args)
         if result is None:
             return None
@@ -99,9 +100,7 @@ class ProviderSession(ABC):
 
 
 class HTTPProvider(Provider):
-    """
-    A provider for RPC via HTTP(S).
-    """
+    """A provider for RPC via HTTP(S)."""
 
     def __init__(self, url: str):
         self._url = url
@@ -157,9 +156,7 @@ class RPCError(Exception):
 
 
 class Unreachable(Exception):
-    """
-    Raised when there is a problem connecting to the provider.
-    """
+    """Raised when there is a problem connecting to the provider."""
 
 
 class HTTPSession(ProviderSession):
@@ -171,7 +168,7 @@ class HTTPSession(ProviderSession):
         json = {"jsonrpc": "2.0", "method": method, "params": args, "id": 0}
         try:
             response = await self._client.post(self._url, json=json)
-        except Exception as exc:
+        except httpx.ConnectError as exc:
             raise Unreachable(str(exc)) from exc
         if response.status_code != HTTPStatus.OK:
             raise RPCError(response.status_code, response.content.decode())

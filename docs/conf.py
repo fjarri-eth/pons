@@ -14,11 +14,10 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import os
 import importlib.metadata
+import os
 
 import setuptools_scm
-
 
 # -- Project information -----------------------------------------------------
 
@@ -48,6 +47,7 @@ extensions = [
 
 autoclass_content = "both"
 autodoc_member_order = "groupwise"
+autodoc_type_aliases = {"JSON": "JSON"}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = []

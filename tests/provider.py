@@ -1,28 +1,25 @@
-"""
-PyEVM-based provider for tests.
-"""
+"""PyEVM-based provider for tests."""
 
 import ast
 from contextlib import asynccontextmanager, contextmanager
-from typing import Union, List
+from typing import List, Union
 
+from eth.exceptions import Revert
 from eth_account import Account
 from eth_tester import EthereumTester, PyEVMBackend
-from eth_tester.exceptions import TransactionNotFound, TransactionFailed, BlockNotFound
-from eth.exceptions import Revert
+from eth_tester.exceptions import BlockNotFound, TransactionFailed, TransactionNotFound
 from eth_utils.exceptions import ValidationError
 
-from pons import abi, Amount, Address
-from pons._abi_types import keccak, encode_args, decode_args
-from pons._provider import Provider, ProviderSession, RPCError
+from pons import Address, Amount, abi
+from pons._abi_types import decode_args, encode_args, keccak
 from pons._client import ProviderErrorCode
 from pons._entities import (
-    rpc_encode_quantity,
+    rpc_decode_block,
     rpc_decode_quantity,
     rpc_encode_data,
-    rpc_decode_block,
+    rpc_encode_quantity,
 )
-
+from pons._provider import Provider, ProviderSession, RPCError
 
 # The standard `revert(string)` is a EIP838 error.
 _ERROR_SELECTOR = keccak(b"Error(string)")[:4]

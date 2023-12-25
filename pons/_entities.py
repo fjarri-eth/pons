@@ -1,17 +1,26 @@
 from abc import ABC, abstractmethod
-from functools import cached_property
 from enum import Enum
-from typing import NamedTuple, Union, Optional, Tuple, Type, TypeVar, Any, Sequence, Iterable, cast
+from functools import cached_property
+from typing import (
+    Any,
+    Iterable,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
-from eth_utils import to_checksum_address, to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 from ._provider import ResponseDict
 
 
 class RPCDecodingError(Exception):
-    """
-    Raised on an error when decoding a value in an RPC response.
-    """
+    """Raised on an error when decoding a value in an RPC response."""
 
 
 TypedDataLike = TypeVar("TypedDataLike", bound="TypedData")
@@ -57,7 +66,7 @@ class TypedData(ABC):
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
         return cast(TypedDataLike, other)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self._value == self._check_type(other)._value
 
     def __repr__(self) -> str:
@@ -92,7 +101,7 @@ class TypedQuantity:
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
         return cast(TypedQuantityLike, other)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self._value == self._check_type(other)._value
 
     def __repr__(self) -> str:
@@ -117,41 +126,29 @@ class Amount(TypedQuantity):
 
     @classmethod
     def wei(cls: Type[CustomAmount], value: int) -> CustomAmount:
-        """
-        Creates a sum from the amount in wei (``10^(-18)`` of the main unit).
-        """
+        """Creates a sum from the amount in wei (``10^(-18)`` of the main unit)."""
         return cls(value)
 
     @classmethod
-    def gwei(cls: Type[CustomAmount], value: Union[int, float]) -> CustomAmount:
-        """
-        Creates a sum from the amount in gwei (``10^(-9)`` of the main unit).
-        """
+    def gwei(cls: Type[CustomAmount], value: float) -> CustomAmount:
+        """Creates a sum from the amount in gwei (``10^(-9)`` of the main unit)."""
         return cls(int(10**9 * value))
 
     @classmethod
-    def ether(cls: Type[CustomAmount], value: Union[int, float]) -> CustomAmount:
-        """
-        Creates a sum from the amount in the main currency unit.
-        """
+    def ether(cls: Type[CustomAmount], value: float) -> CustomAmount:
+        """Creates a sum from the amount in the main currency unit."""
         return cls(int(10**18 * value))
 
     def as_wei(self) -> int:
-        """
-        Returns the amount in wei.
-        """
+        """Returns the amount in wei."""
         return self._value
 
     def as_gwei(self) -> float:
-        """
-        Returns the amount in gwei.
-        """
+        """Returns the amount in gwei."""
         return self._value / 10**9
 
     def as_ether(self) -> float:
-        """
-        Returns the amount in the main currency unit.
-        """
+        """Returns the amount in the main currency unit."""
         return self._value / 10**18
 
     def __add__(self: CustomAmount, other: Any) -> CustomAmount:
@@ -191,9 +188,7 @@ CustomAddress = TypeVar("CustomAddress", bound="Address")
 
 
 class Address(TypedData):
-    """
-    Represents an Ethereum address.
-    """
+    """Represents an Ethereum address."""
 
     def _length(self) -> int:
         return 20
@@ -208,9 +203,7 @@ class Address(TypedData):
 
     @cached_property
     def checksum(self) -> str:
-        """
-        Retunrs the checksummed hex representation of the address.
-        """
+        """Retunrs the checksummed hex representation of the address."""
         return to_checksum_address(self._value)
 
     def rpc_encode(self) -> str:
@@ -226,9 +219,7 @@ class Address(TypedData):
 
 
 class Block(Enum):
-    """
-    Block aliases supported by Ethereum RPC.
-    """
+    """Block aliases supported by Ethereum RPC."""
 
     LATEST = "latest"
     """The latest confirmed block"""
@@ -247,75 +238,61 @@ class Block(Enum):
 
 
 class BlockFilterId(TypedQuantity):
-    """
-    A block filter identifier (returned by ``eth_newBlockFilter``).
-    """
+    """A block filter identifier (returned by ``eth_newBlockFilter``)."""
 
 
 class PendingTransactionFilterId(TypedQuantity):
-    """
-    A pending transaction filter identifier (returned by ``eth_newPendingTransactionFilter``).
-    """
+    """A pending transaction filter identifier (returned by ``eth_newPendingTransactionFilter``)."""
 
 
 class LogFilterId(TypedQuantity):
-    """
-    A log filter identifier (returned by ``eth_newFilter``).
-    """
+    """A log filter identifier (returned by ``eth_newFilter``)."""
 
 
 class BlockFilter(NamedTuple):
-    id: BlockFilterId
+    id_: BlockFilterId
     provider_path: Tuple[int, ...]
 
 
 class PendingTransactionFilter(NamedTuple):
-    id: PendingTransactionFilterId
+    id_: PendingTransactionFilterId
     provider_path: Tuple[int, ...]
 
 
 class LogFilter(NamedTuple):
-    id: LogFilterId
+    id_: LogFilterId
     provider_path: Tuple[int, ...]
 
 
 class LogTopic(TypedData):
-    """
-    A log topic for log filtering.
-    """
+    """A log topic for log filtering."""
 
     def _length(self) -> int:
         return 32
 
 
 class BlockHash(TypedData):
-    """
-    A wrapper for the block hash.
-    """
+    """A wrapper for the block hash."""
 
     def _length(self) -> int:
         return 32
 
 
 class TxHash(TypedData):
-    """
-    A wrapper for the transaction hash.
-    """
+    """A wrapper for the transaction hash."""
 
     def _length(self) -> int:
         return 32
 
 
 class TxInfo(NamedTuple):
-    """
-    Transaction info.
-    """
+    """Transaction info."""
 
     # TODO: make an enum?
-    type: int
+    type_: int
     """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
 
-    hash: TxHash
+    hash_: TxHash
     """Transaction hash."""
 
     block_hash: BlockHash
@@ -366,8 +343,8 @@ class TxInfo(NamedTuple):
             else None
         )
         return cls(
-            type=rpc_decode_quantity(val["type"]),
-            hash=TxHash.rpc_decode(val["hash"]),
+            type_=rpc_decode_quantity(val["type"]),
+            hash_=TxHash.rpc_decode(val["hash"]),
             block_hash=BlockHash.rpc_decode(val["blockHash"]),
             block_number=rpc_decode_quantity(val["blockNumber"]),
             transaction_index=rpc_decode_quantity(val["transactionIndex"]),
@@ -383,14 +360,12 @@ class TxInfo(NamedTuple):
 
 
 class BlockInfo(NamedTuple):
-    """
-    Block info.
-    """
+    """Block info."""
 
     number: int
     """Block number."""
 
-    hash: BlockHash
+    hash_: BlockHash
     """Block hash."""
 
     parent_hash: BlockHash
@@ -451,11 +426,11 @@ class BlockInfo(NamedTuple):
             transactions = tuple(
                 TxInfo.rpc_decode(ResponseDict(tx_info)) for tx_info in transactions_raw
             )
-            transaction_hashes = tuple(tx.hash for tx in transactions)
+            transaction_hashes = tuple(tx.hash_ for tx in transactions)
 
         return cls(
             number=rpc_decode_quantity(val["number"]),
-            hash=BlockHash.rpc_decode(val["hash"]),
+            hash_=BlockHash.rpc_decode(val["hash"]),
             parent_hash=BlockHash.rpc_decode(val["parentHash"]),
             nonce=rpc_decode_quantity(val["nonce"]),
             difficulty=rpc_decode_quantity(val["difficulty"]),
@@ -472,9 +447,7 @@ class BlockInfo(NamedTuple):
 
 
 class TxReceipt(NamedTuple):
-    """
-    Transaction receipt.
-    """
+    """Transaction receipt."""
 
     block_hash: BlockHash
     """Hash of the block including this transaction."""
@@ -513,7 +486,7 @@ class TxReceipt(NamedTuple):
     """Integer of the transaction's index position in the block."""
 
     # TODO: make an enum?
-    type: int
+    type_: int
     """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
 
     succeeded: bool
@@ -533,15 +506,13 @@ class TxReceipt(NamedTuple):
             to=Address.rpc_decode(val["to"]) if val["to"] else None,
             transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
             transaction_index=rpc_decode_quantity(val["transactionIndex"]),
-            type=rpc_decode_quantity(val["type"]),
+            type_=rpc_decode_quantity(val["type"]),
             succeeded=(rpc_decode_quantity(val["status"]) == 1),
         )
 
 
 class LogEntry(NamedTuple):
-    """
-    Log entry metadata.
-    """
+    """Log entry metadata."""
 
     removed: bool
     """

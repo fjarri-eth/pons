@@ -1,30 +1,30 @@
-from contextlib import contextmanager
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 import trio
 
 from pons import (
-    abi,
     ABIDecodingError,
     Address,
     Amount,
-    ContractABI,
-    DeployedContract,
-    Method,
-    TxHash,
-    BlockHash,
     Block,
-    Either,
-    ContractPanic,
-    ContractLegacyError,
+    BlockHash,
+    ContractABI,
     ContractError,
+    ContractLegacyError,
+    ContractPanic,
+    DeployedContract,
+    Either,
+    Method,
     Mutability,
+    TxHash,
+    abi,
 )
-from pons._abi_types import keccak, encode_args
-from pons._contract_abi import PANIC_ERROR
+from pons._abi_types import encode_args, keccak
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
+from pons._contract_abi import PANIC_ERROR
 from pons._entities import rpc_encode_data
 from pons._provider import RPCError
 
@@ -422,7 +422,7 @@ async def test_get_block(test_provider, session, root_signer, another_signer):
     block_info = await session.eth_get_block_by_number(1, with_transactions=True)
     assert block_info.transactions is not None
 
-    block_info2 = await session.eth_get_block_by_hash(block_info.hash, with_transactions=True)
+    block_info2 = await session.eth_get_block_by_hash(block_info.hash_, with_transactions=True)
     assert block_info2 == block_info
 
     # no transactions
@@ -475,13 +475,13 @@ async def test_block_filter(test_provider, session, root_signer, another_signer)
     prev_block = await session.eth_get_block_by_number(last_block.number - 1)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
-    assert block_hashes == (prev_block.hash, last_block.hash)
+    assert block_hashes == (prev_block.hash_, last_block.hash_)
 
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
     last_block = await session.eth_get_block_by_number(Block.LATEST)
-    assert block_hashes == (last_block.hash,)
+    assert block_hashes == (last_block.hash_,)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
     assert len(block_hashes) == 0

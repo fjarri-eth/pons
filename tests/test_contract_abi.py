@@ -1,27 +1,27 @@
-from collections import namedtuple
 import re
+from collections import namedtuple
 
 import pytest
 
 from pons import (
-    abi,
-    Constructor,
-    Method,
-    Fallback,
-    Receive,
-    ContractABI,
-    Event,
-    Error,
-    Either,
     ABIDecodingError,
+    Constructor,
+    ContractABI,
+    Either,
+    Error,
+    Event,
+    Fallback,
+    Method,
     Mutability,
+    Receive,
+    abi,
 )
-from pons._abi_types import keccak, encode_args
+from pons._abi_types import encode_args, keccak
 from pons._contract_abi import (
-    Signature,
-    EventSignature,
-    PANIC_ERROR,
     LEGACY_ERROR,
+    PANIC_ERROR,
+    EventSignature,
+    Signature,
     UnknownError,
 )
 from pons._entities import LogTopic
@@ -600,7 +600,7 @@ def test_event_errors():
     # This works
     Event("Foo", dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8), indexed={"a", "b", "c"})
 
-    with pytest.raises(ValueError, match="Event fields must be named"):
+    with pytest.raises(TypeError, match="Event fields must be named"):
         Event.from_json(
             dict(
                 anonymous=True,
@@ -635,7 +635,7 @@ def test_error_from_json():
     ):
         Error.from_json(dict(type="constructor"))
 
-    with pytest.raises(ValueError, match="Error fields must be named"):
+    with pytest.raises(TypeError, match="Error fields must be named"):
         Error.from_json(
             dict(
                 inputs=[

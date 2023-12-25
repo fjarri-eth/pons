@@ -1,5 +1,5 @@
-from eth_account import Account
 import pytest
+from eth_account import Account
 
 from pons import AccountSigner, Client
 

@@ -1,6 +1,6 @@
 [project]
 name = "pons"
-version = "0.7.0"
+version = "0.8.0-dev"
 description = "Async RPC client for Ethereum"
 authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
@@ -12,6 +12,7 @@ dependencies = [
     "eth-abi>=4",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
+    "typing_extensions>=4.2"
 ]
 requires-python = ">=3.8"
 license = "MIT"
@@ -29,7 +30,7 @@ tests = [
     "py-solc-x>=1",
     # eth-tester only has pre-releases, so we can't set a range.
     # TODO: make our own mock around Pyevm.
-    "eth-tester[pyevm]==0.9.1b1",
+    "eth-tester[pyevm]==0.10.0-beta.1",
     "starlette",
     "hypercorn",
     "mypy-extensions>=1"
@@ -44,6 +45,7 @@ lint = [
     "mypy>=1.4",
     "trio-typing[mypy]>=0.9.0",
     "black>=23",
+    "isort>=5"
 ]
 
 [tool.black]
@@ -70,3 +72,82 @@ source-includes = [
 [build-system]
 requires = ["pdm-pep517"]
 build-backend = "pdm.pep517.api"
+
+[tool.ruff]
+select = ["ALL"]
+ignore = [
+    # It's a stylistic choice. Don't save on matches.
+    "C408",
+    # It's never a problem unless you mutate function arguments (which is rarely a good idea).
+    "B008",
+    # The type of `self` is derived automatically.
+    "ANN101",
+    # We use `Any` quite a bit because we need to accept a lot of third-party unnormalized input.
+    "ANN401",
+    # The return type of `__init__` is derived automatically.
+    "ANN204",
+    # The type of `cls` in classmethods is derived automatically.
+    "ANN102",
+    # `Tuple` is deprecated since Python 3.9, but we still support 3.8.
+    # When we only support 3.9+, use `tuple` instead and remove this ignore.
+    "FA100",
+    # Doesn't mesh well with the way `black` puts the final parenthesis on a separate line
+    # in functions with one parameter and a long argument.
+    "COM812",
+    # The formatting message is actually useful in a traceback.
+    "EM102",
+    # Could be useful, but triggers on built-in exception classes (e.g. `ValueError`),
+    # which are supposed to be used like that.
+    "TRY003",
+    # Mutually exclusive with D213, which we prefer.
+    "D212",
+    # Mutually exclusive with D211, which we prefer.
+    "D203",
+    # Small project, no need to assign authors in TODOs.
+    "TD002",
+    # A trade-off between traceback noise and code noise. I prefer less code noise.
+    "EM101",
+    # Would be a good rule, but has weird false positives
+    # (it triggers even if it's only one sentence but a long one).
+    "D205",
+    # Not sure on this one. The code has been using third-person form before,
+    # but I can see the potential merit.
+    "D401",
+    # Not helpful. Issues ID should be enough to silence both of these.
+    "TD003",
+    "FIX002",
+    # Too much code noise. A concept of error can be conveyed
+    # without using the word "error" explicitly.
+    "N818",
+    # Too ham-fisted. 5 arguments is too small of a limit.
+    "PLR0913",
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+exclude = [
+    ".eggs",
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pypackages__",
+    "build",
+    "dist",
+]
+per-file-ignores = {}
+
+# Same as Black.
+line-length = 100
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.8
+target-version = "py38"
+
+[tool.isort]
+profile = "black"
+src_paths = ["pons", "test"]

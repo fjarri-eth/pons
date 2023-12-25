@@ -1,5 +1,5 @@
-from typing import Dict
 from pathlib import Path
+from typing import Dict
 
 import solcx
 

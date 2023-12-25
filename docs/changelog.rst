@@ -2,14 +2,23 @@ Changelog
 ---------
 
 
-0.7.1 (unreleased)
+0.8.0 (unreleased)
 ~~~~~~~~~~~~~~~~~~
+
+Changed
+~~~~~~~
+
+- Added an explicit ``typing_extensions`` dependency. (PR_57_)
+- Various boolean arguments are now keyword-only to prevent usage errors. (PR_57_)
+- Field names clashing with Python built-ins (``hash``, ``type``, ``id``) are suffixed with an underscore. (PR_57_)
+
 
 Added
 ^^^^^
 
 - ``Client.transact()`` takes an optional ``return_events`` argument, allowing one to get "return values" from the transaction via events. (PR_52_)
 - Exposed ``ClientSession``, ``ConstructorCall``, ``MethodCall``, ``EventFilter``, ``BoundConstructor``, ``BoundConstructorCall``, ``BoundMethod``, ``BoundMethodCall``, ``BoundEvent``, ``BoundEventFilter`` from the top level. (PR_56_)
+- Various methods that had a default ``Amount(0)`` for a parameter can now take ``None``. (PR_57_)
 
 
 Fixed
@@ -21,6 +30,7 @@ Fixed
 .. _PR_51: https://github.com/fjarri/pons/pull/51
 .. _PR_52: https://github.com/fjarri/pons/pull/52
 .. _PR_56: https://github.com/fjarri/pons/pull/56
+.. _PR_57: https://github.com/fjarri/pons/pull/57
 
 
 0.7.0 (09-07-2023)

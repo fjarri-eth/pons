@@ -1,12 +1,11 @@
 import http
 
+import trio
+from hypercorn.config import Config
+from hypercorn.trio import serve
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
-
-from hypercorn.config import Config
-from hypercorn.trio import serve
-import trio
 
 from pons import HTTPProvider
 from pons._provider import RPCError
@@ -37,9 +36,7 @@ async def entry_point(request):
 
 
 def make_app(provider):
-    """
-    Creates and returns an ASGI app.
-    """
+    """Creates and returns an ASGI app."""
 
     # Since we need to use an externally passed context in the app (``ursula_server``),
     # we have to create the app inside a function.
