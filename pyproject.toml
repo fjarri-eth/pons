@@ -71,3 +71,37 @@ source-includes = [
 [build-system]
 requires = ["pdm-pep517"]
 build-backend = "pdm.pep517.api"
+
+[tool.ruff]
+select = ["E", "F", "W", "C", "B", "Q", "I"]
+ignore = [
+    # It's a stylistic choice. Don't save on matches.
+    "C408",
+    # It's never a problem unless you mutate function arguments (which is rarely a good idea).
+    "B008",
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+exclude = [
+    ".eggs",
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pypackages__",
+    "build",
+    "dist",
+]
+per-file-ignores = {}
+
+# Same as Black.
+line-length = 100
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.8
+target-version = "py38"
