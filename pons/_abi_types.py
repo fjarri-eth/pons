@@ -20,6 +20,12 @@ from eth_utils import keccak
 
 from ._entities import Address
 
+# Maximum bits in an `int` or `uint` type in Solidity.
+MAX_INTEGER_BITS = 256
+
+# Maximum size of a `bytes` type in Solidity.
+MAX_BYTES_SIZE = 32
+
 
 class ABIDecodingError(Exception):
     """Raised on an error when decoding a value in an Eth ABI encoded bytestring."""
@@ -36,8 +42,7 @@ def encode_typed(types: Iterable[str], args: Iterable[ABIType]) -> bytes:
     # ``eth_abi.encode()`` does not have type annotations.
     # This is a typed wrapper (easier than making custom stubs).
     # Remove when typing is added in ``eth_abi``.
-    encoded = eth_abi.encode(types, args)
-    return encoded
+    return eth_abi.encode(types, args)
 
 
 def decode_typed(types: Iterable[str], data: bytes) -> Tuple[ABIType, ...]:
@@ -67,10 +72,7 @@ class Type(ABC):
 
     @abstractmethod
     def _denormalize(self, val: ABIType) -> Any:
-        """
-        Checks the result of ``decode()``
-        and wraps it in a specific type, if applicable.
-        """
+        """Checks the result of ``decode()`` and wraps it in a specific type, if applicable."""
         ...
 
     def encode(self, val: Any) -> bytes:
@@ -133,7 +135,7 @@ class UInt(Type):
     """Corresponds to the Solidity ``uint<bits>`` type."""
 
     def __init__(self, bits: int):
-        if bits <= 0 or bits > 256 or bits % 8 != 0:
+        if bits <= 0 or bits > MAX_INTEGER_BITS or bits % 8 != 0:
             raise ValueError(f"Incorrect `uint` bit size: {bits}")
         self._bits = bits
 
@@ -165,7 +167,7 @@ class UInt(Type):
     def _denormalize(self, val: ABIType) -> int:
         return self._check_val(val)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, UInt) and self._bits == other._bits
 
 
@@ -173,7 +175,7 @@ class Int(Type):
     """Corresponds to the Solidity ``int<bits>`` type."""
 
     def __init__(self, bits: int):
-        if bits <= 0 or bits > 256 or bits % 8 != 0:
+        if bits <= 0 or bits > MAX_INTEGER_BITS or bits % 8 != 0:
             raise ValueError(f"Incorrect `int` bit size: {bits}")
         self._bits = bits
 
@@ -201,7 +203,7 @@ class Int(Type):
     def _denormalize(self, val: ABIType) -> int:
         return self._check_val(val)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, Int) and self._bits == other._bits
 
 
@@ -209,7 +211,7 @@ class Bytes(Type):
     """Corresponds to the Solidity ``bytes<size>`` type."""
 
     def __init__(self, size: Optional[int] = None):
-        if size is not None and (size <= 0 or size > 32):
+        if size is not None and (size <= 0 or size > MAX_BYTES_SIZE):
             raise ValueError(f"Incorrect `bytes` size: {size}")
         self._size = size
 
@@ -254,7 +256,7 @@ class Bytes(Type):
             return None
         return super().decode_from_topic(val)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, Bytes) and self._size == other._size
 
 
@@ -281,7 +283,7 @@ class AddressType(Type):
             raise TypeError(f"Expected a string to convert to `Address`, got {type(val).__name__}")
         return Address.from_hex(val)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, AddressType)
 
 
@@ -313,11 +315,11 @@ class String(Type):
         # `string` is encoded and treated as dynamic `bytes`
         return Bytes()._encode_to_topic_inner(val.encode())
 
-    def decode_from_topic(self, val: bytes) -> None:
+    def decode_from_topic(self, _val: bytes) -> None:
         # Dynamic `string` is hashed, so the value cannot be recovered.
         return None
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, String)
 
 
@@ -341,7 +343,7 @@ class Bool(Type):
     def _denormalize(self, val: ABIType) -> bool:
         return self._check_val(val)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, Bool)
 
 
@@ -377,10 +379,10 @@ class Array(Type):
     def _encode_to_topic_inner(self, val: Any) -> bytes:
         return b"".join(self._element_type._encode_to_topic_inner(elem) for elem in val)
 
-    def decode_from_topic(self, val: Any) -> None:
+    def decode_from_topic(self, _val: Any) -> None:
         return None
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, Array)
             and self._element_type == other._element_type
@@ -430,14 +432,14 @@ class Struct(Type):
             tp._encode_to_topic_inner(elem) for elem, tp in zip(val, self._fields.values())
         )
 
-    def decode_from_topic(self, val: Any) -> None:
+    def decode_from_topic(self, _val: Any) -> None:
         return None
 
     def __str__(self) -> str:
         # Overriding  the `Type`'s implementation because we want to show the field names too
         return "(" + ", ".join(str(tp) + " " + str(name) for name, tp in self._fields.items()) + ")"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, Struct)
             and self._fields == other._fields
@@ -487,13 +489,14 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
         element_entry["type"] = element_type_name
         element_type = dispatch_type(element_entry)
         return Array(element_type, array_size)
-    elif element_type_name == "tuple":
+
+    if element_type_name == "tuple":
         fields = {}
         for component in abi_entry["components"]:
             fields[component["name"]] = dispatch_type(component)
         return Struct(fields)
-    else:
-        return type_from_abi_string(element_type_name)
+
+    return type_from_abi_string(element_type_name)
 
 
 def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Union[List[Type], Dict[str, Type]]:
@@ -531,8 +534,7 @@ def decode_args(types: Iterable[Type], data: bytes) -> Tuple[ABIType, ...]:
         # wrap possible `eth_abi` errors
         signature = "(" + ",".join(canonical_types) + ")"
         message = (
-            f"Could not decode the return value "
-            f"with the expected signature {signature}: {str(exc)}"
+            f"Could not decode the return value with the expected signature {signature}: {exc}"
         )
         raise ABIDecodingError(message) from exc
 

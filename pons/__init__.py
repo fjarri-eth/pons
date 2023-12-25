@@ -1,3 +1,5 @@
+"""Async Ethereum RPC client."""
+
 from . import abi
 from ._abi_types import ABIDecodingError
 from ._client import (
