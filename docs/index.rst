@@ -12,8 +12,7 @@ A quick usage example:
     import pons
     import eth_account
 
-    from tests.provider import EthereumTesterProvider
-    from tests.provider_server import ServerHandle
+    from pons import EthereumTesterProvider, ServerHandle
 
     # Run examples with our test server in the background
 
