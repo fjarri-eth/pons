@@ -103,6 +103,10 @@ Contract ABI
    :members:
    :special-members: __call__
 
+.. autoclass:: MultiMethod
+   :members:
+   :special-members: __call__
+
 .. autoclass:: Event
    :members:
 

@@ -33,6 +33,7 @@ from ._contract_abi import (
     Fallback,
     Method,
     MethodCall,
+    MultiMethod,
     Mutability,
     Receive,
 )
@@ -83,6 +84,7 @@ __all__ = [
     "JSON",
     "Method",
     "MethodCall",
+    "MultiMethod",
     "Mutability",
     "PriorityFallback",
     "ProviderError",

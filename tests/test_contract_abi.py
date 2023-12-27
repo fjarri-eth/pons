@@ -12,6 +12,7 @@ from pons import (
     Event,
     Fallback,
     Method,
+    MultiMethod,
     Mutability,
     Receive,
     abi,
@@ -256,6 +257,79 @@ def test_method_errors():
         Method.from_json(json)
 
 
+def test_multi_method():
+    method1 = Method(
+        name="someMethod",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8), b=abi.bool),
+        outputs=abi.uint(8),
+    )
+    method2 = Method(
+        name="someMethod",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8)),
+        outputs=abi.uint(8),
+    )
+
+    multi_method = MultiMethod(method1, method2)
+    assert multi_method["(uint8,bool)"] == method1
+    assert multi_method["(uint8)"] == method2
+
+    assert str(multi_method) == (
+        "function someMethod(uint8 a, bool b) view returns (uint8); "
+        "function someMethod(uint8 a) view returns (uint8)"
+    )
+
+    # Create sequentially
+    multi_method = MultiMethod(method1).with_method(method2)
+    assert multi_method["(uint8,bool)"] == method1
+    assert multi_method["(uint8)"] == method2
+
+    # Call the first method
+    call = multi_method(1, b=True)
+    assert call.method == method1
+
+    # Call the second method
+    call = multi_method(a=1)
+    assert call.method == method2
+
+    # Call with arguments not matching any of the methods
+    with pytest.raises(
+        TypeError, match="Could not find a suitable overloaded method for the given arguments"
+    ):
+        multi_method(1, True, 2)
+
+    # If the multi-method only contains one method, raise the binding error right away
+    multi_method = MultiMethod(method1)
+    with pytest.raises(TypeError, match="missing a required argument: 'b'"):
+        multi_method(1)
+
+
+def test_multi_method_errors():
+    with pytest.raises(ValueError, match="`methods` cannot be empty"):
+        MultiMethod()
+
+    method = Method(
+        name="someMethod",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8), b=abi.bool),
+        outputs=abi.uint(8),
+    )
+    method_with_different_name = Method(
+        name="someMethod2",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8)),
+        outputs=abi.uint(8),
+    )
+
+    with pytest.raises(ValueError, match="All overloaded methods must have the same name"):
+        MultiMethod(method, method_with_different_name)
+
+    msg = re.escape("A method someMethod(uint8,bool) is already registered in this MultiMethod")
+    with pytest.raises(ValueError, match=msg):
+        MultiMethod(method, method)
+
+
 def test_fallback():
     fallback = Fallback.from_json(dict(type="fallback", stateMutability="payable"))
     assert fallback.payable
@@ -425,6 +499,45 @@ def test_contract_abi_init():
     assert isinstance(cabi.method.writeMethod, Method)
 
 
+def test_overloaded_methods():
+    json_abi = [
+        dict(
+            type="function",
+            name="readMethod",
+            stateMutability="view",
+            inputs=[
+                dict(type="uint8", name="a"),
+                dict(type="bool", name="b"),
+            ],
+            outputs=[
+                dict(type="uint8", name=""),
+            ],
+        ),
+        dict(
+            type="function",
+            name="readMethod",
+            stateMutability="view",
+            inputs=[
+                dict(type="uint8", name="a"),
+            ],
+            outputs=[
+                dict(type="uint8", name=""),
+            ],
+        ),
+    ]
+
+    cabi = ContractABI.from_json(json_abi)
+    assert str(cabi) == (
+        "{\n"
+        "    constructor() nonpayable\n"
+        "    function readMethod(uint8 a, bool b) view returns (uint8)\n"
+        "    function readMethod(uint8 a) view returns (uint8)\n"
+        "}"
+    )
+
+    assert isinstance(cabi.method.readMethod, MultiMethod)
+
+
 def test_no_constructor():
     cabi = ContractABI()
     assert isinstance(cabi.constructor, Constructor)
@@ -437,12 +550,6 @@ def test_contract_abi_errors():
         ValueError, match="JSON ABI contains more than one constructor declarations"
     ):
         abi = ContractABI.from_json([constructor_abi, constructor_abi])
-
-    write_abi = dict(type="function", name="someMethod", stateMutability="payable", inputs=[])
-    with pytest.raises(
-        ValueError, match="JSON ABI contains more than one declarations of `someMethod`"
-    ):
-        abi = ContractABI.from_json([write_abi, write_abi])
 
     fallback_abi = dict(type="fallback", stateMutability="payable")
     with pytest.raises(ValueError, match="JSON ABI contains more than one fallback declarations"):

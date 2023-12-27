@@ -42,6 +42,14 @@ contract Test {
         return v1 + _x;
     }
 
+    function overloaded(uint256 _x, uint256 _y) public view returns (uint256) {
+        return _y + _x;
+    }
+
+    function overloaded(uint256 _x) public view returns (uint256) {
+        return v1 + _x;
+    }
+
     struct Inner {
         uint256 inner1;
         uint256 inner2;
