@@ -62,6 +62,20 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
     assert result == (inner, outer)
 
 
+async def test_overloaded_method(session, root_signer, another_signer, compiled_contracts):
+    compiled_contract = compiled_contracts["Test"]
+
+    # Deploy the contract
+    call = compiled_contract.constructor(12345, 56789)
+    deployed_contract = await session.deploy(root_signer, call)
+
+    result = await session.eth_call(deployed_contract.method.overloaded(123))
+    assert result == (12345 + 123,)
+
+    result = await session.eth_call(deployed_contract.method.overloaded(123, 456))
+    assert result == (456 + 123,)
+
+
 async def test_read_only_mode(session, root_signer, compiled_contracts):
     # Test that a "nonpayable" (that is, mutating) method can still be invoked
     # via `eth_call`, and it will use the current state of the contract

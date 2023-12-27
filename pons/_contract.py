@@ -1,6 +1,14 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ._contract_abi import ContractABI, Error, Event, EventFilter, Method, Methods
+from ._contract_abi import (
+    ContractABI,
+    Error,
+    Event,
+    EventFilter,
+    Method,
+    Methods,
+    MultiMethod,
+)
 from ._entities import Address, LogEntry, LogTopic
 from ._provider import JSON
 
@@ -43,7 +51,12 @@ class BoundConstructorCall:
 class BoundMethod:
     """A regular method bound to a specific contract's address."""
 
-    def __init__(self, contract_abi: ContractABI, contract_address: Address, method: Method):
+    def __init__(
+        self,
+        contract_abi: ContractABI,
+        contract_address: Address,
+        method: Union[Method, MultiMethod],
+    ):
         self._contract_abi = contract_abi
         self._contract_address = contract_address
         self._method = method
@@ -52,7 +65,7 @@ class BoundMethod:
         """Returns a contract call with encoded arguments bound to a specific address."""
         call = self._method(*args, **kwargs)
         return BoundMethodCall(
-            self._contract_abi, self._method, self._contract_address, call.data_bytes
+            self._contract_abi, call.method, self._contract_address, call.data_bytes
         )
 
 
