@@ -6,8 +6,8 @@ from typing import Any, AsyncIterator, Iterable, Iterator, Mapping, Union, cast
 
 from eth.exceptions import Revert
 from eth_account import Account
-from eth_tester import EthereumTester, PyEVMBackend  # type: ignore
-from eth_tester.exceptions import (  # type: ignore
+from eth_tester import EthereumTester, PyEVMBackend  # type: ignore[import-untyped]
+from eth_tester.exceptions import (  # type: ignore[import-untyped]
     BlockNotFound,
     TransactionFailed,
     TransactionNotFound,
@@ -211,8 +211,8 @@ class EthereumTesterProvider(Provider):
         return normalize_return_value(result)
 
     def eth_get_block_by_hash(
-        self, block_hash: str, with_transactions: bool
-    ) -> JSON:  # noqa: FBT001
+        self, block_hash: str, with_transactions: bool  # noqa: FBT001
+    ) -> JSON:
         try:
             result = self._ethereum_tester.get_block_by_hash(
                 block_hash, full_transactions=with_transactions
