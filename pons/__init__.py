@@ -12,7 +12,7 @@ from ._client import (
     RemoteError,
     TransactionFailed,
 )
-from ._compiler import compile_contract_file
+from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
     BoundConstructor,
     BoundConstructorCall,
@@ -80,6 +80,7 @@ __all__ = [
     "EthereumTesterProvider",
     "Event",
     "EventFilter",
+    "EVMVersion",
     "Fallback",
     "FallbackProvider",
     "FallbackStrategy",
