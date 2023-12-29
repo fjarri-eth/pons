@@ -18,7 +18,6 @@ from . import abi
 from ._abi_types import decode_args, encode_args, keccak
 from ._client import ProviderErrorCode
 from ._entities import (
-    Address,
     Amount,
     rpc_decode_block,
     rpc_decode_quantity,
@@ -26,6 +25,7 @@ from ._entities import (
     rpc_encode_quantity,
 )
 from ._provider import JSON, Provider, ProviderSession, RPCError
+from ._signer import AccountSigner, Signer
 
 # The standard `revert(string)` is a EIP838 error.
 _ERROR_SELECTOR = keccak(b"Error(string)")[:4]
@@ -107,20 +107,33 @@ def normalize_return_value(value: Normalizable) -> JSON:
     return value
 
 
-class EthereumTesterProvider(Provider):
-    def __init__(self, root_balance_eth: int = 100):
+class TesterProvider(Provider):
+    """A provider maintaining its own chain state, useful for tests."""
+
+    # Disable py.test picking this class up.
+    __test__ = False
+
+    root_account: Signer
+    """The signer for the pre-created account."""
+
+    def __init__(self, *, root_balance: Amount):
         custom_genesis_state = PyEVMBackend.generate_genesis_state(
-            num_accounts=1, overrides=dict(balance=Amount.ether(root_balance_eth).as_wei())
+            num_accounts=1, overrides=dict(balance=root_balance.as_wei())
         )
         backend = PyEVMBackend(genesis_state=custom_genesis_state)
         self._ethereum_tester = EthereumTester(backend)
-        self.root_account = Account.from_key(backend.account_keys[0])
-        self._default_address = Address.from_hex(self.root_account.address)
+        self.root = AccountSigner(Account.from_key(backend.account_keys[0]))
+        self._default_address = self.root.address
 
     def disable_auto_mine_transactions(self) -> None:
+        """Disable mining a new block after each transaction."""
         self._ethereum_tester.disable_auto_mine_transactions()
 
     def enable_auto_mine_transactions(self) -> None:
+        """
+        Disable mining a new block after each transaction.
+        This is the default behavior.
+        """
         self._ethereum_tester.enable_auto_mine_transactions()
 
     def rpc(self, method: str, *args: Any) -> JSON:
@@ -276,12 +289,12 @@ class EthereumTesterProvider(Provider):
         return cast(JSON, results)
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator["EthereumTesterProviderSession"]:
-        yield EthereumTesterProviderSession(self)
+    async def session(self) -> AsyncIterator["TesterProviderSession"]:
+        yield TesterProviderSession(self)
 
 
-class EthereumTesterProviderSession(ProviderSession):
-    def __init__(self, provider: EthereumTesterProvider):
+class TesterProviderSession(ProviderSession):
+    def __init__(self, provider: TesterProvider):
         self._provider = provider
 
     async def rpc(self, method: str, *args: JSON) -> JSON:

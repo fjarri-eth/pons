@@ -40,7 +40,6 @@ def compile_contract_file(
     Some ``evm_version`` values may not be available depending on the compiler version.
     If ``evm_version`` is not given, the compiler default is used.
     """
-
     path = Path(path).resolve()
 
     compiled = solcx.compile_files(

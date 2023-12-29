@@ -1,12 +1,11 @@
 import pytest
-from eth_account import Account
 
-from pons import AccountSigner, Client, EthereumTesterProvider
+from pons import AccountSigner, Amount, Client, TesterProvider
 
 
 @pytest.fixture
 def test_provider():
-    yield EthereumTesterProvider()
+    yield TesterProvider(root_balance=Amount.ether(100))
 
 
 @pytest.fixture
@@ -18,10 +17,9 @@ async def session(test_provider):
 
 @pytest.fixture
 def root_signer(test_provider):
-    root_account = test_provider.root_account
-    yield AccountSigner(root_account)
+    yield test_provider.root
 
 
 @pytest.fixture
 def another_signer():
-    return AccountSigner(Account.create())
+    return AccountSigner.create()

@@ -48,7 +48,7 @@ from ._fallback_provider import (
 )
 from ._provider import JSON, HTTPProvider, Unreachable
 from ._signer import AccountSigner, Signer
-from ._test_provider import EthereumTesterProvider
+from ._test_provider import TesterProvider
 from ._test_rpc_provider import ServerHandle
 
 __all__ = [
@@ -77,7 +77,7 @@ __all__ = [
     "DeployedContract",
     "Either",
     "Error",
-    "EthereumTesterProvider",
+    "TesterProvider",
     "Event",
     "EventFilter",
     "EVMVersion",

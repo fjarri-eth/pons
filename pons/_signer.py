@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Mapping
 
+from eth_account import Account
 from eth_account.signers.base import BaseAccount
 
 from ._entities import Address
@@ -29,6 +30,16 @@ class AccountSigner(Signer):
 
     def __init__(self, account: BaseAccount):
         self._account = account
+
+    @staticmethod
+    def create() -> "AccountSigner":
+        """Creates an account with a random private key."""
+        return AccountSigner(Account.create())
+
+    @property
+    def account(self) -> BaseAccount:
+        """Returns the account object used to create this signer."""
+        return self._account
 
     @cached_property
     def address(self) -> Address:
