@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import AsyncIterator, Iterable, List, Optional, Tuple
 
-from ._provider import JSON, Provider, ProviderSession, RPCError, UnexpectedResponse
+from ._provider import JSON, InvalidResponse, Provider, ProviderSession, RPCError
 
 
 class FallbackStrategy(ABC):
@@ -147,15 +147,24 @@ class FallbackProviderSession(ProviderSession):
                 return result, (provider_idx, *sub_idx)
 
         # Here we may have a list with each element being
-        # `RPCError`, `UnexpectedResponse`, or `Unreachable`.
+        # `RPCError`, `ProtocolError`, `InvalidResponse`, or `Unreachable`.
         # Since the users of `Provider` rely on the error being one of these types,
         # we can only raise one. So we raise the one with the most information.
+        #
+        # RPC errors give the most information, since they usually signify our request was invalid,
+        # so all the providers would respond to it in the same manner.
+        #
+        # `InvalidResponse` means that the library is unable to parse the response for some reason,
+        # probably because of a bug. So it will be the same for all providers.
+        #
+        # The other two, `ProtocolError` and `Unreachable` is exactly why we have the fallback.
+        # It is pretty much expected to happen.
         rpc_errors = [exc for exc in exceptions if isinstance(exc, RPCError)]
         if len(rpc_errors) > 0:
             raise rpc_errors[0]
-        unexpecteds = [exc for exc in exceptions if isinstance(exc, UnexpectedResponse)]
-        if len(unexpecteds) > 0:
-            raise unexpecteds[0]
+        invalid_responses = [exc for exc in exceptions if isinstance(exc, InvalidResponse)]
+        if len(invalid_responses) > 0:
+            raise invalid_responses[0]
         raise exceptions[0]
 
     async def rpc(self, method: str, *args: JSON) -> JSON:

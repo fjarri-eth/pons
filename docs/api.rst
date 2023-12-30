@@ -51,6 +51,8 @@ Errors
 
 .. autoclass:: pons.Unreachable
 
+.. autoclass:: pons.ProtocolError
+
 .. autoclass:: pons.TransactionFailed
 
 .. autoclass:: pons._provider.ProviderErrorCode

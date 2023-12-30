@@ -23,7 +23,7 @@ from ._entities import (
     rpc_encode_data,
     rpc_encode_quantity,
 )
-from ._provider import JSON, Provider, ProviderSession, RPCError, ProviderErrorCode
+from ._provider import JSON, Provider, ProviderErrorCode, ProviderSession, RPCError
 from ._signer import AccountSigner, Signer
 
 # The standard `revert(string)` is a EIP838 error.

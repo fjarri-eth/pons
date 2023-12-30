@@ -63,12 +63,12 @@ from ._entities import (
 )
 from ._provider import (
     JSON,
+    InvalidResponse,
     Provider,
+    ProviderErrorCode,
     ProviderSession,
     ResponseDict,
     RPCError,
-    UnexpectedResponse,
-    ProviderErrorCode,
 )
 from ._signer import Signer
 
@@ -163,7 +163,7 @@ def rpc_call(
         async def _wrapped(*args: Any, **kwargs: Any) -> RetType:
             try:
                 result = await func(*args, **kwargs)
-            except (RPCDecodingError, UnexpectedResponse) as exc:
+            except (RPCDecodingError, InvalidResponse) as exc:
                 raise BadResponseFormat(f"{method_name}: {exc}") from exc
             except RPCError as exc:
                 raise ProviderError.from_rpc_error(exc) from exc
@@ -768,7 +768,7 @@ class ClientSession:
 
         # TODO: this will go away with generalized RPC decoding.
         if not isinstance(results, list):
-            raise UnexpectedResponse(f"Expected a list as a response, got {type(results).__name__}")
+            raise InvalidResponse(f"Expected a list as a response, got {type(results).__name__}")
 
         if isinstance(filter_, BlockFilter):
             return tuple(BlockHash.rpc_decode(elem) for elem in results)

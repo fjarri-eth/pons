@@ -13,7 +13,7 @@ from pons import (
     Unreachable,
 )
 from pons._fallback_provider import PriorityFallbackStrategy
-from pons._provider import JSON, Provider, ProviderSession, RPCError, UnexpectedResponse
+from pons._provider import JSON, InvalidResponse, Provider, ProviderSession, RPCError
 
 
 def random_request():
@@ -51,7 +51,7 @@ class MockSession(ProviderSession):
         elif self.provider.state == ProviderState.UNREACHABLE:
             raise Unreachable("")
         elif self.provider.state == ProviderState.BAD_RESPONSE:
-            raise UnexpectedResponse("")
+            raise InvalidResponse("")
         elif self.provider.state == ProviderState.RPC_ERROR:
             raise RPCError(-1, "")
 
@@ -140,11 +140,11 @@ async def test_raising_errors():
         with pytest.raises(Unreachable):
             result = await session.rpc(random_request())
 
-        # UnexpectedResponse is raised if present
+        # InvalidResponse is raised if present
         providers[0].set_state(ProviderState.UNREACHABLE)
         providers[1].set_state(ProviderState.BAD_RESPONSE)
         providers[2].set_state(ProviderState.UNREACHABLE)
-        with pytest.raises(UnexpectedResponse):
+        with pytest.raises(InvalidResponse):
             result = await session.rpc(random_request())
 
         # RPCError is raised if present

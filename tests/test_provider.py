@@ -7,11 +7,12 @@ from pons import _test_rpc_provider  # For monkeypatching purposes
 from pons import Amount, Client, HTTPProvider, ServerHandle, Unreachable
 from pons._client import BadResponseFormat, ProviderError
 from pons._provider import (
+    HTTPError,
+    InvalidResponse,
     Provider,
     ProviderSession,
     ResponseDict,
     RPCError,
-    UnexpectedResponse,
 )
 
 
@@ -39,15 +40,13 @@ async def test_dict_request(session, root_signer, another_signer):
 
 
 def test_response_dict():
-    with pytest.raises(
-        UnexpectedResponse, match="Some keys in the response are not strings: {1: 2}"
-    ):
+    with pytest.raises(InvalidResponse, match="Some keys in the response are not strings: {1: 2}"):
         ResponseDict({1: 2})
 
 
 def test_rpc_error():
     with pytest.raises(
-        UnexpectedResponse, match=r"Error data must be a string or None, got <class 'int'> \(1\)"
+        InvalidResponse, match=r"Error data must be a string or None, got <class 'int'> \(1\)"
     ):
         RPCError.from_json({"data": 1, "code": 2, "message": "error"})
 
@@ -58,7 +57,7 @@ def test_rpc_error():
     assert error.code == 2
 
     with pytest.raises(
-        UnexpectedResponse,
+        InvalidResponse,
         match=(
             r"Error code must be an integer \(possibly string-encoded\), "
             r"got <class 'float'> \(1\.0\)"
@@ -67,7 +66,7 @@ def test_rpc_error():
         RPCError.from_json({"code": 1.0, "message": "error"})
 
     with pytest.raises(
-        UnexpectedResponse, match=r"Error message must be a string, got <class 'int'> \(1\)"
+        InvalidResponse, match=r"Error message must be a string, got <class 'int'> \(1\)"
     ):
         RPCError.from_json({"code": 2, "message": 1})
 
@@ -142,9 +141,7 @@ async def test_non_ok_http_status(test_provider, session, monkeypatch):
 
     monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
 
-    with pytest.raises(
-        ProviderError, match=r"Provider error \(500\): Something unexpected happened"
-    ):
+    with pytest.raises(HTTPError, match=r"HTTP status 500: Something unexpected happened"):
         await session.net_version()
 
 

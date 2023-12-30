@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 from contextlib import asynccontextmanager
+from enum import Enum
 from http import HTTPStatus
 from typing import (
     Any,
@@ -47,6 +47,75 @@ class ProviderErrorCode(Enum):
             return cls.UNKNOWN_REASON
 
 
+class InvalidResponse(Exception):
+    """Raised when the remote server's response is not of an expected format."""
+
+
+class Unreachable(Exception):
+    """Raised when there is a problem connecting to the provider."""
+
+
+class ProtocolError(Exception):
+    """A protocol-specific error."""
+
+
+class HTTPError(ProtocolError):
+    def __init__(self, status_code: int, message: str):
+        try:
+            status = HTTPStatus(status_code)
+        except ValueError:
+            # How to handle it better? Ideally, `httpx` should have returned a parsed status
+            # in the first place, but, alas, it just gives us an integer.
+            status = HTTPStatus.INTERNAL_SERVER_ERROR
+
+        self.status = status
+        self.message = message
+
+    def __str__(self) -> str:
+        return f"HTTP status {self.status}: {self.message}"
+
+
+class RPCError(Exception):
+    """A wrapper for a call execution error returned as a proper RPC response."""
+
+    @classmethod
+    def from_json(cls, response: JSON) -> "RPCError":
+        error = ResponseDict(response)
+        if "data" in error:
+            data = error["data"]
+            if data is not None and not isinstance(data, str):
+                raise InvalidResponse(
+                    f"Error data must be a string or None, got {type(data)} ({data})"
+                )
+        else:
+            data = None
+
+        error_code = error["code"]
+        if isinstance(error_code, str):
+            code = int(error_code)
+        elif isinstance(error_code, int):
+            code = error_code
+        else:
+            raise InvalidResponse(
+                "Error code must be an integer (possibly string-encoded), "
+                f"got {type(error_code)} ({error_code})"
+            )
+
+        message = error["message"]
+        if not isinstance(message, str):
+            raise InvalidResponse(
+                f"Error message must be a string, got {type(message)} ({message})"
+            )
+
+        return cls(code, message, data)
+
+    def __init__(self, code: int, message: str, data: Optional[str] = None):
+        super().__init__(code, message, data)
+        self.code = code
+        self.message = message
+        self.data = data
+
+
 class Provider(ABC):
     """The base class for JSON RPC providers."""
 
@@ -62,10 +131,6 @@ class Provider(ABC):
         yield  # type: ignore[misc]
 
 
-class UnexpectedResponse(Exception):
-    """Raised when the remote server's response is not of an expected format."""
-
-
 class ResponseDict:
     """
     A wrapper for dictionaries allowing as to narrow down KeyErrors
@@ -74,11 +139,11 @@ class ResponseDict:
 
     def __init__(self, response: Any):
         if not isinstance(response, dict):
-            raise UnexpectedResponse(
+            raise InvalidResponse(
                 f"Expected a dictionary as a response, got {type(response).__name__}"
             )
         if not all(isinstance(key, str) for key in response):
-            raise UnexpectedResponse(f"Some keys in the response are not strings: {response}")
+            raise InvalidResponse(f"Some keys in the response are not strings: {response}")
         self._response = cast(Dict[str, JSON], response)
 
     def __contains__(self, field: str) -> bool:
@@ -88,9 +153,7 @@ class ResponseDict:
         try:
             contents = self._response[field]
         except KeyError as exc:
-            raise UnexpectedResponse(
-                f"Expected field `{field}` is missing from the result"
-            ) from exc
+            raise InvalidResponse(f"Expected field `{field}` is missing from the result") from exc
         return contents
 
 
@@ -139,54 +202,6 @@ class HTTPProvider(Provider):
             yield HTTPSession(self._url, client)
 
 
-class RPCError(Exception):
-    """
-    A wrapper for a server error returned either as a proper RPC response,
-    or as an HTTP error code response.
-    """
-
-    @classmethod
-    def from_json(cls, response: JSON) -> "RPCError":
-        error = ResponseDict(response)
-        if "data" in error:
-            data = error["data"]
-            if data is not None and not isinstance(data, str):
-                raise UnexpectedResponse(
-                    f"Error data must be a string or None, got {type(data)} ({data})"
-                )
-        else:
-            data = None
-
-        error_code = error["code"]
-        if isinstance(error_code, str):
-            code = int(error_code)
-        elif isinstance(error_code, int):
-            code = error_code
-        else:
-            raise UnexpectedResponse(
-                "Error code must be an integer (possibly string-encoded), "
-                f"got {type(error_code)} ({error_code})"
-            )
-
-        message = error["message"]
-        if not isinstance(message, str):
-            raise UnexpectedResponse(
-                f"Error message must be a string, got {type(message)} ({message})"
-            )
-
-        return cls(code, message, data)
-
-    def __init__(self, code: int, message: str, data: Optional[str] = None):
-        super().__init__(code, message, data)
-        self.code = code
-        self.message = message
-        self.data = data
-
-
-class Unreachable(Exception):
-    """Raised when there is a problem connecting to the provider."""
-
-
 class HTTPSession(ProviderSession):
     def __init__(self, url: str, http_client: httpx.AsyncClient):
         self._url = url
@@ -199,15 +214,15 @@ class HTTPSession(ProviderSession):
         except httpx.ConnectError as exc:
             raise Unreachable(str(exc)) from exc
         if response.status_code != HTTPStatus.OK:
-            raise RPCError(response.status_code, response.content.decode())
+            raise HTTPError(response.status_code, response.content.decode())
 
         response_json = response.json()
         if not isinstance(response_json, Mapping):
-            raise UnexpectedResponse(f"RPC response must be a dictionary, got: {response_json}")
+            raise InvalidResponse(f"RPC response must be a dictionary, got: {response_json}")
         # Assuming that the HTTP client knows what it's doing, and gives us a valid JSON dict
         response_json = cast(Mapping[str, JSON], response_json)
         if "error" in response_json:
             raise RPCError.from_json(response_json["error"])
         if "result" not in response_json:
-            raise UnexpectedResponse(f"`result` is not present in the response: {response_json}")
+            raise InvalidResponse(f"`result` is not present in the response: {response_json}")
         return response_json["result"]
