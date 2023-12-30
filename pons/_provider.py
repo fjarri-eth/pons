@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from typing import (
@@ -17,6 +18,33 @@ import httpx
 
 # TODO: the doc entry had to be written manually for this type because of Sphinx limitations.
 JSON = Union[bool, int, float, str, None, Iterable["JSON"], Mapping[str, "JSON"]]
+
+
+class ProviderErrorCode(Enum):
+    """Known RPC error codes returned by providers."""
+
+    # This is our placeholder value, shouldn't be encountered in a remote server response
+    UNKNOWN_REASON = 0
+    """An error code whose description is not present in this enum."""
+
+    SERVER_ERROR = -32000
+    """Reserved for implementation-defined server-errors. See the message for details."""
+
+    INVALID_REQUEST = -32600
+    """The JSON sent is not a valid Request object."""
+
+    METHOD_NOT_FOUND = -32601
+    """The method does not exist / is not available."""
+
+    EXECUTION_ERROR = 3
+    """Contract transaction failed during execution. See the data for details."""
+
+    @classmethod
+    def from_int(cls, val: int) -> "ProviderErrorCode":
+        try:
+            return cls(val)
+        except ValueError:
+            return cls.UNKNOWN_REASON
 
 
 class Provider(ABC):

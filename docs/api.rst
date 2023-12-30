@@ -53,7 +53,7 @@ Errors
 
 .. autoclass:: pons.TransactionFailed
 
-.. autoclass:: pons._client.ProviderErrorCode
+.. autoclass:: pons._provider.ProviderErrorCode
    :members:
 
 .. autoclass:: pons.ProviderError()

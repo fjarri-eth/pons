@@ -16,7 +16,6 @@ from eth_utils.exceptions import ValidationError
 
 from . import abi
 from ._abi_types import decode_args, encode_args, keccak
-from ._client import ProviderErrorCode
 from ._entities import (
     Amount,
     rpc_decode_block,
@@ -24,7 +23,7 @@ from ._entities import (
     rpc_encode_data,
     rpc_encode_quantity,
 )
-from ._provider import JSON, Provider, ProviderSession, RPCError
+from ._provider import JSON, Provider, ProviderSession, RPCError, ProviderErrorCode
 from ._signer import AccountSigner, Signer
 
 # The standard `revert(string)` is a EIP838 error.

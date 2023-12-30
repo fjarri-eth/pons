@@ -68,6 +68,7 @@ from ._provider import (
     ResponseDict,
     RPCError,
     UnexpectedResponse,
+    ProviderErrorCode,
 )
 from ._signer import Signer
 
@@ -106,27 +107,6 @@ class TransactionFailed(RemoteError):
     Raised if the transaction was submitted successfully,
     but the final receipt indicates a failure.
     """
-
-
-class ProviderErrorCode(Enum):
-    """Known RPC error codes returned by providers."""
-
-    # This is our placeholder value, shouldn't be encountered in a remote server response
-    UNKNOWN_REASON = 0
-    """An error code whose description is not present in this enum."""
-
-    SERVER_ERROR = -32000
-    """Reserved for implementation-defined server-errors. See the message for details."""
-
-    EXECUTION_ERROR = 3
-    """Contract transaction failed during execution. See the data for details."""
-
-    @classmethod
-    def from_int(cls, val: int) -> "ProviderErrorCode":
-        try:
-            return cls(val)
-        except ValueError:
-            return cls.UNKNOWN_REASON
 
 
 class ProviderError(RemoteError):
