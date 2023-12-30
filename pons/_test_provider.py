@@ -56,7 +56,9 @@ def pyevm_errors_into_rpc_errors() -> Iterator[None]:
 
         else:
             # Shouldn't happen unless the API of eth-tester changes
-            raise NotImplementedError from exc  # pragma: no cover
+            raise TypeError(
+                "Unexpected `eth_tester.TransactionFailed` format. Please open an issue."
+            ) from exc  # pragma: no cover
 
         if reason_data == b"":
             # Empty `revert()`, or `require()` without a message.
@@ -233,11 +235,15 @@ class TesterProvider(Provider):
         except BlockNotFound:
             return None
 
-        # TODO (#44): major providers still use "miner",
-        # but eth-tester is already using "coinbase". Replacing for now.
-        if "miner" not in result:
-            result["miner"] = result["coinbase"]
-            del result["coinbase"]
+        # Major providers still use "miner", but eth-tester is already using "coinbase" (see #44).
+        # Replacing for now.
+        if not ("miner" not in result and "coinbase" in result):  # pragma: no cover
+            raise RuntimeError(
+                "`eth-tester` changed its block info representation. "
+                "Please open an issue (also see issue #44)."
+            )
+        result["miner"] = result["coinbase"]
+        del result["coinbase"]
 
         return normalize_return_value(result)
 
@@ -249,11 +255,15 @@ class TesterProvider(Provider):
         except BlockNotFound:
             return None
 
-        # TODO (#44): major providers still use "miner",
-        # but eth-tester is already using "coinbase". Replacing for now.
-        if "miner" not in result:
-            result["miner"] = result["coinbase"]
-            del result["coinbase"]
+        # Major providers still use "miner", but eth-tester is already using "coinbase" (see #44).
+        # Replacing for now.
+        if not ("miner" not in result and "coinbase" in result):  # pragma: no cover
+            raise RuntimeError(
+                "`eth-tester` changed its block info representation. "
+                "Please open an issue (also see issue #44)."
+            )
+        result["miner"] = result["coinbase"]
+        del result["coinbase"]
 
         return normalize_return_value(result)
 
