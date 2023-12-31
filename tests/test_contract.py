@@ -1,5 +1,5 @@
-from collections import namedtuple
 from pathlib import Path
+from typing import NamedTuple, Tuple
 
 import pytest
 
@@ -21,12 +21,11 @@ from pons._entities import LogTopic
 @pytest.fixture
 def compiled_contracts():
     path = Path(__file__).resolve().parent / "TestContract.sol"
-    yield compile_contract_file(path)
+    return compile_contract_file(path)
 
 
 def test_abi_declaration(compiled_contracts):
     """Checks that the compiler output is parsed correctly."""
-
     compiled_contract = compiled_contracts["JsonAbiTest"]
 
     cabi = compiled_contract.abi
@@ -70,7 +69,6 @@ def test_abi_declaration(compiled_contracts):
 
 def test_api_binding(compiled_contracts):
     """Checks that the methods are bound correctly on deploy."""
-
     compiled_contract = compiled_contracts["JsonAbiTest"]
 
     address = Address(b"\xab" * 20)
@@ -112,9 +110,13 @@ def test_api_binding(compiled_contracts):
     )
 
     # We only need a couple of fields
-    fake_log_entry = namedtuple("fake_log_entry", ["topics", "data", "address"])
+    class FakeLogEntry(NamedTuple):
+        data: bytes
+        address: Address
+        topics: Tuple[LogTopic, ...]
+
     decoded = event_filter.decode_log_entry(
-        fake_log_entry(
+        FakeLogEntry(
             address=address,
             topics=[LogTopic(abi.uint(256).encode(1)), LogTopic(keccak(b"1234"))],
             data=encode_args((abi.bytes(4), b"4567"), (abi.bytes(), b"bytestring")),
@@ -124,5 +126,5 @@ def test_api_binding(compiled_contracts):
 
     with pytest.raises(ValueError, match="Log entry originates from a different contract"):
         decoded = event_filter.decode_log_entry(
-            fake_log_entry(address=Address(b"\xba" * 20), topics=[], data=b"")
+            FakeLogEntry(address=Address(b"\xba" * 20), topics=[], data=b"")
         )

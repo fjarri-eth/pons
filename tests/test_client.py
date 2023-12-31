@@ -27,14 +27,14 @@ from pons import (
 from pons._abi_types import encode_args, keccak
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
-from pons._entities import rpc_decode_block, rpc_encode_data
+from pons._entities import rpc_encode_data
 from pons._provider import RPCError
 
 
 @pytest.fixture
 def compiled_contracts():
     path = Path(__file__).resolve().parent / "TestClient.sol"
-    yield compile_contract_file(path)
+    return compile_contract_file(path)
 
 
 @contextmanager
@@ -60,7 +60,7 @@ async def test_net_version(test_provider, session):
 
     # This is not going to get called
     def wrong_net_version():
-        raise NotImplementedError()  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     # The result should have been cached the first time
     with monkeypatched(test_provider, "net_version", wrong_net_version):
@@ -81,7 +81,7 @@ async def test_eth_chain_id(test_provider, session):
 
     # This is not going to get called
     def wrong_chain_id():
-        raise NotImplementedError()  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     # The result should have been cached the first time
     with monkeypatched(test_provider, "eth_chain_id", wrong_chain_id):
@@ -132,12 +132,13 @@ async def test_wait_for_transaction_receipt(
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
 
     # The receipt won't be available until we mine, so the waiting should time out
+    timeout = 5
     start_time = trio.current_time()
     with pytest.raises(trio.TooSlowError):
-        with trio.fail_after(5):
+        with trio.fail_after(timeout):
             receipt = await session.wait_for_transaction_receipt(tx_hash)
     end_time = trio.current_time()
-    assert end_time - start_time == 5
+    assert end_time - start_time == timeout
 
     # Now let's enable mining while we wait for the receipt
     receipt = None
@@ -147,7 +148,7 @@ async def test_wait_for_transaction_receipt(
         receipt = await session.wait_for_transaction_receipt(tx_hash)
 
     async def delayed_enable_mining():
-        await trio.sleep(5)
+        await trio.sleep(timeout)
         test_provider.enable_auto_mine_transactions()
 
     async with trio.open_nursery() as nursery:
@@ -197,14 +198,16 @@ async def test_eth_call_decoding_error(session, compiled_contracts, root_signer)
 async def test_estimate_deploy(session, compiled_contracts):
     compiled_contract = compiled_contracts["BasicContract"]
     gas = await session.estimate_deploy(compiled_contract.constructor(1))
-    assert isinstance(gas, int) and gas > 0
+    assert isinstance(gas, int)
+    assert gas > 0
 
 
 async def test_estimate_transfer(session, root_signer, another_signer):
     gas = await session.estimate_transfer(
         root_signer.address, another_signer.address, Amount.ether(10)
     )
-    assert isinstance(gas, int) and gas > 0
+    assert isinstance(gas, int)
+    assert gas > 0
 
     with pytest.raises(
         ProviderError,
@@ -219,7 +222,8 @@ async def test_estimate_transact(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(1))
     gas = await session.estimate_transact(deployed_contract.method.setState(456))
-    assert isinstance(gas, int) and gas > 0
+    assert isinstance(gas, int)
+    assert gas > 0
 
 
 async def test_eth_gas_price(session):
@@ -328,7 +332,7 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
             await session.deploy(root_signer, basic_contract.constructor(0))
 
 
-async def test_transact(test_provider, session, compiled_contracts, root_signer):
+async def test_transact(session, compiled_contracts, root_signer):
     basic_contract = compiled_contracts["BasicContract"]
 
     # Normal transact
@@ -369,13 +373,14 @@ async def test_transact_and_return_events(
 
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
 
-    Event1 = deployed_contract.event.Event1
-    Event2 = deployed_contract.event.Event2
+    event1 = deployed_contract.event.Event1
+    event2 = deployed_contract.event.Event2
 
-    results_for = lambda x: {
-        Event1: [{"value": x}, {"value": x + 1}],
-        Event2: [{"value": x + 2}, {"value": x + 3}],
-    }
+    def results_for(x):
+        return {
+            event1: [{"value": x}, {"value": x + 1}],
+            event2: [{"value": x + 2}, {"value": x + 3}],
+        }
 
     # Normal operation: one relevant transaction in the block
 
@@ -383,7 +388,7 @@ async def test_transact_and_return_events(
     result = await session.transact(
         root_signer,
         deployed_contract.method.emitMultipleEvents(x),
-        return_events=[Event1, Event2],
+        return_events=[event1, event2],
     )
     assert result == results_for(x)
 
@@ -396,7 +401,7 @@ async def test_transact_and_return_events(
 
     async def transact(signer, x):
         result = await session.transact(
-            signer, deployed_contract.method.emitMultipleEvents(x), return_events=[Event1, Event2]
+            signer, deployed_contract.method.emitMultipleEvents(x), return_events=[event1, event2]
         )
         results[x] = result
 
@@ -415,7 +420,7 @@ async def test_transact_and_return_events(
     assert results[x2] == results_for(x2)
 
 
-async def test_get_block(test_provider, session, root_signer, another_signer):
+async def test_get_block(session, root_signer, another_signer):
     to_transfer = Amount.ether(10)
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
@@ -438,7 +443,7 @@ async def test_get_block(test_provider, session, root_signer, another_signer):
     assert block_info is None
 
 
-async def test_eth_get_transaction_by_hash(test_provider, session, root_signer, another_signer):
+async def test_eth_get_transaction_by_hash(session, root_signer, another_signer):
     to_transfer = Amount.ether(1)
 
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
@@ -451,7 +456,7 @@ async def test_eth_get_transaction_by_hash(test_provider, session, root_signer, 
 
 
 async def test_eth_get_filter_changes_bad_response(test_provider, session, monkeypatch):
-    monkeypatch.setattr(test_provider, "eth_get_filter_changes", lambda filter_id: {"foo": 1})
+    monkeypatch.setattr(test_provider, "eth_get_filter_changes", lambda _filter_id: {"foo": 1})
 
     block_filter = await session.eth_new_block_filter()
 
@@ -461,7 +466,7 @@ async def test_eth_get_filter_changes_bad_response(test_provider, session, monke
         await session.eth_get_filter_changes(block_filter)
 
 
-async def test_block_filter(test_provider, session, root_signer, another_signer):
+async def test_block_filter(session, root_signer, another_signer):
     to_transfer = Amount.ether(1)
 
     await session.transfer(root_signer, another_signer.address, to_transfer)
@@ -871,7 +876,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     # Provider returns an unknown panic code
 
-    def eth_estimate_gas(*args, **kwargs):
+    def eth_estimate_gas(*_args, **_kwargs):
         # Invalid selector
         data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
         raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data))
@@ -882,7 +887,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     # Provider returns an unknown error (a selector not present in the ABI)
 
-    def eth_estimate_gas(*args, **kwargs):
+    def eth_estimate_gas(*_args, **_kwargs):
         # Invalid selector
         data = b"1234" + encode_args((abi.uint(256), 1))
         raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data))
@@ -895,7 +900,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
 
     # Provider returns an error with an unknown RPC code
 
-    def eth_estimate_gas(*args, **kwargs):
+    def eth_estimate_gas(*_args, **_kwargs):
         # Invalid selector
         data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
         raise RPCError(12345, "execution reverted", rpc_encode_data(data))

@@ -32,7 +32,7 @@ from pons._provider import RPCError, RPCErrorCode
 # (since TesterProvider is what we're testing).
 @pytest.fixture
 def provider():
-    yield TesterProvider(root_balance=Amount.ether(100))
+    return TesterProvider(root_balance=Amount.ether(100))
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ async def session(provider):
 
 @pytest.fixture
 def root_signer(provider):
-    yield provider.root
+    return provider.root
 
 
 @pytest.fixture
@@ -139,14 +139,14 @@ async def test_eth_get_transaction_count(provider, session, root_signer, another
     assert provider.eth_get_transaction_count(address, rpc_encode_block(Block.LATEST)) == "0x1"
 
 
-async def test_eth_send_raw_transaction(provider, session, root_signer, another_signer):
+async def test_eth_send_raw_transaction(provider, root_signer, another_signer):
     amount = Amount.ether(1)
     dest = another_signer.address
     latest = rpc_encode_block(Block.LATEST)
 
     tx = make_transfer_tx(provider, dest, amount, 0)
     signed_tx = root_signer.sign_transaction(tx)
-    tx_hash = TxHash.rpc_decode(provider.eth_send_raw_transaction(rpc_encode_data(signed_tx)))
+    provider.eth_send_raw_transaction(rpc_encode_data(signed_tx))
 
     # Test that the transaction came through
     assert provider.eth_get_balance(dest.rpc_encode(), latest) == amount.rpc_encode()
@@ -190,35 +190,6 @@ async def test_eth_block_number(provider, session, root_signer, another_signer):
     assert provider.eth_block_number() == "0x0"
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     assert provider.eth_block_number() == "0x1"
-
-
-async def test_eth_get_transaction_by_hash(provider, root_signer, another_signer):
-    amount = Amount.ether(1)
-    dest = another_signer.address
-
-    tx = make_transfer_tx(provider, dest, amount, 0)
-    signed_tx = root_signer.sign_transaction(tx)
-    tx_hash = TxHash.rpc_decode(provider.eth_send_raw_transaction(rpc_encode_data(signed_tx)))
-
-    recorded_tx = provider.eth_get_transaction_by_hash(tx_hash.rpc_encode())
-
-    preserved_fields = [
-        "type",
-        "chainId",
-        "nonce",
-        "value",
-        "to",
-        "gas",
-        "maxFeePerGas",
-        "maxPriorityFeePerGas",
-    ]
-    for field in preserved_fields:
-        assert recorded_tx[field] == tx[field]
-
-    assert recorded_tx["blockNumber"] == "0x1"
-
-    # Test non-existent transaction
-    assert provider.eth_get_transaction_by_hash("0x" + "1" * 64) is None
 
 
 async def test_eth_get_transaction_by_hash(provider, root_signer, another_signer):

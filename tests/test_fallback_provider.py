@@ -1,17 +1,11 @@
 import os
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import AsyncIterator, List, Optional
+from typing import AsyncIterator
 
 import pytest
 
-from pons import (
-    CycleFallback,
-    FallbackProvider,
-    FallbackStrategy,
-    PriorityFallback,
-    Unreachable,
-)
+from pons import CycleFallback, FallbackProvider, PriorityFallback, Unreachable
 from pons._fallback_provider import PriorityFallbackStrategy
 from pons._provider import JSON, InvalidResponse, Provider, ProviderSession, RPCError
 
@@ -44,16 +38,15 @@ class MockSession(ProviderSession):
     def __init__(self, provider: Provider):
         self.provider = provider
 
-    async def rpc(self, method: str, *args: JSON) -> JSON:
+    async def rpc(self, method: str, *_args: JSON) -> JSON:
         self.provider.requests.append(method)
-        if self.provider.state == ProviderState.NORMAL:
-            return "success"
-        elif self.provider.state == ProviderState.UNREACHABLE:
+        if self.provider.state == ProviderState.UNREACHABLE:
             raise Unreachable("")
-        elif self.provider.state == ProviderState.BAD_RESPONSE:
+        if self.provider.state == ProviderState.BAD_RESPONSE:
             raise InvalidResponse("")
-        elif self.provider.state == ProviderState.RPC_ERROR:
+        if self.provider.state == ProviderState.RPC_ERROR:
             raise RPCError(-1, "")
+        return "success"
 
 
 async def test_default_fallback():
@@ -138,21 +131,21 @@ async def test_raising_errors():
         providers[1].set_state(ProviderState.UNREACHABLE)
         providers[2].set_state(ProviderState.UNREACHABLE)
         with pytest.raises(Unreachable):
-            result = await session.rpc(random_request())
+            await session.rpc(random_request())
 
         # InvalidResponse is raised if present
         providers[0].set_state(ProviderState.UNREACHABLE)
         providers[1].set_state(ProviderState.BAD_RESPONSE)
         providers[2].set_state(ProviderState.UNREACHABLE)
         with pytest.raises(InvalidResponse):
-            result = await session.rpc(random_request())
+            await session.rpc(random_request())
 
         # RPCError is raised if present
         providers[0].set_state(ProviderState.UNREACHABLE)
         providers[1].set_state(ProviderState.BAD_RESPONSE)
         providers[2].set_state(ProviderState.RPC_ERROR)
         with pytest.raises(RPCError):
-            result = await session.rpc(random_request())
+            await session.rpc(random_request())
 
 
 async def test_nested_providers():
@@ -199,7 +192,7 @@ async def test_nested_providers():
         request = random_request()
         providers[3].set_state(ProviderState.NORMAL)
         providers[2].set_state(ProviderState.UNREACHABLE)
-        result = await session.rpc_at_pin(path, request)
+        await session.rpc_at_pin(path, request)
         assert providers[3].requests[-1] == request
 
 

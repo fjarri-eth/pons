@@ -5,7 +5,7 @@ from pons import AccountSigner, Amount, Client, TesterProvider
 
 @pytest.fixture
 def test_provider():
-    yield TesterProvider(root_balance=Amount.ether(100))
+    return TesterProvider(root_balance=Amount.ether(100))
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ async def session(test_provider):
 
 @pytest.fixture
 def root_signer(test_provider):
-    yield test_provider.root
+    return test_provider.root
 
 
 @pytest.fixture

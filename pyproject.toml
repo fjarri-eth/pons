@@ -160,4 +160,5 @@ target-version = "py38"
 
 [tool.isort]
 profile = "black"
-src_paths = ["pons", "test"]
+src_paths = ["pons", "tests"]
+known_first_party = ["pons"]

@@ -21,11 +21,12 @@ from pons._entities import (
 
 def test_amount():
     # Conversions
-    assert Amount.wei(100).as_wei() == 100
-    assert Amount.wei(100).as_gwei() == 100 / 10**9
-    assert Amount.wei(100).as_ether() == 100 / 10**18
-    assert Amount.gwei(100).as_wei() == 100 * 10**9
-    assert Amount.ether(100).as_wei() == 100 * 10**18
+    val = 100
+    assert Amount.wei(val).as_wei() == val
+    assert Amount.wei(val).as_gwei() == val / 10**9
+    assert Amount.wei(val).as_ether() == val / 10**18
+    assert Amount.gwei(val).as_wei() == val * 10**9
+    assert Amount.ether(val).as_wei() == val * 10**18
 
     with pytest.raises(TypeError, match="Amount must be an integer, got float"):
         Amount.wei(100.0)
@@ -56,7 +57,7 @@ def test_amount():
 
     # The type is hashable
     amount_set = {Amount.wei(100), Amount.wei(100), Amount.wei(50)}
-    assert len(amount_set) == 2
+    assert amount_set == {Amount.wei(100), Amount.wei(50)}
 
     class MyAmount(Amount):
         pass
@@ -82,6 +83,8 @@ def test_address():
     random_addr = b"dv\xbbCQ,\xfe\xd0\xbfF\x8aq\x07OK\xf9\xa1i\x88("
     random_addr_checksum = "0x6476Bb43512CFed0bF468a71074F4bF9A1698828"
 
+    random_addr2 = os.urandom(20)
+
     assert bytes(Address(random_addr)) == random_addr
     assert bytes(Address.from_hex(random_addr_checksum)) == random_addr
     assert bytes(Address.from_hex(random_addr_checksum.lower())) == random_addr
@@ -101,8 +104,8 @@ def test_address():
     assert repr(MyAddress(random_addr)) == f"MyAddress.from_hex({random_addr_checksum})"
 
     # The type is hashable
-    addr_set = {Address(random_addr), Address(os.urandom(20)), Address(random_addr)}
-    assert len(addr_set) == 2
+    addr_set = {Address(random_addr), Address(random_addr2), Address(random_addr)}
+    assert addr_set == {Address(random_addr), Address(random_addr2)}
 
     with pytest.raises(TypeError, match="Address must be a bytestring, got str"):
         Address(random_addr_checksum)
@@ -115,11 +118,11 @@ def test_address():
 
     with pytest.raises(TypeError, match="Incompatible types: MyAddress and Address"):
         # For whatever reason the the values are switched places in `__eq__()`
-        Address(random_addr) == MyAddress(random_addr)
+        assert Address(random_addr) == MyAddress(random_addr)
 
     # This error comes from eth_utils, we don't care about the phrasing,
     # but want to detect if the type changes.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         Address.from_hex(random_addr_checksum[:-1])
 
     with pytest.raises(RPCDecodingError, match="Address must be 20 bytes long, got 19"):
@@ -178,8 +181,9 @@ def test_decode_tx_receipt():
 
 
 def test_encode_decode_quantity():
-    assert rpc_encode_quantity(100) == "0x64"
-    assert rpc_decode_quantity("0x64") == 100
+    val = 100
+    assert rpc_encode_quantity(val) == hex(val)
+    assert rpc_decode_quantity(hex(val)) == val
 
     with pytest.raises(RPCDecodingError, match="Encoded quantity must be a string"):
         rpc_decode_quantity(100)
@@ -206,20 +210,21 @@ def test_encode_decode_data():
 
 
 def test_encode_decode_block():
+    val = 123
     assert rpc_encode_block(Block.LATEST) == "latest"
     assert rpc_encode_block(Block.EARLIEST) == "earliest"
     assert rpc_encode_block(Block.PENDING) == "pending"
     assert rpc_encode_block(Block.SAFE) == "safe"
     assert rpc_encode_block(Block.FINALIZED) == "finalized"
-    assert rpc_encode_block(123) == "0x7b"
+    assert rpc_encode_block(val) == hex(val)
     assert rpc_decode_block("latest") == "latest"
     assert rpc_decode_block("earliest") == "earliest"
     assert rpc_decode_block("pending") == "pending"
-    assert rpc_decode_block("0x7b") == 123
+    assert rpc_decode_block(hex(val)) == val
 
 
 def test_decode_bool():
-    assert rpc_decode_bool(True) == True
+    assert rpc_decode_bool(True) is True
 
     with pytest.raises(RPCDecodingError, match="Encoded boolean must be `true` or `false`"):
         rpc_decode_bool(1)

@@ -1,10 +1,9 @@
 import re
-from collections import namedtuple
+from typing import NamedTuple, Tuple
 
 import pytest
 
 from pons import (
-    ABIDecodingError,
     Constructor,
     ContractABI,
     Either,
@@ -549,28 +548,28 @@ def test_contract_abi_errors():
     with pytest.raises(
         ValueError, match="JSON ABI contains more than one constructor declarations"
     ):
-        abi = ContractABI.from_json([constructor_abi, constructor_abi])
+        ContractABI.from_json([constructor_abi, constructor_abi])
 
     fallback_abi = dict(type="fallback", stateMutability="payable")
     with pytest.raises(ValueError, match="JSON ABI contains more than one fallback declarations"):
-        abi = ContractABI.from_json([fallback_abi, fallback_abi])
+        ContractABI.from_json([fallback_abi, fallback_abi])
 
     receive_abi = dict(type="receive", stateMutability="payable")
     with pytest.raises(
         ValueError, match="JSON ABI contains more than one receive method declarations"
     ):
-        abi = ContractABI.from_json([receive_abi, receive_abi])
+        ContractABI.from_json([receive_abi, receive_abi])
 
     event_abi = dict(type="event", name="Foo", inputs=[], anonymous=False)
     with pytest.raises(ValueError, match="JSON ABI contains more than one declarations of `Foo`"):
-        abi = ContractABI.from_json([event_abi, event_abi])
+        ContractABI.from_json([event_abi, event_abi])
 
     error_abi = dict(type="error", name="Foo", inputs=[])
     with pytest.raises(ValueError, match="JSON ABI contains more than one declarations of `Foo`"):
-        abi = ContractABI.from_json([error_abi, error_abi])
+        ContractABI.from_json([error_abi, error_abi])
 
     with pytest.raises(ValueError, match="Unknown ABI entry type: foobar"):
-        abi = ContractABI.from_json([dict(type="foobar")])
+        ContractABI.from_json([dict(type="foobar")])
 
 
 def test_event_from_json():
@@ -627,12 +626,14 @@ def test_event_encode():
 
 def test_event_decode():
     # We only need a couple of fields
-    fake_log_entry = namedtuple("fake_log_entry", ["topics", "data"])
+    class FakeLogEntry(NamedTuple):
+        topics: Tuple[LogTopic, ...]
+        data: bytes
 
     event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
 
     decoded = event.decode_log_entry(
-        fake_log_entry(
+        FakeLogEntry(
             [
                 LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),
                 LogTopic(abi.bool.encode(True)),
@@ -646,7 +647,7 @@ def test_event_decode():
     # Wrong selector
     with pytest.raises(ValueError, match="This log entry belongs to a different event"):
         decoded = event.decode_log_entry(
-            fake_log_entry(
+            FakeLogEntry(
                 [
                     LogTopic(keccak(b"NotFoo" + event.fields.canonical_form.encode())),
                     LogTopic(abi.bool.encode(True)),
@@ -666,7 +667,7 @@ def test_event_decode():
     )
 
     decoded = event.decode_log_entry(
-        fake_log_entry(
+        FakeLogEntry(
             [LogTopic(abi.bool.encode(True)), LogTopic(abi.uint(8).encode(2))],
             encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
         )

@@ -2,9 +2,8 @@
 # and don't use high-level API.
 
 import pytest
-import trio
 
-from pons import Amount, Client, RPCError, RPCErrorCode, ServerHandle, TesterProvider
+from pons import RPCError, RPCErrorCode, ServerHandle
 
 
 @pytest.fixture

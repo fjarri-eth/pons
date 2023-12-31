@@ -12,7 +12,6 @@ from pons._provider import (
     InvalidResponse,
     Provider,
     ProviderSession,
-    ResponseDict,
     RPCError,
     RPCErrorCode,
 )
@@ -42,17 +41,19 @@ async def test_dict_request(session, root_signer, another_signer):
 
 
 def test_rpc_error():
-    error = RPCError.from_json({"code": 2, "message": "error", "data": "additional data"})
-    assert error.code == 2
+    error_code = 2
+
+    error = RPCError.from_json({"code": error_code, "message": "error", "data": "additional data"})
+    assert error.code == error_code
     assert error.data == "additional data"
-    assert error.to_json() == {"code": 2, "message": "error", "data": "additional data"}
+    assert error.to_json() == {"code": error_code, "message": "error", "data": "additional data"}
 
-    error = RPCError.from_json({"code": 2, "message": "error"})
+    error = RPCError.from_json({"code": error_code, "message": "error"})
     assert error.data is None
-    assert error.to_json() == {"code": 2, "message": "error"}
+    assert error.to_json() == {"code": error_code, "message": "error"}
 
-    error = RPCError.from_json({"code": "2", "message": "error"})
-    assert error.code == 2
+    error = RPCError.from_json({"code": str(error_code), "message": "error"})
+    assert error.code == error_code
 
     error = RPCError.invalid_request()
     assert error.code == RPCErrorCode.INVALID_REQUEST.value
@@ -97,14 +98,14 @@ async def test_dict_request_introspection(session, root_signer, another_signer):
 async def test_unexpected_response_type(
     test_provider, session, monkeypatch, root_signer, another_signer
 ):
-    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda tx_hash: "something")
+    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda _tx_hash: "something")
 
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
     )
 
     with pytest.raises(BadResponseFormat, match="Expected a dictionary as a response, got str"):
-        receipt = await session.eth_get_transaction_receipt(tx_hash)
+        await session.eth_get_transaction_receipt(tx_hash)
 
 
 async def test_missing_field(test_provider, session, monkeypatch, root_signer, another_signer):
@@ -126,7 +127,7 @@ async def test_missing_field(test_provider, session, monkeypatch, root_signer, a
     with pytest.raises(
         BadResponseFormat, match="Expected field `status` is missing from the result"
     ):
-        receipt = await session.eth_get_transaction_receipt(tx_hash)
+        await session.eth_get_transaction_receipt(tx_hash)
 
 
 async def test_none_instead_of_dict(
@@ -136,7 +137,7 @@ async def test_none_instead_of_dict(
     # (the interpretation of such an event is up to the client).
     # `eth_getTransactionReceipt` can return a None normally (if there's no receipt yet),
     # but we force it here, just in case.
-    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda tx_hash: None)
+    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda _tx_hash: None)
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
     )
@@ -146,7 +147,7 @@ async def test_none_instead_of_dict(
 async def test_non_ok_http_status(test_provider, session, monkeypatch):
     def faulty_net_version():
         # A generic exception will generate a 500 status code
-        raise Exception("Something unexpected happened")
+        raise Exception("Something unexpected happened")  # noqa: TRY002
 
     monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
 
@@ -154,7 +155,7 @@ async def test_non_ok_http_status(test_provider, session, monkeypatch):
         await session.net_version()
 
 
-async def test_neither_result_nor_error_field(test_provider, session, monkeypatch):
+async def test_neither_result_nor_error_field(session, monkeypatch):
     # Tests the handling of a badly formed provider response
     # without either "error" or "result" fields.
     # Unfortunately we can't achieve that by just patching the provider, have to patch the server
@@ -172,11 +173,11 @@ async def test_neither_result_nor_error_field(test_provider, session, monkeypatc
         await session.net_version()
 
 
-async def test_result_is_not_a_dict(test_provider, session, monkeypatch):
+async def test_result_is_not_a_dict(session, monkeypatch):
     # Tests the handling of a badly formed provider response that is not a dictionary.
     # Unfortunately we can't achieve that by just patching the provider, have to patch the server
 
-    async def faulty_process_request(*args, **kwargs):
+    async def faulty_process_request(*_args, **_kwargs):
         return (HTTPStatus.OK, 1)
 
     monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
@@ -203,7 +204,7 @@ async def test_default_implementations():
             yield MockSession()
 
     class MockSession(ProviderSession):
-        async def rpc(self, method, *args):
+        async def rpc(self, method, *_args):
             return method
 
     provider = MockProvider()
