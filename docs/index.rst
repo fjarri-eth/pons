@@ -62,11 +62,11 @@ A quick usage example:
         global root_signer
         global http_provider
 
-        test_provider = LocalProvider(root_balance=Amount.ether(100))
-        root_signer = test_provider.root
+        local_provider = LocalProvider(root_balance=Amount.ether(100))
+        root_signer = local_provider.root
 
         async with trio.open_nursery() as nursery:
-            handle = HTTPProviderServer(test_provider)
+            handle = HTTPProviderServer(local_provider)
             http_provider = handle.http_provider
             await nursery.start(handle)
             await func()

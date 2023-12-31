@@ -7,16 +7,16 @@ from pons import HTTPProviderServer, RPCError, RPCErrorCode
 
 
 @pytest.fixture
-async def test_server(nursery, test_provider):
-    handle = HTTPProviderServer(test_provider)
+async def server(nursery, local_provider):
+    handle = HTTPProviderServer(local_provider)
     await nursery.start(handle)
     yield handle
     await handle.shutdown()
 
 
 @pytest.fixture
-async def provider_session(test_server):
-    async with test_server.http_provider.session() as session:
+async def provider_session(server):
+    async with server.http_provider.session() as session:
         yield session
 
 

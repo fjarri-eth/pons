@@ -21,6 +21,7 @@ Added
 - Various methods that had a default ``Amount(0)`` for a parameter can now take ``None``. (PR_57_)
 - Support for overloaded methods via ``MultiMethod``. (PR_59_)
 - Expose ``HTTPProviderServer``, ``LocalProvider``, ``compile_contract_file`` that can be used for tests of Ethereum-using applications. These are gated behind optional features. (PR_54_)
+- ``LocalProvider.take_snapshot()`` and ``revert_to_snapshot()``. (PR_61_)
 
 
 Fixed
@@ -35,6 +36,7 @@ Fixed
 .. _PR_56: https://github.com/fjarri/pons/pull/56
 .. _PR_57: https://github.com/fjarri/pons/pull/57
 .. _PR_59: https://github.com/fjarri/pons/pull/59
+.. _PR_61: https://github.com/fjarri/pons/pull/61
 
 
 0.7.0 (09-07-2023)

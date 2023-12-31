@@ -4,20 +4,20 @@ from pons import AccountSigner, Amount, Client, LocalProvider
 
 
 @pytest.fixture
-def test_provider():
+def local_provider():
     return LocalProvider(root_balance=Amount.ether(100))
 
 
 @pytest.fixture
-async def session(test_provider):
-    client = Client(provider=test_provider)
+async def session(local_provider):
+    client = Client(provider=local_provider)
     async with client.session() as session:
         yield session
 
 
 @pytest.fixture
-def root_signer(test_provider):
-    return test_provider.root
+def root_signer(local_provider):
+    return local_provider.root
 
 
 @pytest.fixture

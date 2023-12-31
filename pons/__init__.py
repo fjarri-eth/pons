@@ -47,7 +47,7 @@ from ._fallback_provider import (
     PriorityFallback,
 )
 from ._http_provider_server import HTTPProviderServer
-from ._local_provider import LocalProvider
+from ._local_provider import LocalProvider, SnapshotID
 from ._provider import (
     JSON,
     HTTPProvider,
@@ -107,6 +107,7 @@ __all__ = [
     "RPCErrorCode",
     "HTTPProviderServer",
     "Signer",
+    "SnapshotID",
     "TransactionFailed",
     "TxHash",
     "Unreachable",

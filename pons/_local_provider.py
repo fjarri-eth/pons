@@ -108,6 +108,13 @@ def normalize_return_value(value: Normalizable) -> JSON:
     return value
 
 
+class SnapshotID:
+    """An ID of a snapshot in a :py:class:`LocalProvider`."""
+
+    def __init__(self, id_: int):
+        self.id_ = id_
+
+
 class LocalProvider(Provider):
     """A provider maintaining its own chain state, useful for tests."""
 
@@ -136,6 +143,14 @@ class LocalProvider(Provider):
         This is the default behavior.
         """
         self._ethereum_tester.enable_auto_mine_transactions()
+
+    def take_snapshot(self) -> SnapshotID:
+        """Creates a snapshot of the chain state internally and returns its ID."""
+        return SnapshotID(self._ethereum_tester.take_snapshot())
+
+    def revert_to_snapshot(self, snapshot_id: SnapshotID) -> None:
+        """Restores the chain state to the snapshot with the given ID."""
+        self._ethereum_tester.revert_to_snapshot(snapshot_id.id_)
 
     def rpc(self, method: str, *args: Any) -> JSON:
         dispatch = dict(
