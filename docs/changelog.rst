@@ -20,6 +20,7 @@ Added
 - Exposed ``ClientSession``, ``ConstructorCall``, ``MethodCall``, ``EventFilter``, ``BoundConstructor``, ``BoundConstructorCall``, ``BoundMethod``, ``BoundMethodCall``, ``BoundEvent``, ``BoundEventFilter`` from the top level. (PR_56_)
 - Various methods that had a default ``Amount(0)`` for a parameter can now take ``None``. (PR_57_)
 - Support for overloaded methods via ``MultiMethod``. (PR_59_)
+- Expose ``HTTPProviderServer``, ``LocalProvider``, ``compile_contract_file`` that can be used for tests of Ethereum-using applications. These are gated behind optional features. (PR_54_)
 
 
 Fixed
@@ -30,6 +31,7 @@ Fixed
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
 .. _PR_52: https://github.com/fjarri/pons/pull/52
+.. _PR_54: https://github.com/fjarri/pons/pull/54
 .. _PR_56: https://github.com/fjarri/pons/pull/56
 .. _PR_57: https://github.com/fjarri/pons/pull/57
 .. _PR_59: https://github.com/fjarri/pons/pull/59
