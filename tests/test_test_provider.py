@@ -25,6 +25,7 @@ from pons._entities import (
     rpc_encode_data,
     rpc_encode_quantity,
 )
+from pons._provider import RPCError, RPCErrorCode
 
 
 # Masking the global fixtures to make this test self-contained
@@ -64,6 +65,19 @@ def make_transfer_tx(provider, dest, amount, nonce):
         "maxPriorityFeePerGas": Amount.gwei(1).rpc_encode(),
         "nonce": rpc_encode_quantity(nonce),
     }
+
+
+async def test_method_not_found(provider):
+    with pytest.raises(RPCError) as excinfo:
+        provider.rpc("unknown_method", 1, 2)
+    assert excinfo.value.code == RPCErrorCode.METHOD_NOT_FOUND.value
+    assert excinfo.value.message == "The method unknown_method does not exist/is not available"
+
+
+async def test_invalid_parameter(provider):
+    with pytest.raises(RPCError) as excinfo:
+        provider.rpc("eth_getBalance", 1)  # one missing argument
+    assert excinfo.value.code == RPCErrorCode.INVALID_PARAMETER.value
 
 
 async def test_root_balance():

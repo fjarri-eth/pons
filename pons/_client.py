@@ -65,10 +65,10 @@ from ._provider import (
     JSON,
     InvalidResponse,
     Provider,
-    ProviderErrorCode,
     ProviderSession,
     ResponseDict,
     RPCError,
+    RPCErrorCode,
 )
 from ._signer import Signer
 
@@ -112,12 +112,10 @@ class TransactionFailed(RemoteError):
 class ProviderError(RemoteError):
     """A general problem with fulfilling the request at the provider's side."""
 
-    Code = ProviderErrorCode
-
     raw_code: int
     """The error code returned by the server."""
 
-    code: ProviderErrorCode
+    code: RPCErrorCode
     """The parsed error code."""
 
     message: str
@@ -129,11 +127,11 @@ class ProviderError(RemoteError):
     @classmethod
     def from_rpc_error(cls, exc: RPCError) -> "ProviderError":
         data = rpc_decode_data(exc.data) if exc.data else None
-        parsed_code = ProviderErrorCode.from_int(exc.code)
+        parsed_code = RPCErrorCode.from_int(exc.code)
         return cls(exc.code, parsed_code, exc.message, data)
 
     def __init__(
-        self, raw_code: int, code: ProviderErrorCode, message: str, data: Optional[bytes] = None
+        self, raw_code: int, code: RPCErrorCode, message: str, data: Optional[bytes] = None
     ):
         super().__init__(raw_code, code, message, data)
         self.raw_code = raw_code
@@ -143,7 +141,7 @@ class ProviderError(RemoteError):
 
     def __str__(self) -> str:
         # Substitute the known code if any, or report the raw integer value otherwise
-        code = self.raw_code if self.code == ProviderErrorCode.UNKNOWN_REASON else self.code.name
+        code = self.raw_code if self.code == RPCErrorCode.UNKNOWN_REASON else self.code.name
         return f"Provider error ({code}): {self.message}" + (
             f" (data: {self.data.hex()})" if self.data else ""
         )
@@ -272,9 +270,9 @@ def decode_contract_error(
 ) -> Union[ContractPanic, ContractLegacyError, ContractError, ProviderError]:
     # A little wonky, but there's no better way to detect legacy errors without a message.
     # Hopefully these are used very rarely.
-    if exc.code == ProviderErrorCode.SERVER_ERROR and exc.message == "execution reverted":
+    if exc.code == RPCErrorCode.SERVER_ERROR and exc.message == "execution reverted":
         return ContractLegacyError("")
-    if exc.code == ProviderErrorCode.EXECUTION_ERROR:
+    if exc.code == RPCErrorCode.EXECUTION_ERROR:
         try:
             error, decoded_data = abi.resolve_error(exc.data or b"")
         except UnknownError:

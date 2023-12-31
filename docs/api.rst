@@ -55,7 +55,10 @@ Errors
 
 .. autoclass:: pons.TransactionFailed
 
-.. autoclass:: pons._provider.ProviderErrorCode
+.. autoclass:: pons._provider.RPCError
+   :members:
+
+.. autoclass:: pons._provider.RPCErrorCode
    :members:
 
 .. autoclass:: pons.ProviderError()

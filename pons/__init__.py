@@ -46,7 +46,14 @@ from ._fallback_provider import (
     FallbackStrategyFactory,
     PriorityFallback,
 )
-from ._provider import JSON, HTTPProvider, ProtocolError, Unreachable
+from ._provider import (
+    JSON,
+    HTTPProvider,
+    ProtocolError,
+    RPCError,
+    RPCErrorCode,
+    Unreachable,
+)
 from ._signer import AccountSigner, Signer
 from ._test_provider import TesterProvider
 from ._test_rpc_provider import ServerHandle
@@ -96,6 +103,8 @@ __all__ = [
     "ProviderError",
     "Receive",
     "RemoteError",
+    "RPCError",
+    "RPCErrorCode",
     "ServerHandle",
     "Signer",
     "TransactionFailed",

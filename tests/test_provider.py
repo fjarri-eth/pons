@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 
 import pytest
 import trio
@@ -13,6 +14,7 @@ from pons._provider import (
     ProviderSession,
     ResponseDict,
     RPCError,
+    RPCErrorCode,
 )
 
 
@@ -39,22 +41,29 @@ async def test_dict_request(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, Amount.ether(10))
 
 
-def test_response_dict():
-    with pytest.raises(InvalidResponse, match="Some keys in the response are not strings: {1: 2}"):
-        ResponseDict({1: 2})
-
-
 def test_rpc_error():
+    error = RPCError.from_json({"code": 2, "message": "error", "data": "additional data"})
+    assert error.code == 2
+    assert error.data == "additional data"
+    assert error.to_json() == {"code": 2, "message": "error", "data": "additional data"}
+
+    error = RPCError.from_json({"code": 2, "message": "error"})
+    assert error.data is None
+    assert error.to_json() == {"code": 2, "message": "error"}
+
+    error = RPCError.from_json({"code": "2", "message": "error"})
+    assert error.code == 2
+
+    error = RPCError.invalid_request()
+    assert error.code == RPCErrorCode.INVALID_REQUEST.value
+
+    error = RPCError.method_not_found("abc")
+    assert error.code == RPCErrorCode.METHOD_NOT_FOUND.value
+
     with pytest.raises(
         InvalidResponse, match=r"Error data must be a string or None, got <class 'int'> \(1\)"
     ):
         RPCError.from_json({"data": 1, "code": 2, "message": "error"})
-
-    error = RPCError.from_json({"code": 2, "message": "error"})
-    assert error.data is None
-
-    error = RPCError.from_json({"code": "2", "message": "error"})
-    assert error.code == 2
 
     with pytest.raises(
         InvalidResponse,
@@ -153,9 +162,9 @@ async def test_neither_result_nor_error_field(test_provider, session, monkeypatc
     orig_process_request = _test_rpc_provider.process_request
 
     async def faulty_process_request(*args, **kwargs):
-        result = await orig_process_request(*args, **kwargs)
-        del result["result"]
-        return result
+        status, response = await orig_process_request(*args, **kwargs)
+        del response["result"]
+        return (status, response)
 
     monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
 
@@ -168,7 +177,7 @@ async def test_result_is_not_a_dict(test_provider, session, monkeypatch):
     # Unfortunately we can't achieve that by just patching the provider, have to patch the server
 
     async def faulty_process_request(*args, **kwargs):
-        return 1
+        return (HTTPStatus.OK, 1)
 
     monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
 
@@ -207,3 +216,7 @@ async def test_default_implementations():
 
         with pytest.raises(ValueError, match=r"Unexpected provider path: \(1,\)"):
             await session.rpc_at_pin((1,), "3")
+
+
+def test_unknown_rpc_error_code():
+    assert RPCErrorCode.from_int(-12345) == RPCErrorCode.UNKNOWN_REASON

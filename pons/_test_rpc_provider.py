@@ -1,5 +1,5 @@
-import http
-from typing import Iterable, cast
+from http import HTTPStatus
+from typing import Dict, List, Tuple, cast
 
 import trio
 from hypercorn.config import Config
@@ -11,41 +11,56 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 from trio_typing import TaskStatus
 
-from ._provider import JSON, HTTPProvider, Provider, ResponseDict, RPCError
+from ._provider import JSON, HTTPProvider, Provider, RPCError
 
 
-async def process_request(provider: Provider, data: JSON) -> JSON:
+def parse_request(request: JSON) -> Tuple[JSON, str, List[JSON]]:
+    request = cast(Dict[str, JSON], request)
+    request_id = request["id"]
+    method = request["method"]
+    if not isinstance(method, str):
+        raise TypeError("The method name must be a string")
+    params = request["params"]
+    if not isinstance(params, list):
+        raise TypeError("The method parameters must be a list")
+    return (request_id, method, params)
+
+
+async def process_request_inner(provider: Provider, request: JSON) -> Tuple[JSON, JSON]:
+    try:
+        request_id, method, params = parse_request(request)
+    except (KeyError, TypeError) as exc:
+        raise RPCError.invalid_request() from exc  # noqa: RSE102
+
+    async with provider.session() as session:
+        result = await session.rpc(method, *params)
+
+    return request_id, result
+
+
+async def process_request(provider: Provider, request: JSON) -> Tuple[HTTPStatus, JSON]:
     """
     Partially parses the incoming JSON RPC request, passes it to the VM wrapper,
     and wraps the results in a JSON RPC formatted response.
     """
-    request = ResponseDict(data)
-    request_id = request["id"]
     try:
-        if not isinstance(request["method"], str):
-            raise RuntimeError("`method` field must be a string")  # noqa: TRY004
-        if not isinstance(request["params"], Iterable):
-            raise RuntimeError("`params` field must be a list")  # noqa: TRY004
-        params = list(request["params"])
-        async with provider.session() as session:
-            result = await session.rpc(request["method"], *params)
-    except RPCError as e:
-        error = {"code": e.code, "message": e.message, "data": e.data}
-        return {"jsonrpc": "2.0", "id": request_id, "error": error}
+        request_id, result = await process_request_inner(provider, request)
+    except RPCError as exc:
+        return HTTPStatus.BAD_REQUEST, {"jsonrpc": "2.0", "error": exc.to_json()}
 
-    return {"jsonrpc": "2.0", "id": request_id, "result": result}
+    return HTTPStatus.OK, {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
 async def entry_point(request: Request) -> Response:
     data = await request.json()
     provider = request.app.state.provider
     try:
-        result = await process_request(provider, data)
-    except Exception as e:  # noqa: BLE001
+        status, response = await process_request(provider, data)
+    except Exception as exc:  # noqa: BLE001
         # A catch-all for any unexpected errors
-        return Response(str(e), status_code=http.HTTPStatus.INTERNAL_SERVER_ERROR)
+        return Response(str(exc), status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-    return JSONResponse(result)
+    return JSONResponse(response, status_code=status)
 
 
 def make_app(provider: Provider) -> ASGIFramework:

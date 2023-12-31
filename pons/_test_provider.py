@@ -23,7 +23,7 @@ from ._entities import (
     rpc_encode_data,
     rpc_encode_quantity,
 )
-from ._provider import JSON, Provider, ProviderErrorCode, ProviderSession, RPCError
+from ._provider import JSON, Provider, ProviderSession, RPCError, RPCErrorCode
 from ._signer import AccountSigner, Signer
 
 # The standard `revert(string)` is a EIP838 error.
@@ -64,26 +64,26 @@ def pyevm_errors_into_rpc_errors() -> Iterator[None]:
 
             # who knows why it's different in this specific case,
             # but that's how Infura and Quicknode work
-            error = ProviderErrorCode.SERVER_ERROR
+            error = RPCErrorCode.SERVER_ERROR
 
             message = "execution reverted"
             data = None
 
         elif reason_data.startswith(_ERROR_SELECTOR):
-            error = ProviderErrorCode.EXECUTION_ERROR
+            error = RPCErrorCode.EXECUTION_ERROR
             reason_message = decode_args([abi.string], reason_data[len(_ERROR_SELECTOR) :])[0]
             message = f"execution reverted: {reason_message!r}"
             data = rpc_encode_data(reason_data)
 
         else:
-            error = ProviderErrorCode.EXECUTION_ERROR
+            error = RPCErrorCode.EXECUTION_ERROR
             message = "execution reverted"
             data = rpc_encode_data(reason_data)
 
         raise RPCError(error.value, message, data) from exc
 
     except ValidationError as exc:
-        raise RPCError(ProviderErrorCode.SERVER_ERROR.value, exc.args[0]) from exc
+        raise RPCError.invalid_parameter(exc.args[0]) from exc
 
 
 def make_camel_case(key: str) -> str:
@@ -157,8 +157,15 @@ class TesterProvider(Provider):
             eth_newFilter=self.eth_new_filter,
             eth_getFilterChanges=self.eth_get_filter_changes,
         )
-        # TODO: can it be typed properly? Seems like a lot of effort.
-        return cast(JSON, dispatch[method](*args))  # type: ignore[operator]
+        if method not in dispatch:
+            raise RPCError.method_not_found(method)
+
+        try:
+            result = dispatch[method](*args)  # type: ignore[operator]
+        except TypeError as exc:
+            raise RPCError.invalid_parameter(str(exc)) from exc
+
+        return cast(JSON, result)
 
     def net_version(self) -> str:
         return "0"
