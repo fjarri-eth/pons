@@ -11,14 +11,13 @@ from pons import (
     Mutability,
     abi,
 )
-
-from .compile import compile_file
+from pons._compiler import compile_contract_file
 
 
 @pytest.fixture
 def compiled_contracts():
     path = Path(__file__).resolve().parent / "TestContractFunctionality.sol"
-    yield compile_file(path)
+    return compile_contract_file(path)
 
 
 async def test_empty_constructor(session, root_signer, compiled_contracts):
@@ -26,7 +25,6 @@ async def test_empty_constructor(session, root_signer, compiled_contracts):
     Checks that an empty constructor is created automatically if none is provided,
     and it can be used to deploy the contract.
     """
-
     compiled_contract = compiled_contracts["NoConstructor"]
 
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
@@ -62,7 +60,7 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
     assert result == (inner, outer)
 
 
-async def test_overloaded_method(session, root_signer, another_signer, compiled_contracts):
+async def test_overloaded_method(session, root_signer, compiled_contracts):
     compiled_contract = compiled_contracts["Test"]
 
     # Deploy the contract

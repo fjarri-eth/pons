@@ -51,9 +51,14 @@ Errors
 
 .. autoclass:: pons.Unreachable
 
+.. autoclass:: pons.ProtocolError
+
 .. autoclass:: pons.TransactionFailed
 
-.. autoclass:: pons._client.ProviderErrorCode
+.. autoclass:: pons._provider.RPCError
+   :members:
+
+.. autoclass:: pons._provider.RPCErrorCode
    :members:
 
 .. autoclass:: pons.ProviderError()
@@ -118,6 +123,20 @@ Contract ABI
 
 .. autoclass:: Receive
    :members:
+
+
+Testing utilities
+-----------------
+
+``pons`` exposes several types useful for testing applications that connect to Ethereum RPC servers. Not intended for the production environment.
+
+.. autoclass:: LocalProvider
+   :show-inheritance:
+   :members: disable_auto_mine_transactions, enable_auto_mine_transactions
+
+.. autoclass:: HTTPProviderServer
+   :members:
+   :special-members: __call__
 
 
 Secondary classes

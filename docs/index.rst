@@ -12,8 +12,7 @@ A quick usage example:
     import pons
     import eth_account
 
-    from tests.provider import EthereumTesterProvider
-    from tests.provider_server import ServerHandle
+    from pons import LocalProvider, HTTPProviderServer, Amount
 
     # Run examples with our test server in the background
 
@@ -32,14 +31,14 @@ A quick usage example:
     http_provider = None
     pons.HTTPProvider = lambda uri: http_provider
 
-    # This variable will be set when the EthereumTesterProvider is created
+    # This variable will be set when the LocalProvider is created
 
-    root_account = None
+    root_signer = None
     orig_Account_from_key = eth_account.Account.from_key
 
     def mock_Account_from_key(private_key_hex):
         if private_key_hex == "0x<your secret key>":
-            return root_account
+            return root_signer.account
         else:
             return orig_Account_from_key(private_key_hex)
 
@@ -60,14 +59,14 @@ A quick usage example:
     # This function will start a test server and fill in some global variables
 
     async def run_with_server(func):
-        global root_account
+        global root_signer
         global http_provider
 
-        test_provider = EthereumTesterProvider()
-        root_account = test_provider.root_account
+        test_provider = LocalProvider(root_balance=Amount.ether(100))
+        root_signer = test_provider.root
 
         async with trio.open_nursery() as nursery:
-            handle = ServerHandle(test_provider)
+            handle = HTTPProviderServer(test_provider)
             http_provider = handle.http_provider
             await nursery.start(handle)
             await func()

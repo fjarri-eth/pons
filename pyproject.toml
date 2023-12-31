@@ -12,7 +12,8 @@ dependencies = [
     "eth-abi>=4",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
-    "typing_extensions>=4.2"
+    "typing_extensions>=4.2",
+    "trio-typing>=0.9.0",
 ]
 requires-python = ">=3.8"
 license = "MIT"
@@ -22,18 +23,28 @@ readme = "README.md"
 homepage = "https://github.com/fjarri/pons"
 
 [project.optional-dependencies]
-tests = [
-    "pytest>=6",
-    "trio>=0.19.0",
-    "pytest-trio",
-    "pytest-cov",
-    "py-solc-x>=1",
+compiler = [
+    "py-solc-x>=2",
+]
+test-rpc-provider = [
     # eth-tester only has pre-releases, so we can't set a range.
     # TODO: make our own mock around Pyevm.
     "eth-tester[pyevm]==0.10.0-beta.1",
     "starlette",
     "hypercorn",
-    "mypy-extensions>=1"
+]
+tests = [
+    "pytest>=6",
+    "trio>=0.19.0",
+    "pytest-trio",
+    "pytest-cov",
+    "mypy-extensions>=1",
+    # from `compiler` feature
+    "py-solc-x>=2",
+    # from `test-rpc-provider` feature
+    "eth-tester[pyevm]==0.10.0-beta.1",
+    "starlette",
+    "hypercorn",
 ]
 docs = [
     "sphinx>=4",
@@ -43,7 +54,6 @@ docs = [
 ]
 lint = [
     "mypy>=1.4",
-    "trio-typing[mypy]>=0.9.0",
     "black>=23",
     "isort>=5"
 ]
@@ -150,4 +160,5 @@ target-version = "py38"
 
 [tool.isort]
 profile = "black"
-src_paths = ["pons", "test"]
+src_paths = ["pons", "tests"]
+known_first_party = ["pons"]

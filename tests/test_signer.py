@@ -8,6 +8,7 @@ def test_signer():
     signer = AccountSigner(acc)
 
     assert signer.address == Address.from_hex(acc.address)
+    assert signer.account == acc
 
     tx = dict(gas="0x3333", gasPrice="0x4444", nonce="0x5555", value="0x6666")
     sig = signer.sign_transaction(tx)

@@ -266,7 +266,7 @@ def test_normalization_roundtrip():
     assert struct._denormalize(expected_normalized) == value
 
 
-def check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=True):
+def check_topic_encode_decode(tp, val, encoded_val, *, can_be_decoded=True):
     assert tp.encode_to_topic(val) == encoded_val
     if can_be_decoded:
         assert tp.decode_from_topic(encoded_val) == val

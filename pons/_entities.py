@@ -608,7 +608,6 @@ def rpc_decode_data(val: Any) -> bytes:
         raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
 
 
-# Only used intests, but I'll leave it here so that it could be matched with `rpc_encode_block()`
 def rpc_decode_block(val: Any) -> Union[int, str]:
     try:
         Block(val)  # check if it's one of the enum's values

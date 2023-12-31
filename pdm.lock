@@ -2,11 +2,10 @@
 # It is not intended for manual editing.
 
 [metadata]
-groups = ["default", "docs", "lint", "tests"]
-cross_platform = true
-static_urls = false
-lock_version = "4.3"
-content_hash = "sha256:74888475f4a56f1b11ec5c2a880b024e5a4dcf2b085eadafe54f8631cfa91943"
+groups = ["default", "compiler", "docs", "lint", "test-rpc-provider", "tests"]
+strategy = ["cross_platform"]
+lock_version = "4.4.1"
+content_hash = "sha256:ea61af909824b60031076558d2ede29d8f679898acf1d6b52e723c2a685cd55a"
 
 [[package]]
 name = "alabaster"
@@ -1865,20 +1864,6 @@ dependencies = [
     "packaging",
     "trio>=0.16.0",
     "typing-extensions>=3.7.4",
-]
-files = [
-    {file = "trio-typing-0.10.0.tar.gz", hash = "sha256:065ee684296d52a8ab0e2374666301aec36ee5747ac0e7a61f230250f8907ac3"},
-    {file = "trio_typing-0.10.0-py3-none-any.whl", hash = "sha256:6d0e7ec9d837a2fe03591031a172533fbf4a1a95baf369edebfc51d5a49f0264"},
-]
-
-[[package]]
-name = "trio-typing"
-version = "0.10.0"
-extras = ["mypy"]
-summary = "Static type checking support for Trio and related projects"
-dependencies = [
-    "mypy>=1.0",
-    "trio-typing==0.10.0",
 ]
 files = [
     {file = "trio-typing-0.10.0.tar.gz", hash = "sha256:065ee684296d52a8ab0e2374666301aec36ee5747ac0e7a61f230250f8907ac3"},

@@ -12,6 +12,7 @@ from ._client import (
     RemoteError,
     TransactionFailed,
 )
+from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
     BoundConstructor,
     BoundConstructorCall,
@@ -45,7 +46,16 @@ from ._fallback_provider import (
     FallbackStrategyFactory,
     PriorityFallback,
 )
-from ._provider import JSON, HTTPProvider, Unreachable
+from ._http_provider_server import HTTPProviderServer
+from ._local_provider import LocalProvider
+from ._provider import (
+    JSON,
+    HTTPProvider,
+    ProtocolError,
+    RPCError,
+    RPCErrorCode,
+    Unreachable,
+)
 from ._signer import AccountSigner, Signer
 
 __all__ = [
@@ -74,8 +84,10 @@ __all__ = [
     "DeployedContract",
     "Either",
     "Error",
+    "LocalProvider",
     "Event",
     "EventFilter",
+    "EVMVersion",
     "Fallback",
     "FallbackProvider",
     "FallbackStrategy",
@@ -87,12 +99,17 @@ __all__ = [
     "MultiMethod",
     "Mutability",
     "PriorityFallback",
+    "ProtocolError",
     "ProviderError",
     "Receive",
     "RemoteError",
+    "RPCError",
+    "RPCErrorCode",
+    "HTTPProviderServer",
     "Signer",
     "TransactionFailed",
     "TxHash",
     "Unreachable",
     "abi",
+    "compile_contract_file",
 ]
