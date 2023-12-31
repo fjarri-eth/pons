@@ -113,6 +113,21 @@ async def test_auto_mine(provider, session, root_signer, another_signer):
     assert provider.eth_get_balance(dest.rpc_encode(), latest) == Amount.ether(2).rpc_encode()
 
 
+async def test_snapshots(provider, session, root_signer, another_signer):
+    amount = Amount.ether(1)
+    double_amount = Amount.ether(2)
+    dest = another_signer.address
+    latest = rpc_encode_block(Block.LATEST)
+
+    await session.broadcast_transfer(root_signer, dest, amount)
+    snapshot_id = provider.take_snapshot()
+    await session.broadcast_transfer(root_signer, dest, amount)
+    assert provider.eth_get_balance(dest.rpc_encode(), latest) == double_amount.rpc_encode()
+
+    provider.revert_to_snapshot(snapshot_id)
+    assert provider.eth_get_balance(dest.rpc_encode(), latest) == amount.rpc_encode()
+
+
 def test_net_version(provider):
     assert provider.net_version() == "0"
 
