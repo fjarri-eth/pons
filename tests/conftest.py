@@ -1,11 +1,11 @@
 import pytest
 
-from pons import AccountSigner, Amount, Client, TesterProvider
+from pons import AccountSigner, Amount, Client, LocalProvider
 
 
 @pytest.fixture
 def test_provider():
-    return TesterProvider(root_balance=Amount.ether(100))
+    return LocalProvider(root_balance=Amount.ether(100))
 
 
 @pytest.fixture

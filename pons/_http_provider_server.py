@@ -77,10 +77,10 @@ def make_app(provider: Provider) -> ASGIFramework:
     return cast(ASGIFramework, app)
 
 
-class ServerHandle:
+class HTTPProviderServer:
     """
-    A handle for a running web server.
-    Can be used to shut it down.
+    A server counterpart of :py:class:`pons.HTTPProvider`.
+    Intended for testing, not production-ready.
     """
 
     def __init__(self, provider: Provider, host: str = "127.0.0.1", port: int = 8888):
@@ -108,5 +108,6 @@ class ServerHandle:
         self._shutdown_finished.set()
 
     async def shutdown(self) -> None:
+        """Shuts down the server."""
         self._shutdown_event.set()
         await self._shutdown_finished.wait()

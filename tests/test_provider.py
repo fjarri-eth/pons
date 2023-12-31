@@ -4,8 +4,8 @@ from http import HTTPStatus
 import pytest
 import trio
 
-from pons import _test_rpc_provider  # For monkeypatching purposes
-from pons import Amount, Client, HTTPProvider, ServerHandle, Unreachable
+from pons import _http_provider_server  # For monkeypatching purposes
+from pons import Amount, Client, HTTPProvider, HTTPProviderServer, Unreachable
 from pons._client import BadResponseFormat, ProviderError
 from pons._provider import (
     HTTPError,
@@ -19,7 +19,7 @@ from pons._provider import (
 
 @pytest.fixture
 async def test_server(nursery, test_provider):
-    handle = ServerHandle(test_provider)
+    handle = HTTPProviderServer(test_provider)
     await nursery.start(handle)
     yield handle
     await handle.shutdown()
@@ -160,14 +160,14 @@ async def test_neither_result_nor_error_field(session, monkeypatch):
     # without either "error" or "result" fields.
     # Unfortunately we can't achieve that by just patching the provider, have to patch the server
 
-    orig_process_request = _test_rpc_provider.process_request
+    orig_process_request = _http_provider_server.process_request
 
     async def faulty_process_request(*args, **kwargs):
         status, response = await orig_process_request(*args, **kwargs)
         del response["result"]
         return (status, response)
 
-    monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
+    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(BadResponseFormat, match="`result` is not present in the response"):
         await session.net_version()
@@ -180,7 +180,7 @@ async def test_result_is_not_a_dict(session, monkeypatch):
     async def faulty_process_request(*_args, **_kwargs):
         return (HTTPStatus.OK, 1)
 
-    monkeypatch.setattr(_test_rpc_provider, "process_request", faulty_process_request)
+    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(BadResponseFormat, match="RPC response must be a dictionary, got: 1"):
         await session.net_version()

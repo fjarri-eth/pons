@@ -11,7 +11,7 @@ from pons import (
     Amount,
     Block,
     Client,
-    TesterProvider,
+    LocalProvider,
     TxHash,
     abi,
     compile_contract_file,
@@ -29,10 +29,10 @@ from pons._provider import RPCError, RPCErrorCode
 
 
 # Masking the global fixtures to make this test self-contained
-# (since TesterProvider is what we're testing).
+# (since LocalProvider is what we're testing).
 @pytest.fixture
 def provider():
-    return TesterProvider(root_balance=Amount.ether(100))
+    return LocalProvider(root_balance=Amount.ether(100))
 
 
 @pytest.fixture
@@ -82,7 +82,7 @@ async def test_invalid_parameter(provider):
 
 async def test_root_balance():
     amount = Amount.ether(123)
-    provider = TesterProvider(root_balance=amount)
+    provider = LocalProvider(root_balance=amount)
     client = Client(provider=provider)
     async with client.session() as session:
         assert await session.eth_get_balance(provider.root.address) == amount
@@ -125,7 +125,7 @@ def test_eth_chain_id(provider):
 
 def test_eth_get_balance():
     amount = Amount.ether(123)
-    provider = TesterProvider(root_balance=amount)
+    provider = LocalProvider(root_balance=amount)
     balance = provider.eth_get_balance(
         provider.root.address.rpc_encode(), rpc_encode_block(Block.LATEST)
     )

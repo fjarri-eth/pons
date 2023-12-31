@@ -46,6 +46,8 @@ from ._fallback_provider import (
     FallbackStrategyFactory,
     PriorityFallback,
 )
+from ._http_provider_server import HTTPProviderServer
+from ._local_provider import LocalProvider
 from ._provider import (
     JSON,
     HTTPProvider,
@@ -55,8 +57,6 @@ from ._provider import (
     Unreachable,
 )
 from ._signer import AccountSigner, Signer
-from ._test_provider import TesterProvider
-from ._test_rpc_provider import ServerHandle
 
 __all__ = [
     "ABIDecodingError",
@@ -84,7 +84,7 @@ __all__ = [
     "DeployedContract",
     "Either",
     "Error",
-    "TesterProvider",
+    "LocalProvider",
     "Event",
     "EventFilter",
     "EVMVersion",
@@ -105,7 +105,7 @@ __all__ = [
     "RemoteError",
     "RPCError",
     "RPCErrorCode",
-    "ServerHandle",
+    "HTTPProviderServer",
     "Signer",
     "TransactionFailed",
     "TxHash",

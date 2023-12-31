@@ -108,7 +108,7 @@ def normalize_return_value(value: Normalizable) -> JSON:
     return value
 
 
-class TesterProvider(Provider):
+class LocalProvider(Provider):
     """A provider maintaining its own chain state, useful for tests."""
 
     # Disable py.test picking this class up.
@@ -305,12 +305,12 @@ class TesterProvider(Provider):
         return cast(JSON, results)
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator["TesterProviderSession"]:
-        yield TesterProviderSession(self)
+    async def session(self) -> AsyncIterator["LocalProviderSession"]:
+        yield LocalProviderSession(self)
 
 
-class TesterProviderSession(ProviderSession):
-    def __init__(self, provider: TesterProvider):
+class LocalProviderSession(ProviderSession):
+    def __init__(self, provider: LocalProvider):
         self._provider = provider
 
     async def rpc(self, method: str, *args: JSON) -> JSON:

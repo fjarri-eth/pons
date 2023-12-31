@@ -3,12 +3,12 @@
 
 import pytest
 
-from pons import RPCError, RPCErrorCode, ServerHandle
+from pons import HTTPProviderServer, RPCError, RPCErrorCode
 
 
 @pytest.fixture
 async def test_server(nursery, test_provider):
-    handle = ServerHandle(test_provider)
+    handle = HTTPProviderServer(test_provider)
     await nursery.start(handle)
     yield handle
     await handle.shutdown()

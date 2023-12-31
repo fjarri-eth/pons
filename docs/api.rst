@@ -125,6 +125,20 @@ Contract ABI
    :members:
 
 
+Testing utilities
+-----------------
+
+``pons`` exposes several types useful for testing applications that connect to Ethereum RPC servers. Not intended for the production environment.
+
+.. autoclass:: LocalProvider
+   :show-inheritance:
+   :members: disable_auto_mine_transactions, enable_auto_mine_transactions
+
+.. autoclass:: HTTPProviderServer
+   :members:
+   :special-members: __call__
+
+
 Secondary classes
 -----------------
 
