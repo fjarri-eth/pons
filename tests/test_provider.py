@@ -18,8 +18,8 @@ from pons._provider import (
 
 
 @pytest.fixture
-async def test_server(nursery, test_provider):
-    handle = HTTPProviderServer(test_provider)
+async def test_server(nursery, local_provider):
+    handle = HTTPProviderServer(local_provider)
     await nursery.start(handle)
     yield handle
     await handle.shutdown()
@@ -96,9 +96,9 @@ async def test_dict_request_introspection(session, root_signer, another_signer):
 
 
 async def test_unexpected_response_type(
-    test_provider, session, monkeypatch, root_signer, another_signer
+    local_provider, session, monkeypatch, root_signer, another_signer
 ):
-    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda _tx_hash: "something")
+    monkeypatch.setattr(local_provider, "eth_get_transaction_receipt", lambda _tx_hash: "something")
 
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
@@ -108,8 +108,8 @@ async def test_unexpected_response_type(
         await session.eth_get_transaction_receipt(tx_hash)
 
 
-async def test_missing_field(test_provider, session, monkeypatch, root_signer, another_signer):
-    orig_eth_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+async def test_missing_field(local_provider, session, monkeypatch, root_signer, another_signer):
+    orig_eth_get_transaction_receipt = local_provider.eth_get_transaction_receipt
 
     def faulty_eth_get_transaction_receipt(tx_hash):
         receipt = orig_eth_get_transaction_receipt(tx_hash)
@@ -117,7 +117,7 @@ async def test_missing_field(test_provider, session, monkeypatch, root_signer, a
         return receipt
 
     monkeypatch.setattr(
-        test_provider, "eth_get_transaction_receipt", faulty_eth_get_transaction_receipt
+        local_provider, "eth_get_transaction_receipt", faulty_eth_get_transaction_receipt
     )
 
     tx_hash = await session.broadcast_transfer(
@@ -131,25 +131,25 @@ async def test_missing_field(test_provider, session, monkeypatch, root_signer, a
 
 
 async def test_none_instead_of_dict(
-    test_provider, session, monkeypatch, root_signer, another_signer
+    local_provider, session, monkeypatch, root_signer, another_signer
 ):
     # Check that a None can be returned in a call that expects a `dict`
     # (the interpretation of such an event is up to the client).
     # `eth_getTransactionReceipt` can return a None normally (if there's no receipt yet),
     # but we force it here, just in case.
-    monkeypatch.setattr(test_provider, "eth_get_transaction_receipt", lambda _tx_hash: None)
+    monkeypatch.setattr(local_provider, "eth_get_transaction_receipt", lambda _tx_hash: None)
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
     )
     assert await session.eth_get_transaction_receipt(tx_hash) is None
 
 
-async def test_non_ok_http_status(test_provider, session, monkeypatch):
+async def test_non_ok_http_status(local_provider, session, monkeypatch):
     def faulty_net_version():
         # A generic exception will generate a 500 status code
         raise Exception("Something unexpected happened")  # noqa: TRY002
 
-    monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
+    monkeypatch.setattr(local_provider, "net_version", faulty_net_version)
 
     with pytest.raises(HTTPError, match=r"HTTP status 500: Something unexpected happened"):
         await session.net_version()

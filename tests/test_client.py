@@ -54,7 +54,7 @@ def normalize_topics(topics):
     return tuple((elem,) for elem in topics)
 
 
-async def test_net_version(test_provider, session):
+async def test_net_version(local_provider, session):
     net_version1 = await session.net_version()
     assert net_version1 == "0"
 
@@ -63,19 +63,19 @@ async def test_net_version(test_provider, session):
         raise NotImplementedError  # pragma: no cover
 
     # The result should have been cached the first time
-    with monkeypatched(test_provider, "net_version", wrong_net_version):
+    with monkeypatched(local_provider, "net_version", wrong_net_version):
         net_version2 = await session.net_version()
     assert net_version1 == net_version2
 
 
-async def test_net_version_type_check(test_provider, session):
+async def test_net_version_type_check(local_provider, session):
     # Provider returning a bad value
-    with monkeypatched(test_provider, "net_version", lambda: 0):
+    with monkeypatched(local_provider, "net_version", lambda: 0):
         with pytest.raises(BadResponseFormat, match="net_version: expected a string result"):
             await session.net_version()
 
 
-async def test_eth_chain_id(test_provider, session):
+async def test_eth_chain_id(local_provider, session):
     chain_id1 = await session.eth_chain_id()
     assert chain_id1 == 2299111 * 57099167
 
@@ -84,7 +84,7 @@ async def test_eth_chain_id(test_provider, session):
         raise NotImplementedError  # pragma: no cover
 
     # The result should have been cached the first time
-    with monkeypatched(test_provider, "eth_chain_id", wrong_chain_id):
+    with monkeypatched(local_provider, "eth_chain_id", wrong_chain_id):
         chain_id2 = await session.eth_chain_id()
     assert chain_id1 == chain_id2
 
@@ -101,15 +101,15 @@ async def test_eth_get_balance(session, root_signer, another_signer):
     assert balance == Amount.ether(0)
 
 
-async def test_eth_get_transaction_receipt(test_provider, session, root_signer, another_signer):
-    test_provider.disable_auto_mine_transactions()
+async def test_eth_get_transaction_receipt(local_provider, session, root_signer, another_signer):
+    local_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
     )
     receipt = await session.eth_get_transaction_receipt(tx_hash)
     assert receipt is None
 
-    test_provider.enable_auto_mine_transactions()
+    local_provider.enable_auto_mine_transactions()
     receipt = await session.eth_get_transaction_receipt(tx_hash)
     assert receipt.succeeded
 
@@ -125,10 +125,10 @@ async def test_eth_get_transaction_count(session, root_signer, another_signer):
 
 
 async def test_wait_for_transaction_receipt(
-    test_provider, session, root_signer, another_signer, autojump_clock
+    local_provider, session, root_signer, another_signer, autojump_clock
 ):
     to_transfer = Amount.ether(10)
-    test_provider.disable_auto_mine_transactions()
+    local_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
 
     # The receipt won't be available until we mine, so the waiting should time out
@@ -149,7 +149,7 @@ async def test_wait_for_transaction_receipt(
 
     async def delayed_enable_mining():
         await trio.sleep(timeout)
-        test_provider.enable_auto_mine_transactions()
+        local_provider.enable_auto_mine_transactions()
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(get_receipt)
@@ -269,23 +269,23 @@ async def test_transfer_custom_gas(session, root_signer, another_signer):
         await session.transfer(root_signer, another_signer.address, to_transfer, gas=20000)
 
 
-async def test_transfer_failed(test_provider, session, root_signer, another_signer):
+async def test_transfer_failed(local_provider, session, root_signer, another_signer):
     # TODO: it would be nice to reproduce the actual situation where this could happen
     # (tranfer was accepted for mining, but failed in the process,
     # and the resulting receipt has a 0 status).
-    orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+    orig_get_transaction_receipt = local_provider.eth_get_transaction_receipt
 
     def mock_get_transaction_receipt(tx_hash_hex):
         receipt = orig_get_transaction_receipt(tx_hash_hex)
         receipt["status"] = "0x0"
         return receipt
 
-    with monkeypatched(test_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
+    with monkeypatched(local_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
         with pytest.raises(TransactionFailed, match="Transfer failed"):
             await session.transfer(root_signer, another_signer.address, Amount.ether(10))
 
 
-async def test_deploy(test_provider, session, compiled_contracts, root_signer):
+async def test_deploy(local_provider, session, compiled_contracts, root_signer):
     basic_contract = compiled_contracts["BasicContract"]
     construction_error = compiled_contracts["TestErrors"]
     payable_constructor = compiled_contracts["PayableConstructor"]
@@ -314,14 +314,14 @@ async def test_deploy(test_provider, session, compiled_contracts, root_signer):
         await session.deploy(root_signer, construction_error.constructor(0), gas=300000)
 
     # Test the provider returning an empty `contractAddress`
-    orig_get_transaction_receipt = test_provider.eth_get_transaction_receipt
+    orig_get_transaction_receipt = local_provider.eth_get_transaction_receipt
 
     def mock_get_transaction_receipt(tx_hash_hex):
         receipt = orig_get_transaction_receipt(tx_hash_hex)
         receipt["contractAddress"] = None
         return receipt
 
-    with monkeypatched(test_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
+    with monkeypatched(local_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
         with pytest.raises(
             BadResponseFormat,
             match=(
@@ -365,7 +365,7 @@ async def test_transact(session, compiled_contracts, root_signer):
 
 
 async def test_transact_and_return_events(
-    autojump_clock, test_provider, session, compiled_contracts, root_signer, another_signer
+    autojump_clock, local_provider, session, compiled_contracts, root_signer, another_signer
 ):
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
 
@@ -395,7 +395,7 @@ async def test_transact_and_return_events(
     # Two transactions for the same method in the same block -
     # we need to be able to only pick up the results from the relevant transaction receipt
 
-    test_provider.disable_auto_mine_transactions()
+    local_provider.disable_auto_mine_transactions()
 
     results = {}
 
@@ -407,7 +407,7 @@ async def test_transact_and_return_events(
 
     async def delayed_enable_mining():
         await trio.sleep(5)
-        test_provider.enable_auto_mine_transactions()
+        local_provider.enable_auto_mine_transactions()
 
     x1 = 1
     x2 = 2
@@ -455,8 +455,8 @@ async def test_eth_get_transaction_by_hash(session, root_signer, another_signer)
     assert tx_info is None
 
 
-async def test_eth_get_filter_changes_bad_response(test_provider, session, monkeypatch):
-    monkeypatch.setattr(test_provider, "eth_get_filter_changes", lambda _filter_id: {"foo": 1})
+async def test_eth_get_filter_changes_bad_response(local_provider, session, monkeypatch):
+    monkeypatch.setattr(local_provider, "eth_get_filter_changes", lambda _filter_id: {"foo": 1})
 
     block_filter = await session.eth_new_block_filter()
 
@@ -492,12 +492,12 @@ async def test_block_filter(session, root_signer, another_signer):
     assert len(block_hashes) == 0
 
 
-async def test_pending_transaction_filter(test_provider, session, root_signer, another_signer):
+async def test_pending_transaction_filter(local_provider, session, root_signer, another_signer):
     transaction_filter = await session.eth_new_pending_transaction_filter()
 
     to_transfer = Amount.ether(1)
 
-    test_provider.disable_auto_mine_transactions()
+    local_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
     tx_hashes = await session.eth_get_filter_changes(transaction_filter)
     assert tx_hashes == (tx_hash,)
@@ -751,13 +751,13 @@ async def test_event_filter_high_level(
     assert events[2] == {"from_": another_signer.address, "id": b"1111", "value": 3, "value2": 4}
 
 
-async def test_unknown_rpc_status_code(test_provider, session, monkeypatch):
+async def test_unknown_rpc_status_code(local_provider, session, monkeypatch):
     def faulty_net_version():
         # This is a known exception type, and it will be transferred through the network
         # keeping the status code.
         raise RPCError(666, "this method is possessed")
 
-    monkeypatch.setattr(test_provider, "net_version", faulty_net_version)
+    monkeypatch.setattr(local_provider, "net_version", faulty_net_version)
 
     with pytest.raises(ProviderError, match=r"Provider error \(666\): this method is possessed"):
         await session.net_version()
@@ -870,7 +870,7 @@ async def test_contract_exceptions_high_level(session, root_signer, compiled_con
     assert exc.value.data == {"x": 4}
 
 
-async def test_unknown_error_reasons(test_provider, session, compiled_contracts, root_signer):
+async def test_unknown_error_reasons(local_provider, session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
@@ -881,7 +881,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
         data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
         raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data))
 
-    with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
+    with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
             await session.estimate_transact(contract.method.transactPanic(999))
 
@@ -892,7 +892,7 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
         data = b"1234" + encode_args((abi.uint(256), 1))
         raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data))
 
-    with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
+    with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(
             ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
         ):
@@ -905,6 +905,6 @@ async def test_unknown_error_reasons(test_provider, session, compiled_contracts,
         data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
         raise RPCError(12345, "execution reverted", rpc_encode_data(data))
 
-    with monkeypatched(test_provider, "eth_estimate_gas", eth_estimate_gas):
+    with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
             await session.estimate_transact(contract.method.transactPanic(999))

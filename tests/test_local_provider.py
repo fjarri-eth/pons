@@ -153,7 +153,7 @@ async def test_eth_send_raw_transaction(provider, root_signer, another_signer):
 
 
 async def test_eth_call(provider, session, root_signer):
-    path = Path(__file__).resolve().parent / "TestTestProvider.sol"
+    path = Path(__file__).resolve().parent / "TestLocalProvider.sol"
     compiled = compile_contract_file(path)
     compiled_contract = compiled["BasicContract"]
 
