@@ -98,4 +98,10 @@ contract Test {
         ByteInner[2] memory inner_arr = [inner1, inner2];
         emit Complicated("aaaa", bytestring33len2, foo, inner_arr);
     }
+
+    error MyError(address sender);
+
+    function returnSender() public {
+        revert MyError(msg.sender);
+    }
 }
