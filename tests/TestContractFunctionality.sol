@@ -42,7 +42,7 @@ contract Test {
         return v1 + _x;
     }
 
-    function overloaded(uint256 _x, uint256 _y) public view returns (uint256) {
+    function overloaded(uint256 _x, uint256 _y) public pure returns (uint256) {
         return _y + _x;
     }
 
