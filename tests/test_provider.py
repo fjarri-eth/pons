@@ -144,21 +144,20 @@ async def test_none_instead_of_dict(
     assert await session.eth_get_transaction_receipt(tx_hash) is None
 
 
-async def test_non_ok_http_status(local_provider, session, monkeypatch):
+async def test_non_json_response(local_provider, session, monkeypatch):
     def faulty_net_version():
         # A generic exception will generate a 500 status code
         raise Exception("Something unexpected happened")  # noqa: TRY002
 
     monkeypatch.setattr(local_provider, "net_version", faulty_net_version)
 
-    with pytest.raises(HTTPError, match=r"HTTP status 500: Something unexpected happened"):
+    message = "Expected a JSON response, got HTTP status 500: Something unexpected happened"
+    with pytest.raises(BadResponseFormat, match=message):
         await session.net_version()
 
 
-async def test_neither_result_nor_error_field(session, monkeypatch):
-    # Tests the handling of a badly formed provider response
-    # without either "error" or "result" fields.
-    # Unfortunately we can't achieve that by just patching the provider, have to patch the server
+async def test_no_result_field(session, monkeypatch):
+    # Tests the handling of a badly formed success response without the "result" field.
 
     orig_process_request = _http_provider_server.process_request
 
@@ -170,6 +169,22 @@ async def test_neither_result_nor_error_field(session, monkeypatch):
     monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(BadResponseFormat, match="`result` is not present in the response"):
+        await session.net_version()
+
+
+async def test_no_error_field(session, monkeypatch):
+    # Tests the handling of a badly formed success response without the "error" field.
+
+    orig_process_request = _http_provider_server.process_request
+
+    async def faulty_process_request(*args, **kwargs):
+        status, response = await orig_process_request(*args, **kwargs)
+        del response["result"]
+        return (HTTPStatus.BAD_REQUEST, response)
+
+    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
+
+    with pytest.raises(HTTPError, match=r"HTTP status 400: {\"jsonrpc\":\"2.0\",\"id\":0}"):
         await session.net_version()
 
 

@@ -33,6 +33,7 @@ Fixed
 ^^^^^
 
 - Process unnamed arguments in JSON entries correctly (as positional arguments). (PR_51_)
+- More robust error handling in HTTP provider. (PR_63_)
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
@@ -43,6 +44,7 @@ Fixed
 .. _PR_59: https://github.com/fjarri/pons/pull/59
 .. _PR_61: https://github.com/fjarri/pons/pull/61
 .. _PR_62: https://github.com/fjarri/pons/pull/62
+.. _PR_63: https://github.com/fjarri/pons/pull/63
 
 
 0.7.0 (09-07-2023)
