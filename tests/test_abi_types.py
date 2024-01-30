@@ -37,8 +37,7 @@ def test_uint():
         abi.uint(128)._normalize(-1)
     with pytest.raises(
         ValueError,
-        match="`uint128` must correspond to an unsigned integer under 128 bits, got "
-        + str(2**128),
+        match="`uint128` must correspond to an unsigned integer under 128 bits, got " + str(2**128),
     ):
         abi.uint(128)._normalize(2**128)
 
