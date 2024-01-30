@@ -33,6 +33,7 @@ def test_signer():
 
     assert signer.address == Address.from_hex(acc.address)
     assert signer.account == acc
+    assert signer.private_key == bytes(acc._private_key)
 
     check_signer(signer)
 

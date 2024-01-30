@@ -41,6 +41,14 @@ class AccountSigner(Signer):
         """Returns the account object used to create this signer."""
         return self._account
 
+    @property
+    def private_key(self) -> bytes:
+        """
+        Returns the private key corresponding to this signer.
+        Handle with care.
+        """
+        return bytes(self._account._private_key)  # noqa: SLF001
+
     @cached_property
     def address(self) -> Address:
         return Address.from_hex(self._account.address)
