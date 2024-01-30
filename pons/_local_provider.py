@@ -230,8 +230,6 @@ class LocalProvider(Provider):
 
     def eth_estimate_gas(self, tx: Mapping[str, Any], block: str) -> str:
         tx = dict(tx)
-        if "from" not in tx:
-            tx["from"] = self._default_address.rpc_encode()
         tx["value"] = rpc_decode_quantity(tx["value"])
 
         with pyevm_errors_into_rpc_errors():

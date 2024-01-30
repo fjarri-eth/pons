@@ -210,9 +210,9 @@ async def test_eth_call_decoding_error(session, compiled_contracts, root_signer)
         await session.eth_call(wrong_contract.method.getState(456))
 
 
-async def test_estimate_deploy(session, compiled_contracts):
+async def test_estimate_deploy(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
-    gas = await session.estimate_deploy(compiled_contract.constructor(1))
+    gas = await session.estimate_deploy(root_signer.address, compiled_contract.constructor(1))
     assert isinstance(gas, int)
     assert gas > 0
 
@@ -236,7 +236,9 @@ async def test_estimate_transfer(session, root_signer, another_signer):
 async def test_estimate_transact(session, compiled_contracts, root_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(1))
-    gas = await session.estimate_transact(deployed_contract.method.setState(456))
+    gas = await session.estimate_transact(
+        root_signer.address, deployed_contract.method.setState(456)
+    )
     assert isinstance(gas, int)
     assert gas > 0
 
@@ -861,26 +863,26 @@ async def test_contract_exceptions_high_level(session, root_signer, compiled_con
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
     with pytest.raises(ContractPanic) as exc:
-        await session.estimate_transact(contract.method.transactPanic(1))
+        await session.estimate_transact(root_signer.address, contract.method.transactPanic(1))
     assert exc.value.reason == ContractPanic.Reason.OVERFLOW
 
     with pytest.raises(ContractLegacyError) as exc:
-        await session.estimate_transact(contract.method.transactError(0))
+        await session.estimate_transact(root_signer.address, contract.method.transactError(0))
     assert exc.value.message == ""
 
     with pytest.raises(ContractLegacyError) as exc:
-        await session.estimate_transact(contract.method.transactError(1))
+        await session.estimate_transact(root_signer.address, contract.method.transactError(1))
     assert exc.value.message == "require(string)"
 
     with pytest.raises(ContractError) as exc:
-        await session.estimate_transact(contract.method.transactError(4))
+        await session.estimate_transact(root_signer.address, contract.method.transactError(4))
     assert exc.value.error == contract.error.CustomError
     assert exc.value.data == {"x": 4}
 
     # Check that the same works for deployment
 
     with pytest.raises(ContractError) as exc:
-        await session.estimate_deploy(compiled_contract.constructor(4))
+        await session.estimate_deploy(root_signer.address, compiled_contract.constructor(4))
     assert exc.value.error == contract.error.CustomError
     assert exc.value.data == {"x": 4}
 
@@ -898,7 +900,7 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
 
     with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
-            await session.estimate_transact(contract.method.transactPanic(999))
+            await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
 
     # Provider returns an unknown error (a selector not present in the ABI)
 
@@ -911,7 +913,7 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
         with pytest.raises(
             ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
         ):
-            await session.estimate_transact(contract.method.transactPanic(999))
+            await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
 
     # Provider returns an error with an unknown RPC code
 
@@ -922,4 +924,4 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
 
     with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
         with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
-            await session.estimate_transact(contract.method.transactPanic(999))
+            await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))

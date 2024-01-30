@@ -12,6 +12,7 @@ Changed
 - Various boolean arguments are now keyword-only to prevent usage errors. (PR_57_)
 - Field names clashing with Python built-ins (``hash``, ``type``, ``id``) are suffixed with an underscore. (PR_57_)
 - ``AccountSigner`` takes ``LocalSigner`` specifically and not just any ``BaseSigner``. (PR_62_)
+- ``ClientSession.estimate_transact()`` and ``estimate_deploy()`` now require a ``sender_address`` parameter. (PR_62_)
 
 
 Added
