@@ -27,6 +27,7 @@ Added
 - ``AccountSigner.private_key`` property. (PR_62_)
 - ``LocalProvider.add_account()`` method. (PR_62_)
 - An optional ``sender_address`` parameter of ``ClientSession.eth_call()``. (PR_62_)
+- Expose ``Provider`` at the top level. (PR_63_)
 
 
 Fixed
