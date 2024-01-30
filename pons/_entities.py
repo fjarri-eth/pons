@@ -43,7 +43,7 @@ class TypedData(ABC):
 
     @abstractmethod
     def _length(self) -> int:
-        ...
+        """Returns the length of this type's values representation in bytes."""
 
     def rpc_encode(self) -> str:
         return rpc_encode_data(self._value)
