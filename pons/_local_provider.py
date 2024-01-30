@@ -152,6 +152,14 @@ class LocalProvider(Provider):
         """Restores the chain state to the snapshot with the given ID."""
         self._ethereum_tester.revert_to_snapshot(snapshot_id.id_)
 
+    def add_account(self, signer: AccountSigner) -> None:
+        """Registers a new signer to allow it to be used in calls and transactions."""
+        # There are gaps in how EthereumTester handles the accounts.
+        # A random signer can be used to deploy and interact with contracts without being added
+        # to the accounts, if we use `send_raw_transaction()` (which is exactly what we do).
+        # But if `eth_call()` has an explicit "from" field, it must be in the accounts.
+        self._ethereum_tester.add_account(signer.private_key.hex())
+
     def rpc(self, method: str, *args: Any) -> JSON:
         dispatch = dict(
             net_version=self.net_version,

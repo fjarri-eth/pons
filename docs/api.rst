@@ -133,7 +133,7 @@ Testing utilities
 
 .. autoclass:: LocalProvider
    :show-inheritance:
-   :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot
+   :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot, add_account
 
 .. autoclass:: HTTPProviderServer
    :members:

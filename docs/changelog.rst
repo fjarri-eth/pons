@@ -24,6 +24,7 @@ Added
 - Expose ``HTTPProviderServer``, ``LocalProvider``, ``compile_contract_file`` that can be used for tests of Ethereum-using applications. These are gated behind optional features. (PR_54_)
 - ``LocalProvider.take_snapshot()`` and ``revert_to_snapshot()``. (PR_61_)
 - ``AccountSigner.private_key`` property. (PR_62_)
+- ``LocalProvider.add_account()`` method. (PR_62_)
 
 
 Fixed
