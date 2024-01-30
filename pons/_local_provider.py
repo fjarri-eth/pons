@@ -207,7 +207,13 @@ class LocalProvider(Provider):
             return cast(str, self._ethereum_tester.send_raw_transaction(tx_hex))
 
     def eth_call(self, tx: Mapping[str, Any], block: str) -> JSON:
-        # EthereumTester needs it for whatever reason
+        # Methods marked as `view` can use `msg.sender`,
+        # which will resolve to whatever was passed as "from".
+        # If nothing is passed real providers subsitute the zero address;
+        # we would like to do the same, but `EthereumTester` complains.
+        # So we're hoping here that if someone didn't supply "from",
+        # they won't be interested in its value either, so we're substituting a real address
+        # (namely, the one of the root).
         if "from" not in tx:
             tx = dict(tx)
             tx["from"] = self._default_address.rpc_encode()

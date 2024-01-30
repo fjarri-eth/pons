@@ -25,6 +25,7 @@ Added
 - ``LocalProvider.take_snapshot()`` and ``revert_to_snapshot()``. (PR_61_)
 - ``AccountSigner.private_key`` property. (PR_62_)
 - ``LocalProvider.add_account()`` method. (PR_62_)
+- An optional ``sender_address`` parameter of ``ClientSession.eth_call()``. (PR_62_)
 
 
 Fixed

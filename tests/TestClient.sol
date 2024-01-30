@@ -27,6 +27,10 @@ contract BasicContract {
         return state + _x;
     }
 
+    function getSender() public view returns (address) {
+        return msg.sender;
+    }
+
     event Deposit(
         address indexed from,
         bytes4 indexed id,

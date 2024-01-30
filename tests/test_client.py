@@ -158,11 +158,26 @@ async def test_wait_for_transaction_receipt(
     assert receipt.succeeded
 
 
-async def test_eth_call(session, compiled_contracts, root_signer):
+async def test_eth_call(session, compiled_contracts, root_signer, another_signer):
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     result = await session.eth_call(deployed_contract.method.getState(456))
     assert result == (123 + 456,)
+
+    # With a real provider, if `sender_address` is not given, it will default to the zero address.
+    # We currently don't have that option due to the tester chain limitations,
+    # so the default is the root address.
+    result = await session.eth_call(deployed_contract.method.getSender())
+    assert result == (root_signer.address,)
+
+    # Seems to be another tester chain limitation: even though `eth_call` does not spend gas,
+    # the `sender_address` still needs to be funded.
+    await session.transfer(root_signer, another_signer.address, Amount.ether(10))
+
+    result = await session.eth_call(
+        deployed_contract.method.getSender(), sender_address=another_signer.address
+    )
+    assert result == (another_signer.address,)
 
 
 async def test_eth_call_decoding_error(session, compiled_contracts, root_signer):

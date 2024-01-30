@@ -363,19 +363,26 @@ class ClientSession:
             await anyio.sleep(poll_latency)
 
     @rpc_call("eth_call")
-    async def eth_call(self, call: BoundMethodCall, block: Union[int, Block] = Block.LATEST) -> Any:
+    async def eth_call(
+        self,
+        call: BoundMethodCall,
+        block: Union[int, Block] = Block.LATEST,
+        sender_address: Optional[Address] = None,
+    ) -> Any:
         """
         Sends a prepared contact method call to the provided address.
         Returns the decoded output.
+
+        If ``sender_address`` is provided, it will be included in the call
+        and affect the return value if the method uses ``msg.sender`` internally.
         """
-        result = await self._provider_session.rpc(
-            "eth_call",
-            {
-                "to": call.contract_address.rpc_encode(),
-                "data": rpc_encode_data(call.data_bytes),
-            },
-            rpc_encode_block(block),
-        )
+        tx = {
+            "to": call.contract_address.rpc_encode(),
+            "data": rpc_encode_data(call.data_bytes),
+        }
+        if sender_address is not None:
+            tx["from"] = sender_address.rpc_encode()
+        result = await self._provider_session.rpc("eth_call", tx, rpc_encode_block(block))
 
         encoded_output = rpc_decode_data(result)
         return call.decode_output(encoded_output)
