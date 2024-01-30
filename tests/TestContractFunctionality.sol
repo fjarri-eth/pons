@@ -100,8 +100,4 @@ contract Test {
     }
 
     error MyError(address sender);
-
-    function returnSender() public {
-        revert MyError(msg.sender);
-    }
 }

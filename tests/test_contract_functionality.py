@@ -34,26 +34,6 @@ async def test_empty_constructor(session, root_signer, compiled_contracts):
     assert result == (1 + 123,)
 
 
-async def test_sender(session, root_signer, another_signer, compiled_contracts):
-    """
-    A test for a bug in PyEVM, so that we notice when it's fixed:
-    https://github.com/ethereum/py-evm/issues/2129
-    (`msg.sender` is evaluated to the genesis address, not to the actual sender's address).
-    """
-    compiled_contract = compiled_contracts["Test"]
-
-    # Deploy the contract
-    call = compiled_contract.constructor(12345, 56789)
-    await session.transfer(root_signer, another_signer.address, Amount.ether(10))
-    deployed_contract = await session.deploy(another_signer, call)
-
-    with pytest.raises(ContractError) as exc:
-        await session.transact(another_signer, deployed_contract.method.returnSender())
-
-    # Here we would expect `another_signer.address` if EVM was working correctly
-    assert exc.value.data == {"sender": root_signer.address}
-
-
 async def test_basics(session, root_signer, another_signer, compiled_contracts):
     compiled_contract = compiled_contracts["Test"]
 
