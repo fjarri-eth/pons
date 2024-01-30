@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from enum import Enum
 from http import HTTPStatus
+from json import JSONDecodeError
 from typing import AsyncIterator, Dict, Iterable, Mapping, Optional, Tuple, Union, cast
 
 import httpx
@@ -239,19 +240,29 @@ class HTTPSession(ProviderSession):
             response = await self._client.post(self._url, json=json)
         except httpx.ConnectError as exc:
             raise Unreachable(str(exc)) from exc
-        if response.status_code not in (HTTPStatus.OK, HTTPStatus.BAD_REQUEST):
-            raise HTTPError(response.status_code, response.content.decode())
 
-        # Assuming that the HTTP client knows what it's doing, and gives us a valid JSON dict
-        response_json = response.json()
+        status = response.status_code
+
+        try:
+            response_json = response.json()
+        except JSONDecodeError as exc:
+            content = response.content.decode()
+            raise InvalidResponse(
+                f"Expected a JSON response, got HTTP status {status}: {content}"
+            ) from exc
+
         if not isinstance(response_json, Mapping):
             raise InvalidResponse(f"RPC response must be a dictionary, got: {response_json}")
         response_json = cast(Mapping[str, JSON], response_json)
 
-        if response.status_code == HTTPStatus.BAD_REQUEST and "error" in response_json:
+        # Note that the Eth-side errors (e.g. transaction having been reverted)
+        # will have the HTTP status 200, so we are checking for the "error" field first.
+        if "error" in response_json:
             raise RPCError.from_json(response_json["error"])
 
-        if response.status_code == HTTPStatus.OK and "result" in response_json:
-            return response_json["result"]
+        if status == HTTPStatus.OK:
+            if "result" in response_json:
+                return response_json["result"]
+            raise InvalidResponse(f"`result` is not present in the response: {response_json}")
 
-        raise InvalidResponse("`result` is not present in the response")
+        raise HTTPError(status, response.content.decode())

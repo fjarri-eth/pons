@@ -17,7 +17,7 @@ Clients
 Providers
 ---------
 
-.. autoclass:: pons._provider.Provider
+.. autoclass:: Provider
 
 .. autoclass:: HTTPProvider
    :show-inheritance:
