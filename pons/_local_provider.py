@@ -152,6 +152,14 @@ class LocalProvider(Provider):
         """Restores the chain state to the snapshot with the given ID."""
         self._ethereum_tester.revert_to_snapshot(snapshot_id.id_)
 
+    def add_account(self, signer: AccountSigner) -> None:
+        """Registers a new signer to allow it to be used in calls and transactions."""
+        # There are gaps in how EthereumTester handles the accounts.
+        # A random signer can be used to deploy and interact with contracts without being added
+        # to the accounts, if we use `send_raw_transaction()` (which is exactly what we do).
+        # But if `eth_call()` has an explicit "from" field, it must be in the accounts.
+        self._ethereum_tester.add_account(signer.private_key.hex())
+
     def rpc(self, method: str, *args: Any) -> JSON:
         dispatch = dict(
             net_version=self.net_version,
@@ -199,7 +207,13 @@ class LocalProvider(Provider):
             return cast(str, self._ethereum_tester.send_raw_transaction(tx_hex))
 
     def eth_call(self, tx: Mapping[str, Any], block: str) -> JSON:
-        # EthereumTester needs it for whatever reason
+        # Methods marked as `view` can use `msg.sender`,
+        # which will resolve to whatever was passed as "from".
+        # If nothing is passed real providers subsitute the zero address;
+        # we would like to do the same, but `EthereumTester` complains.
+        # So we're hoping here that if someone didn't supply "from",
+        # they won't be interested in its value either, so we're substituting a real address
+        # (namely, the one of the root).
         if "from" not in tx:
             tx = dict(tx)
             tx["from"] = self._default_address.rpc_encode()
@@ -216,8 +230,6 @@ class LocalProvider(Provider):
 
     def eth_estimate_gas(self, tx: Mapping[str, Any], block: str) -> str:
         tx = dict(tx)
-        if "from" not in tx:
-            tx["from"] = self._default_address.rpc_encode()
         tx["value"] = rpc_decode_quantity(tx["value"])
 
         with pyevm_errors_into_rpc_errors():

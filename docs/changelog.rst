@@ -11,6 +11,8 @@ Changed
 - Added an explicit ``typing_extensions`` dependency. (PR_57_)
 - Various boolean arguments are now keyword-only to prevent usage errors. (PR_57_)
 - Field names clashing with Python built-ins (``hash``, ``type``, ``id``) are suffixed with an underscore. (PR_57_)
+- ``AccountSigner`` takes ``LocalSigner`` specifically and not just any ``BaseSigner``. (PR_62_)
+- ``ClientSession.estimate_transact()`` and ``estimate_deploy()`` now require a ``sender_address`` parameter. (PR_62_)
 
 
 Added
@@ -22,6 +24,9 @@ Added
 - Support for overloaded methods via ``MultiMethod``. (PR_59_)
 - Expose ``HTTPProviderServer``, ``LocalProvider``, ``compile_contract_file`` that can be used for tests of Ethereum-using applications. These are gated behind optional features. (PR_54_)
 - ``LocalProvider.take_snapshot()`` and ``revert_to_snapshot()``. (PR_61_)
+- ``AccountSigner.private_key`` property. (PR_62_)
+- ``LocalProvider.add_account()`` method. (PR_62_)
+- An optional ``sender_address`` parameter of ``ClientSession.eth_call()``. (PR_62_)
 
 
 Fixed
@@ -37,6 +42,7 @@ Fixed
 .. _PR_57: https://github.com/fjarri/pons/pull/57
 .. _PR_59: https://github.com/fjarri/pons/pull/59
 .. _PR_61: https://github.com/fjarri/pons/pull/61
+.. _PR_62: https://github.com/fjarri/pons/pull/62
 
 
 0.7.0 (09-07-2023)

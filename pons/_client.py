@@ -363,19 +363,26 @@ class ClientSession:
             await anyio.sleep(poll_latency)
 
     @rpc_call("eth_call")
-    async def eth_call(self, call: BoundMethodCall, block: Union[int, Block] = Block.LATEST) -> Any:
+    async def eth_call(
+        self,
+        call: BoundMethodCall,
+        block: Union[int, Block] = Block.LATEST,
+        sender_address: Optional[Address] = None,
+    ) -> Any:
         """
         Sends a prepared contact method call to the provided address.
         Returns the decoded output.
+
+        If ``sender_address`` is provided, it will be included in the call
+        and affect the return value if the method uses ``msg.sender`` internally.
         """
-        result = await self._provider_session.rpc(
-            "eth_call",
-            {
-                "to": call.contract_address.rpc_encode(),
-                "data": rpc_encode_data(call.data_bytes),
-            },
-            rpc_encode_block(block),
-        )
+        tx = {
+            "to": call.contract_address.rpc_encode(),
+            "data": rpc_encode_data(call.data_bytes),
+        }
+        if sender_address is not None:
+            tx["from"] = sender_address.rpc_encode()
+        result = await self._provider_session.rpc("eth_call", tx, rpc_encode_block(block))
 
         encoded_output = rpc_decode_data(result)
         return call.decode_output(encoded_output)
@@ -396,11 +403,12 @@ class ClientSession:
         return rpc_decode_quantity(result)
 
     async def estimate_deploy(
-        self, call: BoundConstructorCall, amount: Optional[Amount] = None
+        self, sender_address: Address, call: BoundConstructorCall, amount: Optional[Amount] = None
     ) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
-        Use with the same `amount` argument you would use to deploy the contract in production.
+        Use with the same ``amount`` argument you would use to deploy the contract in production,
+        and the ``sender_address`` equal to the address of the transaction signer.
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
         or :py:class:`ContractError` if a known error was caught during the dry run.
@@ -410,6 +418,7 @@ class ClientSession:
             amount = Amount(0)
 
         tx = {
+            "from": sender_address.rpc_encode(),
             "data": rpc_encode_data(call.data_bytes),
             "value": amount.rpc_encode(),
         }
@@ -435,12 +444,13 @@ class ClientSession:
         return await self._estimate_gas(tx)
 
     async def estimate_transact(
-        self, call: BoundMethodCall, amount: Optional[Amount] = None
+        self, sender_address: Address, call: BoundMethodCall, amount: Optional[Amount] = None
     ) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
-        Use with the same `amount` argument you would use to transact
-        with the contract in production.
+        Use with the same ``amount`` argument you would use to transact
+        with the contract in production,
+        and the ``sender_address`` equal to the address of the transaction signer.
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
         or :py:class:`ContractError` if a known error was caught during the dry run.
@@ -450,6 +460,7 @@ class ClientSession:
             amount = Amount(0)
 
         tx = {
+            "from": sender_address.rpc_encode(),
             "to": call.contract_address.rpc_encode(),
             "data": rpc_encode_data(call.data_bytes),
             "value": amount.rpc_encode(),
@@ -575,7 +586,7 @@ class ClientSession:
 
         chain_id = await self.eth_chain_id()
         if gas is None:
-            gas = await self.estimate_deploy(call, amount=amount)
+            gas = await self.estimate_deploy(signer.address, call, amount=amount)
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
@@ -627,7 +638,7 @@ class ClientSession:
 
         chain_id = await self.eth_chain_id()
         if gas is None:
-            gas = await self.estimate_transact(call, amount=amount)
+            gas = await self.estimate_transact(signer.address, call, amount=amount)
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = Amount.gwei(1)
