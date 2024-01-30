@@ -3,13 +3,7 @@ from eth_account import Account
 from pons import AccountSigner, Address
 
 
-def test_signer():
-    acc = Account.create()
-    signer = AccountSigner(acc)
-
-    assert signer.address == Address.from_hex(acc.address)
-    assert signer.account == acc
-
+def check_signer(signer):
     tx = dict(gas="0x3333", gasPrice="0x4444", nonce="0x5555", value="0x6666")
     sig = signer.sign_transaction(tx)
     assert isinstance(sig, bytes)
@@ -31,3 +25,18 @@ def test_signer():
     # 0x80 = 0x80 + 0 -> a value of 0 bytes
     # ... signature values start (v, r, s)
     assert sig.startswith(bytes.fromhex(f"f8{hex(payload_length)[2:]}8255558244448233338082666680"))
+
+
+def test_signer():
+    acc = Account.create()
+    signer = AccountSigner(acc)
+
+    assert signer.address == Address.from_hex(acc.address)
+    assert signer.account == acc
+
+    check_signer(signer)
+
+
+def test_random_signer():
+    signer = AccountSigner.create()
+    check_signer(signer)
