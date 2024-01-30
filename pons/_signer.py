@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import Mapping
 
 from eth_account import Account
-from eth_account.signers.base import BaseAccount
+from eth_account.signers.local import LocalAccount
 
 from ._entities import Address
 from ._provider import JSON
@@ -26,9 +26,9 @@ class Signer(ABC):
 
 
 class AccountSigner(Signer):
-    """A signer wrapper for ``eth_account.BaseAccount`` implementors."""
+    """A signer wrapper for ``LocalAccount`` from ``eth-account`` package."""
 
-    def __init__(self, account: BaseAccount):
+    def __init__(self, account: LocalAccount):
         self._account = account
 
     @staticmethod
@@ -37,7 +37,7 @@ class AccountSigner(Signer):
         return AccountSigner(Account.create())
 
     @property
-    def account(self) -> BaseAccount:
+    def account(self) -> LocalAccount:
         """Returns the account object used to create this signer."""
         return self._account
 
@@ -46,5 +46,5 @@ class AccountSigner(Signer):
         return Address.from_hex(self._account.address)
 
     def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
-        # Ignoring the type since BaseAccount.sign_transaction is untyped
+        # Ignoring the type since `sign_transaction()` is untyped
         return bytes(self._account.sign_transaction(tx_dict).rawTransaction)  # type: ignore[no-untyped-call]

@@ -88,6 +88,7 @@ Signers
    :members:
 
 .. autoclass:: AccountSigner
+   :members:
    :show-inheritance:
 
 

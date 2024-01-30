@@ -11,6 +11,7 @@ Changed
 - Added an explicit ``typing_extensions`` dependency. (PR_57_)
 - Various boolean arguments are now keyword-only to prevent usage errors. (PR_57_)
 - Field names clashing with Python built-ins (``hash``, ``type``, ``id``) are suffixed with an underscore. (PR_57_)
+- ``AccountSigner`` takes ``LocalSigner`` specifically and not just any ``BaseSigner``. (PR_62_)
 
 
 Added
@@ -37,6 +38,7 @@ Fixed
 .. _PR_57: https://github.com/fjarri/pons/pull/57
 .. _PR_59: https://github.com/fjarri/pons/pull/59
 .. _PR_61: https://github.com/fjarri/pons/pull/61
+.. _PR_62: https://github.com/fjarri/pons/pull/62
 
 
 0.7.0 (09-07-2023)
