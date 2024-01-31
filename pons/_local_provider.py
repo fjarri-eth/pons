@@ -167,6 +167,7 @@ class LocalProvider(Provider):
             eth_getBalance=self.eth_get_balance,
             eth_getTransactionReceipt=self.eth_get_transaction_receipt,
             eth_getTransactionCount=self.eth_get_transaction_count,
+            eth_getCode=self.eth_get_code,
             eth_call=self.eth_call,
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
@@ -201,6 +202,9 @@ class LocalProvider(Provider):
 
     def eth_get_transaction_count(self, address: str, block: str) -> str:
         return rpc_encode_quantity(self._ethereum_tester.get_nonce(address, block))
+
+    def eth_get_code(self, address: str, block: str) -> str:
+        return cast(str, self._ethereum_tester.get_code(address, block))
 
     def eth_send_raw_transaction(self, tx_hex: str) -> str:
         with pyevm_errors_into_rpc_errors():

@@ -1,6 +1,15 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 
+contract EmptyContract {
+    uint256 public state;
+
+    constructor(uint256 _state) {
+        state = _state;
+    }
+}
+
+
 contract BasicContract {
     uint256 public state;
 

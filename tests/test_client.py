@@ -472,6 +472,17 @@ async def test_eth_get_transaction_by_hash(session, root_signer, another_signer)
     assert tx_info is None
 
 
+async def test_eth_get_code(session, root_signer, compiled_contracts):
+    compiled_contract = compiled_contracts["EmptyContract"]
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
+    bytecode = await session.eth_get_code(deployed_contract.address, block=Block.LATEST)
+
+    # The bytecode being deployed is not the code that will be stored on chain,
+    # but some code that, having been executed, returns the code that will be stored on chain.
+    # So all we can do is check that the code stored on chain is a part of the initialization code.
+    assert bytecode in compiled_contract.bytecode
+
+
 async def test_eth_get_filter_changes_bad_response(local_provider, session, monkeypatch):
     monkeypatch.setattr(local_provider, "eth_get_filter_changes", lambda _filter_id: {"foo": 1})
 
