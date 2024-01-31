@@ -1,6 +1,23 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 
+contract EmptyContract {
+    uint256 public state;
+
+    constructor(uint256 _state) {
+        state = _state;
+    }
+}
+
+contract Storage {
+    uint x;
+    mapping(address => uint) y;
+    constructor(uint256 _x, address _y_key, uint256 _y_val) {
+        x = _x;
+        y[_y_key] = _y_val;
+    }
+}
+
 contract BasicContract {
     uint256 public state;
 

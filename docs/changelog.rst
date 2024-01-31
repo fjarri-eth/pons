@@ -28,6 +28,8 @@ Added
 - ``LocalProvider.add_account()`` method. (PR_62_)
 - An optional ``sender_address`` parameter of ``ClientSession.eth_call()``. (PR_62_)
 - Expose ``Provider`` at the top level. (PR_63_)
+- ``eth_getCode`` support (as ``ClientSession.eth_get_code()``). (PR_64_)
+- ``eth_getStorageAt`` support (as ``ClientSession.eth_get_storage_at()``). (PR_64_)
 
 
 Fixed
@@ -35,6 +37,7 @@ Fixed
 
 - Process unnamed arguments in JSON entries correctly (as positional arguments). (PR_51_)
 - More robust error handling in HTTP provider. (PR_63_)
+- The transaction tip being set larger than the max gas price (which some providers don't like). (PR_64_)
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
@@ -46,6 +49,7 @@ Fixed
 .. _PR_61: https://github.com/fjarri/pons/pull/61
 .. _PR_62: https://github.com/fjarri/pons/pull/62
 .. _PR_63: https://github.com/fjarri/pons/pull/63
+.. _PR_64: https://github.com/fjarri/pons/pull/64
 
 
 0.7.0 (09-07-2023)
