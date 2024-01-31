@@ -483,6 +483,39 @@ async def test_eth_get_code(session, root_signer, compiled_contracts):
     assert bytecode in compiled_contract.bytecode
 
 
+async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
+
+    x = 0xAB
+    y_key = Address(os.urandom(20))
+    y_val = 0xCD
+
+    compiled_contract = compiled_contracts["Storage"]
+    deployed_contract = await session.deploy(
+        root_signer, compiled_contract.constructor(x, y_key, y_val)
+    )
+
+    # Get the regular stored value
+    storage = await session.eth_get_storage_at(deployed_contract.address, 0, block=Block.LATEST)
+    assert storage == b"\x00" * 31 + x.to_bytes(1, byteorder="big")
+
+    # Get the value of the mapping
+    position = int.from_bytes(
+        keccak(
+            # left-padded key
+            b"\x00" * 12
+            + bytes(y_key)
+            # left-padded position of the mapping (1)
+            + b"\x00" * 31
+            + b"\x01"
+        ),
+        byteorder="big",
+    )
+    storage = await session.eth_get_storage_at(
+        deployed_contract.address, position, block=Block.LATEST
+    )
+    assert storage == b"\x00" * 31 + y_val.to_bytes(1, byteorder="big")
+
+
 async def test_eth_get_filter_changes_bad_response(local_provider, session, monkeypatch):
     monkeypatch.setattr(local_provider, "eth_get_filter_changes", lambda _filter_id: {"foo": 1})
 

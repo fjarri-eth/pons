@@ -29,6 +29,7 @@ Added
 - An optional ``sender_address`` parameter of ``ClientSession.eth_call()``. (PR_62_)
 - Expose ``Provider`` at the top level. (PR_63_)
 - ``eth_getCode`` support (as ``ClientSession.eth_get_code()``). (PR_64_)
+- ``eth_getStorageAt`` support (as ``ClientSession.eth_get_storage_at()``). (PR_64_)
 
 
 Fixed

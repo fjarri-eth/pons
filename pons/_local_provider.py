@@ -168,6 +168,7 @@ class LocalProvider(Provider):
             eth_getTransactionReceipt=self.eth_get_transaction_receipt,
             eth_getTransactionCount=self.eth_get_transaction_count,
             eth_getCode=self.eth_get_code,
+            eth_getStorageAt=self.eth_get_storage_at,
             eth_call=self.eth_call,
             eth_sendRawTransaction=self.eth_send_raw_transaction,
             eth_estimateGas=self.eth_estimate_gas,
@@ -205,6 +206,9 @@ class LocalProvider(Provider):
 
     def eth_get_code(self, address: str, block: str) -> str:
         return cast(str, self._ethereum_tester.get_code(address, block))
+
+    def eth_get_storage_at(self, address: str, position: str, block: str) -> str:
+        return cast(str, self._ethereum_tester.get_storage_at(address, position, block))
 
     def eth_send_raw_transaction(self, tx_hex: str) -> str:
         with pyevm_errors_into_rpc_errors():

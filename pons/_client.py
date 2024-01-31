@@ -362,6 +362,19 @@ class ClientSession:
         )
         return rpc_decode_data(result)
 
+    @rpc_call("eth_getStorageAt")
+    async def eth_get_storage_at(
+        self, address: Address, position: int, block: Union[int, Block] = Block.LATEST
+    ) -> bytes:
+        """Calls the ``eth_getCode`` RPC method."""
+        result = await self._provider_session.rpc(
+            "eth_getStorageAt",
+            address.rpc_encode(),
+            rpc_encode_quantity(position),
+            rpc_encode_block(block),
+        )
+        return rpc_decode_data(result)
+
     async def wait_for_transaction_receipt(
         self, tx_hash: TxHash, poll_latency: float = 1.0
     ) -> TxReceipt:
