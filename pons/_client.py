@@ -546,7 +546,7 @@ class ClientSession:
             gas = await self.estimate_transfer(signer.address, destination_address, amount)
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
-        max_tip = Amount.gwei(1)
+        max_tip = min(Amount.gwei(1), max_gas_price)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
@@ -612,7 +612,7 @@ class ClientSession:
             gas = await self.estimate_deploy(signer.address, call, amount=amount)
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
-        max_tip = Amount.gwei(1)
+        max_tip = min(Amount.gwei(1), max_gas_price)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
@@ -664,7 +664,7 @@ class ClientSession:
             gas = await self.estimate_transact(signer.address, call, amount=amount)
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
-        max_tip = Amount.gwei(1)
+        max_tip = min(Amount.gwei(1), max_gas_price)
         nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
