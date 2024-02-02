@@ -13,6 +13,7 @@ Changed
 - Field names clashing with Python built-ins (``hash``, ``type``, ``id``) are suffixed with an underscore. (PR_57_)
 - ``AccountSigner`` takes ``LocalSigner`` specifically and not just any ``BaseSigner``. (PR_62_)
 - ``ClientSession.estimate_transact()`` and ``estimate_deploy()`` now require a ``sender_address`` parameter. (PR_62_)
+- Switched to ``alysis`` from ``eth-tester`` for the backend of ``LocalProvider``. (PR_70_)
 
 
 Added
@@ -32,6 +33,7 @@ Added
 - ``eth_getStorageAt`` support (as ``ClientSession.eth_get_storage_at()``). (PR_64_)
 - Support for the ``logs`` field in ``TxReceipt``. (PR_68_)
 - ``ClientSession.eth_get_logs()`` and ``eth_get_filter_logs()``. (PR_68_)
+- Support for a custom block number in gas estimation methods. (PR_70_)
 
 
 Fixed
@@ -43,6 +45,8 @@ Fixed
 - Decoding error when fetching pending transactions. (PR_65_)
 - Decoding error when fetching pending blocks. (PR_67_)
 - Get the default nonce based on the pending block, not the latest one. (PR_68_)
+- Using ``eth_getLogs`` instead of creating a filter in ``transact()``. (PR_70_)
+- Expect the block number to be non-null even for pending blocks, since that's what providers return. (PR_70_)
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
@@ -58,6 +62,7 @@ Fixed
 .. _PR_65: https://github.com/fjarri/pons/pull/65
 .. _PR_67: https://github.com/fjarri/pons/pull/67
 .. _PR_68: https://github.com/fjarri/pons/pull/68
+.. _PR_70: https://github.com/fjarri/pons/pull/70
 
 
 0.7.0 (09-07-2023)

@@ -39,7 +39,7 @@ async def session(test_server):
 
 
 async def test_single_value_request(session):
-    assert await session.net_version() == "0"
+    assert await session.net_version() == "1"
 
 
 async def test_dict_request(session, root_signer, another_signer):
@@ -104,31 +104,30 @@ async def test_dict_request_introspection(session, root_signer, another_signer):
 async def test_unexpected_response_type(
     local_provider, session, monkeypatch, root_signer, another_signer
 ):
-    monkeypatch.setattr(local_provider, "eth_get_transaction_receipt", lambda _tx_hash: "something")
-
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
     )
+
+    monkeypatch.setattr(local_provider, "rpc", lambda _method, *_args: "something")
 
     with pytest.raises(BadResponseFormat, match="Expected a dictionary as a response, got str"):
         await session.eth_get_transaction_receipt(tx_hash)
 
 
 async def test_missing_field(local_provider, session, monkeypatch, root_signer, another_signer):
-    orig_eth_get_transaction_receipt = local_provider.eth_get_transaction_receipt
+    orig_rpc = local_provider.rpc
 
-    def faulty_eth_get_transaction_receipt(tx_hash):
-        receipt = orig_eth_get_transaction_receipt(tx_hash)
-        del receipt["status"]
-        return receipt
-
-    monkeypatch.setattr(
-        local_provider, "eth_get_transaction_receipt", faulty_eth_get_transaction_receipt
-    )
+    def mock_rpc(method, *args):
+        result = orig_rpc(method, *args)
+        if method == "eth_getTransactionReceipt":
+            del result["status"]
+        return result
 
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
     )
+
+    monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(
         BadResponseFormat, match="Expected field `status` is missing from the result"
@@ -139,23 +138,25 @@ async def test_missing_field(local_provider, session, monkeypatch, root_signer, 
 async def test_none_instead_of_dict(
     local_provider, session, monkeypatch, root_signer, another_signer
 ):
+    tx_hash = await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
+
     # Check that a None can be returned in a call that expects a `dict`
     # (the interpretation of such an event is up to the client).
     # `eth_getTransactionReceipt` can return a None normally (if there's no receipt yet),
     # but we force it here, just in case.
-    monkeypatch.setattr(local_provider, "eth_get_transaction_receipt", lambda _tx_hash: None)
-    tx_hash = await session.broadcast_transfer(
-        root_signer, another_signer.address, Amount.ether(10)
-    )
+    monkeypatch.setattr(local_provider, "rpc", lambda _method, *_args: None)
+
     assert await session.eth_get_transaction_receipt(tx_hash) is None
 
 
 async def test_non_json_response(local_provider, session, monkeypatch):
-    def faulty_net_version():
+    def faulty_net_version(_method, *_args):
         # A generic exception will generate a 500 status code
         raise Exception("Something unexpected happened")  # noqa: TRY002
 
-    monkeypatch.setattr(local_provider, "net_version", faulty_net_version)
+    monkeypatch.setattr(local_provider, "rpc", faulty_net_version)
 
     message = "Expected a JSON response, got HTTP status 500: Something unexpected happened"
     with pytest.raises(BadResponseFormat, match=message):

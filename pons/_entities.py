@@ -31,6 +31,7 @@ TypedQuantityLike = TypeVar("TypedQuantityLike", bound="TypedQuantity")
 
 class TypedData(ABC):
     def __init__(self, value: bytes):
+        self._value = value
         if not isinstance(value, bytes):
             raise TypeError(
                 f"{self.__class__.__name__} must be a bytestring, got {type(value).__name__}"
@@ -39,7 +40,6 @@ class TypedData(ABC):
             raise ValueError(
                 f"{self.__class__.__name__} must be {self._length()} bytes long, got {len(value)}"
             )
-        self._value = value
 
     @abstractmethod
     def _length(self) -> int:
@@ -298,8 +298,8 @@ class TxInfo(NamedTuple):
     block_hash: Optional[BlockHash]
     """The hash of the block this transaction belongs to. ``None`` for pending transactions."""
 
-    block_number: Optional[int]
-    """The number of the block this transaction belongs to. ``None`` for pending transactions."""
+    block_number: int
+    """The number of the block this transaction belongs to. May be a pending block."""
 
     transaction_index: Optional[int]
     """Transaction index. ``None`` for pending transactions."""
@@ -346,7 +346,7 @@ class TxInfo(NamedTuple):
             type_=rpc_decode_quantity(val["type"]),
             hash_=TxHash.rpc_decode(val["hash"]),
             block_hash=BlockHash.rpc_decode(val["blockHash"]) if val["blockHash"] else None,
-            block_number=rpc_decode_quantity(val["blockNumber"]) if val["blockNumber"] else None,
+            block_number=rpc_decode_quantity(val["blockNumber"]),
             transaction_index=(
                 rpc_decode_quantity(val["transactionIndex"]) if val["transactionIndex"] else None
             ),
@@ -364,8 +364,8 @@ class TxInfo(NamedTuple):
 class BlockInfo(NamedTuple):
     """Block info."""
 
-    number: Optional[int]
-    """Block number. ``None`` for pending blocks."""
+    number: int
+    """Block number."""
 
     hash_: Optional[BlockHash]
     """Block hash. ``None`` for pending blocks."""
@@ -431,7 +431,7 @@ class BlockInfo(NamedTuple):
             transaction_hashes = tuple(tx.hash_ for tx in transactions)
 
         return cls(
-            number=rpc_decode_quantity(val["number"]) if val["number"] is not None else None,
+            number=rpc_decode_quantity(val["number"]),
             hash_=BlockHash.rpc_decode(val["hash"]) if val["hash"] else None,
             parent_hash=BlockHash.rpc_decode(val["parentHash"]),
             nonce=rpc_decode_quantity(val["nonce"]) if val["nonce"] is not None else None,
