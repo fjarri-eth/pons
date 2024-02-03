@@ -17,8 +17,8 @@ from typing import (
     cast,
 )
 
-import eth_abi
-from eth_abi.exceptions import DecodingError
+import eth_abi  # type: ignore[import-untyped]
+from eth_abi.exceptions import DecodingError  # type: ignore[import-untyped]
 from eth_utils import keccak
 
 from ._entities import Address
@@ -45,7 +45,7 @@ def encode_typed(types: Iterable[str], args: Iterable[ABIType]) -> bytes:
     # ``eth_abi.encode()`` does not have type annotations.
     # This is a typed wrapper (easier than making custom stubs).
     # Remove when typing is added in ``eth_abi``.
-    return eth_abi.encode(types, args)
+    return cast(bytes, eth_abi.encode(types, args))
 
 
 def decode_typed(types: Iterable[str], data: bytes) -> Tuple[ABIType, ...]:
