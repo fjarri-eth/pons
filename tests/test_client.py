@@ -493,7 +493,6 @@ async def test_eth_get_code(session, root_signer, compiled_contracts):
 
 
 async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
-
     x = 0xAB
     y_key = Address(os.urandom(20))
     y_val = 0xCD

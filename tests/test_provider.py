@@ -4,8 +4,14 @@ from http import HTTPStatus
 import pytest
 import trio
 
-from pons import _http_provider_server  # For monkeypatching purposes
-from pons import Amount, Client, HTTPProvider, HTTPProviderServer, Unreachable
+from pons import (
+    Amount,
+    Client,
+    HTTPProvider,
+    HTTPProviderServer,
+    Unreachable,
+    _http_provider_server,  # For monkeypatching purposes
+)
 from pons._client import BadResponseFormat, ProviderError
 from pons._provider import (
     HTTPError,
