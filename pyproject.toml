@@ -54,8 +54,7 @@ docs = [
 ]
 lint = [
     "mypy>=1.4",
-    "black>=23",
-    "isort>=5"
+    "ruff>=0.2",
 ]
 
 [tool.pdm]
