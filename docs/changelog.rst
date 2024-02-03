@@ -38,6 +38,7 @@ Fixed
 - Process unnamed arguments in JSON entries correctly (as positional arguments). (PR_51_)
 - More robust error handling in HTTP provider. (PR_63_)
 - The transaction tip being set larger than the max gas price (which some providers don't like). (PR_64_)
+- Decoding error when fetching pending transactions. (PR_65_)
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
@@ -50,6 +51,7 @@ Fixed
 .. _PR_62: https://github.com/fjarri/pons/pull/62
 .. _PR_63: https://github.com/fjarri/pons/pull/63
 .. _PR_64: https://github.com/fjarri/pons/pull/64
+.. _PR_65: https://github.com/fjarri/pons/pull/65
 
 
 0.7.0 (09-07-2023)

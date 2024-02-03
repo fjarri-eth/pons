@@ -295,14 +295,14 @@ class TxInfo(NamedTuple):
     hash_: TxHash
     """Transaction hash."""
 
-    block_hash: BlockHash
-    """The hash of the block this transaction belongs to."""
+    block_hash: Optional[BlockHash]
+    """The hash of the block this transaction belongs to. ``None`` for pending transactions."""
 
-    block_number: int
-    """The number of the block this transaction belongs to."""
+    block_number: Optional[int]
+    """The number of the block this transaction belongs to. ``None`` for pending transactions."""
 
-    transaction_index: int
-    """Transaction index."""
+    transaction_index: Optional[int]
+    """Transaction index. ``None`` for pending transactions."""
 
     from_: Address
     """Transaction sender."""
@@ -345,9 +345,11 @@ class TxInfo(NamedTuple):
         return cls(
             type_=rpc_decode_quantity(val["type"]),
             hash_=TxHash.rpc_decode(val["hash"]),
-            block_hash=BlockHash.rpc_decode(val["blockHash"]),
-            block_number=rpc_decode_quantity(val["blockNumber"]),
-            transaction_index=rpc_decode_quantity(val["transactionIndex"]),
+            block_hash=BlockHash.rpc_decode(val["blockHash"]) if val["blockHash"] else None,
+            block_number=rpc_decode_quantity(val["blockNumber"]) if val["blockNumber"] else None,
+            transaction_index=(
+                rpc_decode_quantity(val["transactionIndex"]) if val["transactionIndex"] else None
+            ),
             from_=Address.rpc_decode(val["from"]),
             to=Address.rpc_decode(val["to"]) if val["to"] else None,
             value=Amount.rpc_decode(val["value"]),
