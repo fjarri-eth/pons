@@ -244,7 +244,7 @@ class Constructor:
             )
         if "name" in method_entry:
             raise ValueError("Constructor's JSON entry cannot have a `name`")
-        if "outputs" in method_entry and method_entry["outputs"]:
+        if method_entry.get("outputs"):
             raise ValueError("Constructor's JSON entry cannot have non-empty `outputs`")
         if method_entry["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(

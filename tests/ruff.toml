@@ -1,6 +1,7 @@
 # Extend the `pyproject.toml` file in the parent directory.
 extend = "../pyproject.toml"
 
+[lint]
 flake8-pytest-style.fixture-parentheses = false
 
 ignore = [

@@ -54,13 +54,8 @@ docs = [
 ]
 lint = [
     "mypy>=1.4",
-    "black>=23",
-    "isort>=5"
+    "ruff>=0.2",
 ]
-
-[tool.black]
-line-length = 100
-target-version = ['py38']
 
 [tool.pdm]
 version = { source = "scm" }
@@ -84,6 +79,10 @@ requires = ["pdm-pep517"]
 build-backend = "pdm.pep517.api"
 
 [tool.ruff]
+target-version = "py38"
+line-length = 100
+
+[tool.ruff.lint]
 select = ["ALL"]
 ignore = [
     # It's a stylistic choice. Don't save on matches.
@@ -131,6 +130,8 @@ ignore = [
     "N818",
     # Too ham-fisted. 5 arguments is too small of a limit.
     "PLR0913",
+    # Conflicts with the formatter, according to the warning.
+    "ISC001",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
@@ -149,16 +150,8 @@ exclude = [
 ]
 per-file-ignores = {}
 
-# Same as Black.
-line-length = 100
-
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.8
-target-version = "py38"
-
-[tool.isort]
-profile = "black"
-src_paths = ["pons", "tests"]
-known_first_party = ["pons"]
+[tool.ruff.lint.isort]
+known-first-party = ["pons"]

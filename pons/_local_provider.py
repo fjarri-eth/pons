@@ -267,7 +267,9 @@ class LocalProvider(Provider):
         return normalize_return_value(result)
 
     def eth_get_block_by_hash(
-        self, block_hash: str, with_transactions: bool  # noqa: FBT001
+        self,
+        block_hash: str,
+        with_transactions: bool,  # noqa: FBT001
     ) -> JSON:
         try:
             result = self._ethereum_tester.get_block_by_hash(
