@@ -6,7 +6,6 @@ from pons import (
     Amount,
     Constructor,
     ContractABI,
-    ContractError,
     DeployedContract,
     Method,
     Mutability,

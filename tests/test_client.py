@@ -125,7 +125,11 @@ async def test_eth_get_transaction_count(session, root_signer, another_signer):
 
 
 async def test_wait_for_transaction_receipt(
-    local_provider, session, root_signer, another_signer, autojump_clock
+    autojump_clock,  # noqa: ARG001
+    local_provider,
+    session,
+    root_signer,
+    another_signer,
 ):
     to_transfer = Amount.ether(10)
     local_provider.disable_auto_mine_transactions()
@@ -382,7 +386,12 @@ async def test_transact(session, compiled_contracts, root_signer):
 
 
 async def test_transact_and_return_events(
-    autojump_clock, local_provider, session, compiled_contracts, root_signer, another_signer
+    autojump_clock,  # noqa: ARG001
+    local_provider,
+    session,
+    compiled_contracts,
+    root_signer,
+    another_signer,
 ):
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
 
@@ -718,7 +727,12 @@ async def test_log_filter_by_block_num(session, compiled_contracts, root_signer,
     ]
 
 
-async def test_block_filter_high_level(autojump_clock, session, root_signer, another_signer):
+async def test_block_filter_high_level(
+    autojump_clock,  # noqa: ARG001
+    session,
+    root_signer,
+    another_signer,
+):
     block_hashes = []
 
     async def observer():
@@ -746,7 +760,10 @@ async def test_block_filter_high_level(autojump_clock, session, root_signer, ano
 
 
 async def test_pending_transaction_filter_high_level(
-    autojump_clock, session, root_signer, another_signer
+    autojump_clock,  # noqa: ARG001
+    session,
+    root_signer,
+    another_signer,
 ):
     tx_hashes = []
 
@@ -777,7 +794,11 @@ async def test_pending_transaction_filter_high_level(
 
 
 async def test_event_filter_high_level(
-    autojump_clock, session, compiled_contracts, root_signer, another_signer
+    autojump_clock,  # noqa: ARG001
+    session,
+    compiled_contracts,
+    root_signer,
+    another_signer,
 ):
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
