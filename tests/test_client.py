@@ -460,7 +460,7 @@ async def test_get_block(session, root_signer, another_signer):
     assert block_info is None
 
 
-async def test_eth_get_transaction_by_hash(session, root_signer, another_signer):
+async def test_eth_get_transaction_by_hash(local_provider, session, root_signer, another_signer):
     to_transfer = Amount.ether(1)
 
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
@@ -470,6 +470,15 @@ async def test_eth_get_transaction_by_hash(session, root_signer, another_signer)
     non_existent = TxHash(b"abcd" * 8)
     tx_info = await session.eth_get_transaction_by_hash(non_existent)
     assert tx_info is None
+
+    local_provider.disable_auto_mine_transactions()
+    tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
+    tx_info = await session.eth_get_transaction_by_hash(tx_hash)
+
+    assert tx_info.block_hash is None
+    assert tx_info.block_number is None
+    assert tx_info.transaction_index is None
+    assert tx_info.value == to_transfer
 
 
 async def test_eth_get_code(session, root_signer, compiled_contracts):
