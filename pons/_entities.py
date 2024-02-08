@@ -364,26 +364,26 @@ class TxInfo(NamedTuple):
 class BlockInfo(NamedTuple):
     """Block info."""
 
-    number: int
-    """Block number."""
+    number: Optional[int]
+    """Block number. ``None`` for pending blocks."""
 
-    hash_: BlockHash
-    """Block hash."""
+    hash_: Optional[BlockHash]
+    """Block hash. ``None`` for pending blocks."""
 
     parent_hash: BlockHash
     """Parent block's hash."""
 
-    nonce: int
-    """Block's nonce."""
+    nonce: Optional[int]
+    """Block's nonce. ``None`` for pending blocks."""
 
-    miner: Address
-    """Block's miner."""
+    miner: Optional[Address]
+    """Block's miner. ``None`` for pending blocks."""
 
     difficulty: int
     """Block's difficulty."""
 
-    total_difficulty: int
-    """Block's totat difficulty."""
+    total_difficulty: Optional[int]
+    """Block's totat difficulty. ``None`` for pending blocks."""
 
     size: int
     """Block size."""
@@ -431,18 +431,20 @@ class BlockInfo(NamedTuple):
             transaction_hashes = tuple(tx.hash_ for tx in transactions)
 
         return cls(
-            number=rpc_decode_quantity(val["number"]),
-            hash_=BlockHash.rpc_decode(val["hash"]),
+            number=rpc_decode_quantity(val["number"]) if val["number"] is not None else None,
+            hash_=BlockHash.rpc_decode(val["hash"]) if val["hash"] else None,
             parent_hash=BlockHash.rpc_decode(val["parentHash"]),
-            nonce=rpc_decode_quantity(val["nonce"]),
+            nonce=rpc_decode_quantity(val["nonce"]) if val["nonce"] is not None else None,
             difficulty=rpc_decode_quantity(val["difficulty"]),
-            total_difficulty=rpc_decode_quantity(val["totalDifficulty"]),
+            total_difficulty=rpc_decode_quantity(val["totalDifficulty"])
+            if val["totalDifficulty"] is not None
+            else None,
             size=rpc_decode_quantity(val["size"]),
             gas_limit=rpc_decode_quantity(val["gasLimit"]),
             gas_used=rpc_decode_quantity(val["gasUsed"]),
             base_fee_per_gas=Amount.rpc_decode(val["baseFeePerGas"]),
             timestamp=rpc_decode_quantity(val["timestamp"]),
-            miner=Address.rpc_decode(val["miner"]),
+            miner=Address.rpc_decode(val["miner"]) if val["miner"] else None,
             transactions=transactions,
             transaction_hashes=transaction_hashes,
         )

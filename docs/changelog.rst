@@ -39,6 +39,7 @@ Fixed
 - More robust error handling in HTTP provider. (PR_63_)
 - The transaction tip being set larger than the max gas price (which some providers don't like). (PR_64_)
 - Decoding error when fetching pending transactions. (PR_65_)
+- Decoding error when fetching pending blocks. (PR_67_)
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
@@ -52,6 +53,7 @@ Fixed
 .. _PR_63: https://github.com/fjarri/pons/pull/63
 .. _PR_64: https://github.com/fjarri/pons/pull/64
 .. _PR_65: https://github.com/fjarri/pons/pull/65
+.. _PR_67: https://github.com/fjarri/pons/pull/67
 
 
 0.7.0 (09-07-2023)

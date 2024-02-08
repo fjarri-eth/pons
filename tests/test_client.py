@@ -184,6 +184,23 @@ async def test_eth_call(session, compiled_contracts, root_signer, another_signer
     assert result == (another_signer.address,)
 
 
+async def test_eth_call_pending(local_provider, session, compiled_contracts, root_signer):
+    compiled_contract = compiled_contracts["BasicContract"]
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
+
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transact(root_signer, deployed_contract.method.setState(456))
+
+    # This uses the state of the last finalized block
+    result = await session.eth_call(deployed_contract.method.getState(0))
+    assert result == (123,)
+
+    # Tester chain limitation: even though we're requesting the state of the pending block,
+    # it still uses the last finalized state.
+    result = await session.eth_call(deployed_contract.method.getState(0), block=Block.PENDING)
+    assert result == (123,)  # should be 456
+
+
 async def test_eth_call_decoding_error(session, compiled_contracts, root_signer):
     """
     Tests that `eth_call()` propagates an error on mismatch of the declared output signature
@@ -467,6 +484,30 @@ async def test_get_block(session, root_signer, another_signer):
         BlockHash(b"\x00" * 32), with_transactions=True
     )
     assert block_info is None
+
+
+async def test_get_block_pending(local_provider, session, root_signer, another_signer):
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
+
+    block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=True)
+    assert len(block_info.transactions) == 0
+    """
+    This should work, but doesn't because of tester chain bugs:
+
+    assert block_info.number is None
+    assert block_info.hash is None
+    assert block_info.nonce is None
+    assert block_info.miner is None
+    assert block_info.transactions[0].hash_ == tx_hash
+    assert block_info.transactions[0].value == Amount.ether(10)
+    block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=False)
+    assert block_info.transaction_hashes[0] == tx_hash
+    """
 
 
 async def test_eth_get_transaction_by_hash(local_provider, session, root_signer, another_signer):
