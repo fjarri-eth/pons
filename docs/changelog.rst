@@ -31,6 +31,7 @@ Added
 - ``eth_getCode`` support (as ``ClientSession.eth_get_code()``). (PR_64_)
 - ``eth_getStorageAt`` support (as ``ClientSession.eth_get_storage_at()``). (PR_64_)
 - Support for the ``logs`` field in ``TxReceipt``. (PR_68_)
+- ``ClientSession.eth_get_logs()`` and ``eth_get_filter_logs()``. (PR_68_)
 
 
 Fixed

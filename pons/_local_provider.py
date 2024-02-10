@@ -183,6 +183,8 @@ class LocalProvider(Provider):
             eth_newPendingTransactionFilter=self.eth_new_pending_transaction_filter,
             eth_newFilter=self.eth_new_filter,
             eth_getFilterChanges=self.eth_get_filter_changes,
+            eth_getLogs=self.eth_get_logs,
+            eth_getFilterLogs=self.eth_get_filter_logs,
         )
         if method not in dispatch:
             raise RPCError.method_not_found(method)
@@ -344,6 +346,29 @@ class LocalProvider(Provider):
             for result in results:
                 # returned by regular RPC providers, but not by EthereumTester
                 result["removed"] = False
+        return cast(JSON, results)
+
+    def eth_get_logs(self, params: Mapping[str, Any]) -> JSON:
+        address = params.get("address", None)
+        topics = params.get("topics", None)
+        results = self._ethereum_tester.get_logs(
+            from_block=rpc_decode_block(params["fromBlock"]),
+            to_block=rpc_decode_block(params["toBlock"]),
+            address=address,
+            topics=topics,
+        )
+        results = normalize_return_value(results)
+        for result in results:
+            # returned by regular RPC providers, but not by EthereumTester
+            result["removed"] = False
+        return cast(JSON, results)
+
+    def eth_get_filter_logs(self, filter_id: str) -> JSON:
+        results = self._ethereum_tester.get_all_filter_logs(rpc_decode_quantity(filter_id))
+        results = normalize_return_value(results)
+        for result in results:
+            # returned by regular RPC providers, but not by EthereumTester
+            result["removed"] = False
         return cast(JSON, results)
 
     @asynccontextmanager

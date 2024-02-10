@@ -171,7 +171,9 @@ def test_decode_tx_receipt():
                 "logIndex": "0x187",
                 "removed": False,
                 "topics": ["0x27f12abfe35860a9a927b465bb3d4a9c23c8428174b83f278fe45ed7b4da2662"],
-                "transactionHash": "0x7114b4da1a6ed391d5d781447ed443733dcf2b508c515b81c17379dea8a3c9af",
+                "transactionHash": (
+                    "0x7114b4da1a6ed391d5d781447ed443733dcf2b508c515b81c17379dea8a3c9af"
+                ),
                 "transactionIndex": "0x76",
             }
         ],
