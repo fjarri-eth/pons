@@ -547,7 +547,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
+        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
@@ -613,7 +613,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
+        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
@@ -665,7 +665,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
+        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
@@ -739,6 +739,49 @@ class ClientSession:
 
         return results
 
+    def _encode_filter_params(
+        self,
+        source: Optional[Union[Address, Iterable[Address]]],
+        event_filter: Optional[EventFilter],
+        from_block: Union[int, Block],
+        to_block: Union[int, Block],
+    ) -> JSON:
+        params: Dict[str, Any] = {
+            "fromBlock": rpc_encode_block(from_block),
+            "toBlock": rpc_encode_block(to_block),
+        }
+        if isinstance(source, Address):
+            params["address"] = source.rpc_encode()
+        elif source:
+            params["address"] = [address.rpc_encode() for address in source]
+        if event_filter:
+            encoded_topics: List[Optional[List[str]]] = []
+            for topic in event_filter.topics:
+                if topic is None:
+                    encoded_topics.append(None)
+                else:
+                    encoded_topics.append([elem.rpc_encode() for elem in topic])
+            params["topics"] = encoded_topics
+        return params
+
+    @rpc_call("eth_getLogs")
+    async def eth_get_logs(
+        self,
+        source: Optional[Union[Address, Iterable[Address]]] = None,
+        event_filter: Optional[EventFilter] = None,
+        from_block: Union[int, Block] = Block.LATEST,
+        to_block: Union[int, Block] = Block.LATEST,
+    ) -> Tuple[LogEntry, ...]:
+        """Calls the ``eth_getLogs`` RPC method."""
+        params = self._encode_filter_params(
+            source=source, event_filter=event_filter, from_block=from_block, to_block=to_block
+        )
+        result = await self._provider_session.rpc("eth_getLogs", params)
+        # TODO: this will go away with generalized RPC decoding.
+        if not isinstance(result, list):
+            raise InvalidResponse(f"Expected a list as a response, got {type(result).__name__}")
+        return tuple(LogEntry.rpc_decode(ResponseDict(elem)) for elem in result)
+
     @rpc_call("eth_newBlockFilter")
     async def eth_new_block_filter(self) -> BlockFilter:
         """Calls the ``eth_newBlockFilter`` RPC method."""
@@ -764,49 +807,51 @@ class ClientSession:
         to_block: Union[int, Block] = Block.LATEST,
     ) -> LogFilter:
         """Calls the ``eth_newFilter`` RPC method."""
-        params: Dict[str, Any] = {
-            "fromBlock": rpc_encode_block(from_block),
-            "toBlock": rpc_encode_block(to_block),
-        }
-        if isinstance(source, Address):
-            params["address"] = source.rpc_encode()
-        elif source:
-            params["address"] = [address.rpc_encode() for address in source]
-        if event_filter:
-            encoded_topics: List[Optional[List[str]]] = []
-            for topic in event_filter.topics:
-                if topic is None:
-                    encoded_topics.append(None)
-                else:
-                    encoded_topics.append([elem.rpc_encode() for elem in topic])
-            params["topics"] = encoded_topics
-
+        params = self._encode_filter_params(
+            source=source, event_filter=event_filter, from_block=from_block, to_block=to_block
+        )
         result, provider_path = await self._provider_session.rpc_and_pin("eth_newFilter", params)
         filter_id = LogFilterId.rpc_decode(result)
         return LogFilter(id_=filter_id, provider_path=provider_path)
 
-    @rpc_call("eth_getFilterChangers")
+    def _parse_filter_result(
+        self,
+        filter_: Union[BlockFilter, PendingTransactionFilter, LogFilter],
+        result: JSON,
+    ) -> Union[Tuple[BlockHash, ...], Tuple[TxHash, ...], Tuple[LogEntry, ...]]:
+        # TODO: this will go away with generalized RPC decoding.
+        if not isinstance(result, list):
+            raise InvalidResponse(f"Expected a list as a response, got {type(result).__name__}")
+
+        if isinstance(filter_, BlockFilter):
+            return tuple(BlockHash.rpc_decode(elem) for elem in result)
+        if isinstance(filter_, PendingTransactionFilter):
+            return tuple(TxHash.rpc_decode(elem) for elem in result)
+        return tuple(LogEntry.rpc_decode(ResponseDict(elem)) for elem in result)
+
+    @rpc_call("eth_getFilterLogs")
+    async def eth_get_filter_logs(
+        self, filter_: Union[BlockFilter, PendingTransactionFilter, LogFilter]
+    ) -> Union[Tuple[BlockHash, ...], Tuple[TxHash, ...], Tuple[LogEntry, ...]]:
+        """Calls the ``eth_getFilterLogs`` RPC method."""
+        result = await self._provider_session.rpc_at_pin(
+            filter_.provider_path, "eth_getFilterLogs", filter_.id_.rpc_encode()
+        )
+        return self._parse_filter_result(filter_, result)
+
+    @rpc_call("eth_getFilterChanges")
     async def eth_get_filter_changes(
         self, filter_: Union[BlockFilter, PendingTransactionFilter, LogFilter]
     ) -> Union[Tuple[BlockHash, ...], Tuple[TxHash, ...], Tuple[LogEntry, ...]]:
         """
-        Calls the ``eth_getFilterChangers`` RPC method.
+        Calls the ``eth_getFilterChanges`` RPC method.
         Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
         # TODO: split into separate functions with specific return types?
-        results = await self._provider_session.rpc_at_pin(
+        result = await self._provider_session.rpc_at_pin(
             filter_.provider_path, "eth_getFilterChanges", filter_.id_.rpc_encode()
         )
-
-        # TODO: this will go away with generalized RPC decoding.
-        if not isinstance(results, list):
-            raise InvalidResponse(f"Expected a list as a response, got {type(results).__name__}")
-
-        if isinstance(filter_, BlockFilter):
-            return tuple(BlockHash.rpc_decode(elem) for elem in results)
-        if isinstance(filter_, PendingTransactionFilter):
-            return tuple(TxHash.rpc_decode(elem) for elem in results)
-        return tuple(LogEntry.rpc_decode(ResponseDict(elem)) for elem in results)
+        return self._parse_filter_result(filter_, result)
 
     async def iter_blocks(self, poll_interval: int = 1) -> AsyncIterator[BlockHash]:
         """Yields hashes of new blocks being mined."""

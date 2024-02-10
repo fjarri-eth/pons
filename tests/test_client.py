@@ -490,9 +490,7 @@ async def test_get_block_pending(local_provider, session, root_signer, another_s
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
 
     local_provider.disable_auto_mine_transactions()
-    await session.broadcast_transfer(
-        root_signer, another_signer.address, Amount.ether(10)
-    )
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
 
     block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=True)
     assert len(block_info.transactions) == 0
@@ -580,7 +578,7 @@ async def test_eth_get_filter_changes_bad_response(local_provider, session, monk
     block_filter = await session.eth_new_block_filter()
 
     with pytest.raises(
-        BadResponseFormat, match=r"eth_getFilterChangers: Expected a list as a response, got dict"
+        BadResponseFormat, match=r"eth_getFilterChanges: Expected a list as a response, got dict"
     ):
         await session.eth_get_filter_changes(block_filter)
 
@@ -620,6 +618,59 @@ async def test_pending_transaction_filter(local_provider, session, root_signer, 
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
     tx_hashes = await session.eth_get_filter_changes(transaction_filter)
     assert tx_hashes == (tx_hash,)
+
+
+async def test_eth_get_logs(
+    monkeypatch, local_provider, session, compiled_contracts, root_signer, another_signer
+):
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+    await session.transact(root_signer, contract1.method.deposit(b"1234"))
+    await session.transact(another_signer, contract2.method.deposit2(b"4567"))
+
+    entries = await session.eth_get_logs(source=contract2.address)
+    assert len(entries) == 1
+    assert entries[0].address == contract2.address
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
+
+    # Test an invalid response
+
+    monkeypatch.setattr(local_provider, "eth_get_logs", lambda _filter_id: {"foo": 1})
+
+    with pytest.raises(
+        BadResponseFormat, match=r"eth_getLogs: Expected a list as a response, got dict"
+    ):
+        await session.eth_get_logs(source=contract2.address)
+
+
+async def test_eth_get_filter_logs(session, compiled_contracts, root_signer, another_signer):
+    basic_contract = compiled_contracts["BasicContract"]
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
+    contract2 = await session.deploy(another_signer, basic_contract.constructor(123))
+
+    log_filter = await session.eth_new_filter()
+    await session.transact(root_signer, contract1.method.deposit(b"1234"))
+    await session.transact(another_signer, contract2.method.deposit2(b"4567"))
+
+    entries = await session.eth_get_filter_logs(log_filter)
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[1].address == contract2.address
+
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1234").topics
+    )
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
 
 
 async def test_log_filter_all(session, compiled_contracts, root_signer, another_signer):

@@ -450,71 +450,6 @@ class BlockInfo(NamedTuple):
         )
 
 
-class TxReceipt(NamedTuple):
-    """Transaction receipt."""
-
-    block_hash: BlockHash
-    """Hash of the block including this transaction."""
-
-    block_number: int
-    """Block number including this transaction."""
-
-    contract_address: Optional[Address]
-    """
-    If it was a successful deployment transaction,
-    contains the address of the deployed contract.
-    """
-
-    cumulative_gas_used: int
-    """The total amount of gas used when this transaction was executed in the block."""
-
-    effective_gas_price: Amount
-    """The actual value per gas deducted from the sender's account."""
-
-    from_: Address
-    """Address of the sender."""
-
-    gas_used: int
-    """The amount of gas used by the transaction."""
-
-    to: Optional[Address]
-    """
-    Address of the receiver.
-    ``None`` when the transaction is a contract creation transaction.
-    """
-
-    transaction_hash: TxHash
-    """Hash of the transaction."""
-
-    transaction_index: int
-    """Integer of the transaction's index position in the block."""
-
-    # TODO: make an enum?
-    type_: int
-    """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
-
-    succeeded: bool
-    """Whether the transaction was successful."""
-
-    @classmethod
-    def rpc_decode(cls, val: ResponseDict) -> "TxReceipt":
-        contract_address = val["contractAddress"]
-        return cls(
-            block_hash=BlockHash.rpc_decode(val["blockHash"]),
-            block_number=rpc_decode_quantity(val["blockNumber"]),
-            contract_address=Address.rpc_decode(contract_address) if contract_address else None,
-            cumulative_gas_used=rpc_decode_quantity(val["cumulativeGasUsed"]),
-            effective_gas_price=Amount.rpc_decode(val["effectiveGasPrice"]),
-            from_=Address.rpc_decode(val["from"]),
-            gas_used=rpc_decode_quantity(val["gasUsed"]),
-            to=Address.rpc_decode(val["to"]) if val["to"] else None,
-            transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
-            transaction_index=rpc_decode_quantity(val["transactionIndex"]),
-            type_=rpc_decode_quantity(val["type"]),
-            succeeded=(rpc_decode_quantity(val["status"]) == 1),
-        )
-
-
 class LogEntry(NamedTuple):
     """Log entry metadata."""
 
@@ -573,6 +508,78 @@ class LogEntry(NamedTuple):
             address=Address.rpc_decode(val["address"]),
             data=rpc_decode_data(val["data"]),
             topics=tuple(LogTopic.rpc_decode(topic) for topic in topics),
+        )
+
+
+class TxReceipt(NamedTuple):
+    """Transaction receipt."""
+
+    block_hash: BlockHash
+    """Hash of the block including this transaction."""
+
+    block_number: int
+    """Block number including this transaction."""
+
+    contract_address: Optional[Address]
+    """
+    If it was a successful deployment transaction,
+    contains the address of the deployed contract.
+    """
+
+    cumulative_gas_used: int
+    """The total amount of gas used when this transaction was executed in the block."""
+
+    effective_gas_price: Amount
+    """The actual value per gas deducted from the sender's account."""
+
+    from_: Address
+    """Address of the sender."""
+
+    gas_used: int
+    """The amount of gas used by the transaction."""
+
+    to: Optional[Address]
+    """
+    Address of the receiver.
+    ``None`` when the transaction is a contract creation transaction.
+    """
+
+    transaction_hash: TxHash
+    """Hash of the transaction."""
+
+    transaction_index: int
+    """Integer of the transaction's index position in the block."""
+
+    # TODO: make an enum?
+    type_: int
+    """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
+
+    succeeded: bool
+    """Whether the transaction was successful."""
+
+    logs: Tuple[LogEntry, ...]
+
+    @classmethod
+    def rpc_decode(cls, val: ResponseDict) -> "TxReceipt":
+        contract_address = val["contractAddress"]
+        logs = val["logs"]
+        if not isinstance(logs, Iterable):
+            raise RPCDecodingError(f"`logs` in a tx receipt must be an iterable, got {logs}")
+
+        return cls(
+            block_hash=BlockHash.rpc_decode(val["blockHash"]),
+            block_number=rpc_decode_quantity(val["blockNumber"]),
+            contract_address=Address.rpc_decode(contract_address) if contract_address else None,
+            cumulative_gas_used=rpc_decode_quantity(val["cumulativeGasUsed"]),
+            effective_gas_price=Amount.rpc_decode(val["effectiveGasPrice"]),
+            from_=Address.rpc_decode(val["from"]),
+            gas_used=rpc_decode_quantity(val["gasUsed"]),
+            to=Address.rpc_decode(val["to"]) if val["to"] else None,
+            transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
+            transaction_index=rpc_decode_quantity(val["transactionIndex"]),
+            type_=rpc_decode_quantity(val["type"]),
+            succeeded=(rpc_decode_quantity(val["status"]) == 1),
+            logs=tuple(LogEntry.rpc_decode(ResponseDict(entry)) for entry in logs),
         )
 
 
