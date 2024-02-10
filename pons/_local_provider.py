@@ -97,6 +97,8 @@ Normalizable = Union[int, bytes, Iterable["Normalizable"], Mapping[str, "Normali
 
 
 def normalize_return_value(value: Normalizable) -> JSON:
+    if isinstance(value, bool):
+        return value
     if isinstance(value, int):
         return rpc_encode_quantity(value)
     if isinstance(value, bytes):
@@ -234,6 +236,9 @@ class LocalProvider(Provider):
             result = self._ethereum_tester.get_transaction_receipt(tx_hash)
         except TransactionNotFound:
             return None
+        for entry in result["logs"]:
+            # returned by regular RPC providers, but not by EthereumTester
+            entry["removed"] = False
         return normalize_return_value(result)
 
     def eth_estimate_gas(self, tx: Mapping[str, Any], block: str) -> str:

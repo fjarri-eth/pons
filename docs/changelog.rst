@@ -30,6 +30,7 @@ Added
 - Expose ``Provider`` at the top level. (PR_63_)
 - ``eth_getCode`` support (as ``ClientSession.eth_get_code()``). (PR_64_)
 - ``eth_getStorageAt`` support (as ``ClientSession.eth_get_storage_at()``). (PR_64_)
+- Support for the ``logs`` field in ``TxReceipt``. (PR_68_)
 
 
 Fixed
@@ -54,6 +55,7 @@ Fixed
 .. _PR_64: https://github.com/fjarri/pons/pull/64
 .. _PR_65: https://github.com/fjarri/pons/pull/65
 .. _PR_67: https://github.com/fjarri/pons/pull/67
+.. _PR_68: https://github.com/fjarri/pons/pull/68
 
 
 0.7.0 (09-07-2023)

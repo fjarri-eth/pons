@@ -162,6 +162,19 @@ def test_decode_tx_receipt():
         "to": None,
         "transactionIndex": "0x18",
         "type": "0x0",
+        "logs": [
+            {
+                "address": "0x388c818ca8b9251b393131c08a736a67ccb19297",
+                "blockHash": "0x0a79eca9f5ca58a1d5d5030a0fabfdd8e815b8b77a9f223f74d59aa39596e1c7",
+                "blockNumber": "0x11e5883",
+                "data": "0x00000000000000000000000000000000000000000000000011b6b79503fb875d",
+                "logIndex": "0x187",
+                "removed": False,
+                "topics": ["0x27f12abfe35860a9a927b465bb3d4a9c23c8428174b83f278fe45ed7b4da2662"],
+                "transactionHash": "0x7114b4da1a6ed391d5d781447ed443733dcf2b508c515b81c17379dea8a3c9af",
+                "transactionIndex": "0x76",
+            }
+        ],
     }
 
     tx_receipt = TxReceipt.rpc_decode(tx_receipt_json)
@@ -178,6 +191,10 @@ def test_decode_tx_receipt():
     assert not tx_receipt.succeeded
     assert tx_receipt.contract_address is None
     assert tx_receipt.to == address
+
+    tx_receipt_json["logs"] = 1
+    with pytest.raises(RPCDecodingError, match="`logs` in a tx receipt must be an iterable, got 1"):
+        TxReceipt.rpc_decode(tx_receipt_json)
 
 
 def test_encode_decode_quantity():
