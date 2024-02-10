@@ -580,7 +580,7 @@ async def test_eth_get_filter_changes_bad_response(local_provider, session, monk
     block_filter = await session.eth_new_block_filter()
 
     with pytest.raises(
-        BadResponseFormat, match=r"eth_getFilterChangers: Expected a list as a response, got dict"
+        BadResponseFormat, match=r"eth_getFilterChanges: Expected a list as a response, got dict"
     ):
         await session.eth_get_filter_changes(block_filter)
 

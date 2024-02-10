@@ -785,12 +785,12 @@ class ClientSession:
         filter_id = LogFilterId.rpc_decode(result)
         return LogFilter(id_=filter_id, provider_path=provider_path)
 
-    @rpc_call("eth_getFilterChangers")
+    @rpc_call("eth_getFilterChanges")
     async def eth_get_filter_changes(
         self, filter_: Union[BlockFilter, PendingTransactionFilter, LogFilter]
     ) -> Union[Tuple[BlockHash, ...], Tuple[TxHash, ...], Tuple[LogEntry, ...]]:
         """
-        Calls the ``eth_getFilterChangers`` RPC method.
+        Calls the ``eth_getFilterChanges`` RPC method.
         Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
         # TODO: split into separate functions with specific return types?
