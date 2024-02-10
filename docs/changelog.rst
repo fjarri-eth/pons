@@ -6,7 +6,7 @@ Changelog
 ~~~~~~~~~~~~~~~~~~
 
 Changed
-~~~~~~~
+^^^^^^^
 
 - Added an explicit ``typing_extensions`` dependency. (PR_57_)
 - Various boolean arguments are now keyword-only to prevent usage errors. (PR_57_)
