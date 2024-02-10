@@ -547,7 +547,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
+        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
@@ -613,7 +613,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
+        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),
@@ -665,7 +665,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.LATEST)
+        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
         tx: Dict[str, Union[int, str]] = {
             "type": 2,  # EIP-2930 transaction
             "chainId": rpc_encode_quantity(chain_id),

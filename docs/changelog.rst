@@ -41,6 +41,7 @@ Fixed
 - The transaction tip being set larger than the max gas price (which some providers don't like). (PR_64_)
 - Decoding error when fetching pending transactions. (PR_65_)
 - Decoding error when fetching pending blocks. (PR_67_)
+- Get the default nonce based on the pending block, not the latest one. (PR_68_)
 
 
 .. _PR_51: https://github.com/fjarri/pons/pull/51
