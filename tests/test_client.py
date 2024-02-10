@@ -490,9 +490,7 @@ async def test_get_block_pending(local_provider, session, root_signer, another_s
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
 
     local_provider.disable_auto_mine_transactions()
-    await session.broadcast_transfer(
-        root_signer, another_signer.address, Amount.ether(10)
-    )
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
 
     block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=True)
     assert len(block_info.transactions) == 0
