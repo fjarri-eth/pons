@@ -2,10 +2,10 @@
 # It is not intended for manual editing.
 
 [metadata]
-groups = ["default", "compiler", "docs", "lint", "test-rpc-provider", "tests"]
+groups = ["default", "compiler", "docs", "lint", "local-provider", "tests"]
 strategy = ["cross_platform"]
 lock_version = "4.4.1"
-content_hash = "sha256:30ccac3cadb14efeb48acaac927977ddd1ae4c5e88b0f7574a9d9044da480b53"
+content_hash = "sha256:7ac7c7ba9283c58e32224fb532d2f714064b296c830b978f5ed43879f4947b0f"
 
 [[package]]
 name = "alabaster"

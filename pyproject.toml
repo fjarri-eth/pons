@@ -26,7 +26,7 @@ homepage = "https://github.com/fjarri/pons"
 compiler = [
     "py-solc-x>=2",
 ]
-test-rpc-provider = [
+local-provider = [
     "alysis>=0.1.2",
     "starlette",
     "hypercorn",
@@ -39,7 +39,7 @@ tests = [
     "mypy-extensions>=1",
     # from `compiler` feature
     "py-solc-x>=2",
-    # from `test-rpc-provider` feature
+    # from `local-provider` feature
     "alysis>=0.1.2",
     "starlette",
     "hypercorn",

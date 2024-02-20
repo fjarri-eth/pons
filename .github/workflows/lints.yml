@@ -31,7 +31,7 @@ jobs:
       run: curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3
     - name: Install dependencies
       run: |
-        pdm sync -G lint,compiler,test-rpc-provider
+        pdm sync -G lint,compiler,local-provider
     - name: Run mypy
       run: |
         pdm run mypy pons
