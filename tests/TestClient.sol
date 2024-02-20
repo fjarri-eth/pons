@@ -29,6 +29,13 @@ contract BasicContract {
         state = _x;
     }
 
+    function doubleStateAndCheck(uint256 _x) public {
+        state = state * 2;
+        if (state == _x) {
+            revert("Check succeeded");
+        }
+    }
+
     function payableSetState(uint256 _x) public payable {
         state = _x;
     }

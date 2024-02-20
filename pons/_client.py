@@ -419,14 +419,16 @@ class ClientSession:
         return TxHash.rpc_decode(result)
 
     @rpc_call("eth_estimateGas")
-    async def _estimate_gas(self, tx: Mapping[str, JSON]) -> int:
-        result = await self._provider_session.rpc(
-            "eth_estimateGas", tx, rpc_encode_block(Block.LATEST)
-        )
+    async def _estimate_gas(self, tx: Mapping[str, JSON], block: Union[int, Block]) -> int:
+        result = await self._provider_session.rpc("eth_estimateGas", tx, rpc_encode_block(block))
         return rpc_decode_quantity(result)
 
     async def estimate_deploy(
-        self, sender_address: Address, call: BoundConstructorCall, amount: Optional[Amount] = None
+        self,
+        sender_address: Address,
+        call: BoundConstructorCall,
+        amount: Optional[Amount] = None,
+        block: Union[int, Block] = Block.LATEST,
     ) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
@@ -446,12 +448,16 @@ class ClientSession:
             "value": amount.rpc_encode(),
         }
         try:
-            return await self._estimate_gas(tx)
+            return await self._estimate_gas(tx, block)
         except ProviderError as exc:
             raise decode_contract_error(call.contract_abi, exc) from exc
 
     async def estimate_transfer(
-        self, source_address: Address, destination_address: Address, amount: Amount
+        self,
+        source_address: Address,
+        destination_address: Address,
+        amount: Amount,
+        block: Union[int, Block] = Block.LATEST,
     ) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
@@ -464,10 +470,14 @@ class ClientSession:
             "to": destination_address.rpc_encode(),
             "value": amount.rpc_encode(),
         }
-        return await self._estimate_gas(tx)
+        return await self._estimate_gas(tx, block)
 
     async def estimate_transact(
-        self, sender_address: Address, call: BoundMethodCall, amount: Optional[Amount] = None
+        self,
+        sender_address: Address,
+        call: BoundMethodCall,
+        amount: Optional[Amount] = None,
+        block: Union[int, Block] = Block.LATEST,
     ) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
@@ -489,7 +499,7 @@ class ClientSession:
             "value": amount.rpc_encode(),
         }
         try:
-            return await self._estimate_gas(tx)
+            return await self._estimate_gas(tx, block)
         except ProviderError as exc:
             raise decode_contract_error(call.contract_abi, exc) from exc
 
@@ -661,7 +671,9 @@ class ClientSession:
 
         chain_id = await self.eth_chain_id()
         if gas is None:
-            gas = await self.estimate_transact(signer.address, call, amount=amount)
+            gas = await self.estimate_transact(
+                signer.address, call, amount=amount, block=Block.PENDING
+            )
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
@@ -716,13 +728,12 @@ class ClientSession:
         results = {}
         for event in return_events:
             event_filter = event()
-            log_filter = await self.eth_new_filter(
+            log_entries = await self.eth_get_logs(
                 source=event_filter.contract_address,
                 event_filter=EventFilter(event_filter.topics),
                 from_block=receipt.block_number,
                 to_block=receipt.block_number,
             )
-            log_entries = await self.eth_get_filter_changes(log_filter)
             event_results = []
             for log_entry in log_entries:
                 # We can't ensure it statically, since `eth_getFilterChanges` return type depends

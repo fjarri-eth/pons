@@ -114,10 +114,6 @@ class RPCError(Exception):
             f"The method {method} does not exist/is not available",
         )
 
-    @classmethod
-    def invalid_parameter(cls, message: str) -> "RPCError":
-        return cls(RPCErrorCode.INVALID_PARAMETER.value, message)
-
     def __init__(self, code: int, message: str, data: Optional[str] = None):
         # Taking an integer and not `RPCErrorCode` here
         # since the codes may differ between providers.

@@ -11,12 +11,14 @@ from pons import (
     Amount,
     Block,
     BlockHash,
+    Client,
     ContractABI,
     ContractError,
     ContractLegacyError,
     ContractPanic,
     DeployedContract,
     Either,
+    LocalProvider,
     Method,
     Mutability,
     RPCErrorCode,
@@ -56,37 +58,41 @@ def normalize_topics(topics):
 
 async def test_net_version(local_provider, session):
     net_version1 = await session.net_version()
-    assert net_version1 == "0"
+    assert net_version1 == "1"
 
     # This is not going to get called
-    def wrong_net_version():
+    def mock_rpc(*_args):
         raise NotImplementedError  # pragma: no cover
 
     # The result should have been cached the first time
-    with monkeypatched(local_provider, "net_version", wrong_net_version):
+    with monkeypatched(local_provider, "rpc", mock_rpc):
         net_version2 = await session.net_version()
     assert net_version1 == net_version2
 
 
 async def test_net_version_type_check(local_provider, session):
     # Provider returning a bad value
-    with monkeypatched(local_provider, "net_version", lambda: 0):
+    with monkeypatched(local_provider, "rpc", lambda *_args: 0):
         with pytest.raises(BadResponseFormat, match="net_version: expected a string result"):
             await session.net_version()
 
 
-async def test_eth_chain_id(local_provider, session):
-    chain_id1 = await session.eth_chain_id()
-    assert chain_id1 == 2299111 * 57099167
+async def test_eth_chain_id():
+    local_provider = LocalProvider(root_balance=Amount.ether(100), chain_id=123)
+    client = Client(local_provider)
 
     # This is not going to get called
-    def wrong_chain_id():
+    def mock_rpc(_method, *_args):
         raise NotImplementedError  # pragma: no cover
 
-    # The result should have been cached the first time
-    with monkeypatched(local_provider, "eth_chain_id", wrong_chain_id):
-        chain_id2 = await session.eth_chain_id()
-    assert chain_id1 == chain_id2
+    async with client.session() as session:
+        chain_id1 = await session.eth_chain_id()
+        assert chain_id1 == 123
+
+        # The result should have been cached the first time
+        with monkeypatched(local_provider, "rpc", mock_rpc):
+            chain_id2 = await session.eth_chain_id()
+        assert chain_id1 == chain_id2
 
 
 async def test_eth_get_balance(session, root_signer, another_signer):
@@ -118,10 +124,15 @@ async def test_eth_get_transaction_receipt(local_provider, session, root_signer,
     assert receipt is None
 
 
-async def test_eth_get_transaction_count(session, root_signer, another_signer):
+async def test_eth_get_transaction_count(local_provider, session, root_signer, another_signer):
     assert await session.eth_get_transaction_count(root_signer.address) == 0
     await session.transfer(root_signer, another_signer.address, Amount.ether(10))
     assert await session.eth_get_transaction_count(root_signer.address) == 1
+
+    # Check that pending transactions are accounted for
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
+    assert await session.eth_get_transaction_count(root_signer.address, Block.PENDING) == 2
 
 
 async def test_wait_for_transaction_receipt(
@@ -169,10 +180,8 @@ async def test_eth_call(session, compiled_contracts, root_signer, another_signer
     assert result == (123 + 456,)
 
     # With a real provider, if `sender_address` is not given, it will default to the zero address.
-    # We currently don't have that option due to the tester chain limitations,
-    # so the default is the root address.
     result = await session.eth_call(deployed_contract.method.getSender())
-    assert result == (root_signer.address,)
+    assert result == (Address.from_hex(b"\x00" * 20),)
 
     # Seems to be another tester chain limitation: even though `eth_call` does not spend gas,
     # the `sender_address` still needs to be funded.
@@ -195,10 +204,9 @@ async def test_eth_call_pending(local_provider, session, compiled_contracts, roo
     result = await session.eth_call(deployed_contract.method.getState(0))
     assert result == (123,)
 
-    # Tester chain limitation: even though we're requesting the state of the pending block,
-    # it still uses the last finalized state.
+    # This also uses the state change introduced by the pending transaction
     result = await session.eth_call(deployed_contract.method.getState(0), block=Block.PENDING)
-    assert result == (123,)  # should be 456
+    assert result == (456,)
 
 
 async def test_eth_call_decoding_error(session, compiled_contracts, root_signer):
@@ -311,14 +319,15 @@ async def test_transfer_failed(local_provider, session, root_signer, another_sig
     # TODO: it would be nice to reproduce the actual situation where this could happen
     # (tranfer was accepted for mining, but failed in the process,
     # and the resulting receipt has a 0 status).
-    orig_get_transaction_receipt = local_provider.eth_get_transaction_receipt
+    orig_rpc = local_provider.rpc
 
-    def mock_get_transaction_receipt(tx_hash_hex):
-        receipt = orig_get_transaction_receipt(tx_hash_hex)
-        receipt["status"] = "0x0"
-        return receipt
+    def mock_rpc(method, *args):
+        result = orig_rpc(method, *args)
+        if method == "eth_getTransactionReceipt":
+            result["status"] = "0x0"
+        return result
 
-    with monkeypatched(local_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
+    with monkeypatched(local_provider, "rpc", mock_rpc):
         with pytest.raises(TransactionFailed, match="Transfer failed"):
             await session.transfer(root_signer, another_signer.address, Amount.ether(10))
 
@@ -352,14 +361,15 @@ async def test_deploy(local_provider, session, compiled_contracts, root_signer):
         await session.deploy(root_signer, construction_error.constructor(0), gas=300000)
 
     # Test the provider returning an empty `contractAddress`
-    orig_get_transaction_receipt = local_provider.eth_get_transaction_receipt
+    orig_rpc = local_provider.rpc
 
-    def mock_get_transaction_receipt(tx_hash_hex):
-        receipt = orig_get_transaction_receipt(tx_hash_hex)
-        receipt["contractAddress"] = None
-        return receipt
+    def mock_rpc(method, *args):
+        result = orig_rpc(method, *args)
+        if method == "eth_getTransactionReceipt":
+            result["contractAddress"] = None
+        return result
 
-    with monkeypatched(local_provider, "eth_get_transaction_receipt", mock_get_transaction_receipt):
+    with monkeypatched(local_provider, "rpc", mock_rpc):
         with pytest.raises(
             BadResponseFormat,
             match=(
@@ -400,6 +410,23 @@ async def test_transact(session, compiled_contracts, root_signer):
     # Not enough gas
     with pytest.raises(TransactionFailed, match="Transact failed"):
         await session.transact(root_signer, deployed_contract.method.faultySetState(0), gas=300000)
+
+
+async def test_transact_with_pending_state(
+    local_provider, session, compiled_contracts, root_signer
+):
+    # Test that a newly submitted transaction uses the pending state and not the finalized state
+
+    basic_contract = compiled_contracts["BasicContract"]
+    deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
+
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transact(root_signer, deployed_contract.method.setState(456))
+
+    with pytest.raises(ContractLegacyError, match="Check succeeded"):
+        await session.broadcast_transact(
+            root_signer, deployed_contract.method.doubleStateAndCheck(456 * 2)
+        )
 
 
 async def test_transact_and_return_events(
@@ -490,22 +517,23 @@ async def test_get_block_pending(local_provider, session, root_signer, another_s
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
 
     local_provider.disable_auto_mine_transactions()
-    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
+    tx_hash = await session.broadcast_transfer(
+        root_signer, another_signer.address, Amount.ether(10)
+    )
 
     block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=True)
-    assert len(block_info.transactions) == 0
-    """
-    This should work, but doesn't because of tester chain bugs:
-
-    assert block_info.number is None
-    assert block_info.hash is None
+    assert block_info.number == 2
+    assert block_info.hash_ is None
     assert block_info.nonce is None
     assert block_info.miner is None
+    assert block_info.total_difficulty is None
+    assert len(block_info.transactions) == 1
     assert block_info.transactions[0].hash_ == tx_hash
     assert block_info.transactions[0].value == Amount.ether(10)
+
     block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=False)
+    assert len(block_info.transaction_hashes) == 1
     assert block_info.transaction_hashes[0] == tx_hash
-    """
 
 
 async def test_eth_get_transaction_by_hash(local_provider, session, root_signer, another_signer):
@@ -523,8 +551,8 @@ async def test_eth_get_transaction_by_hash(local_provider, session, root_signer,
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
     tx_info = await session.eth_get_transaction_by_hash(tx_hash)
 
+    assert tx_info.block_number == 2
     assert tx_info.block_hash is None
-    assert tx_info.block_number is None
     assert tx_info.transaction_index is None
     assert tx_info.value == to_transfer
 
@@ -573,9 +601,12 @@ async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
 
 
 async def test_eth_get_filter_changes_bad_response(local_provider, session, monkeypatch):
-    monkeypatch.setattr(local_provider, "eth_get_filter_changes", lambda _filter_id: {"foo": 1})
-
     block_filter = await session.eth_new_block_filter()
+
+    def mock_rpc(_method, *_args):
+        return {"foo": 1}
+
+    monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(
         BadResponseFormat, match=r"eth_getFilterChanges: Expected a list as a response, got dict"
@@ -640,7 +671,10 @@ async def test_eth_get_logs(
 
     # Test an invalid response
 
-    monkeypatch.setattr(local_provider, "eth_get_logs", lambda _filter_id: {"foo": 1})
+    def mock_rpc(_method, *_args):
+        return {"foo": 1}
+
+    monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(
         BadResponseFormat, match=r"eth_getLogs: Expected a list as a response, got dict"
@@ -802,12 +836,13 @@ async def test_log_filter_by_block_num(session, compiled_contracts, root_signer,
 
     await session.transact(root_signer, contract1.method.deposit(b"1111"))
     block_num = await session.eth_block_number()
+    log_filter = await session.eth_new_filter(from_block=block_num + 1, to_block=block_num + 3)
+
     await session.transact(root_signer, contract1.method.deposit(b"2222"))  # filter will start here
     await session.transact(root_signer, contract1.method.deposit(b"3333"))
     await session.transact(root_signer, contract1.method.deposit(b"4444"))  # filter will stop here
     await session.transact(root_signer, contract1.method.deposit(b"5555"))
 
-    log_filter = await session.eth_new_filter(from_block=block_num + 1, to_block=block_num + 3)
     entries = await session.eth_get_filter_changes(log_filter)
 
     # The range in the filter is inclusive
@@ -934,12 +969,12 @@ async def test_event_filter_high_level(
 
 
 async def test_unknown_rpc_status_code(local_provider, session, monkeypatch):
-    def faulty_net_version():
+    def mock_rpc(_method, *_args):
         # This is a known exception type, and it will be transferred through the network
         # keeping the status code.
         raise RPCError(666, "this method is possessed")
 
-    monkeypatch.setattr(local_provider, "net_version", faulty_net_version)
+    monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(ProviderError, match=r"Provider error \(666\): this method is possessed"):
         await session.net_version()
@@ -972,7 +1007,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     # `require(condition, message)`
     kwargs = dict(
         expected_code=RPCErrorCode.EXECUTION_ERROR,
-        expected_message="execution reverted: 'require(string)'",
+        expected_message="execution reverted",
         expected_data=error_selector + encode_args((abi.string, "require(string)")),
     )
     await check_rpc_error(session.eth_call(contract.method.viewError(1)), **kwargs)
@@ -988,7 +1023,7 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     # `revert(message)`
     kwargs = dict(
         expected_code=RPCErrorCode.EXECUTION_ERROR,
-        expected_message="execution reverted: 'revert(string)'",
+        expected_message="execution reverted",
         expected_data=error_selector + encode_args((abi.string, "revert(string)")),
     )
     await check_rpc_error(session.eth_call(contract.method.viewError(3)), **kwargs)
@@ -1056,25 +1091,35 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
+    orig_rpc = local_provider.rpc
+
     # Provider returns an unknown panic code
 
-    def eth_estimate_gas(*_args, **_kwargs):
-        # Invalid selector
-        data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
-        raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data))
+    def mock_rpc(method, *args):
+        if method == "eth_estimateGas":
+            # Invalid selector
+            data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
+            raise RPCError(
+                RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
+            )
+        return orig_rpc(method, *args)
 
-    with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
+    with monkeypatched(local_provider, "rpc", mock_rpc):
         with pytest.raises(ContractPanic, match=r"ContractPanicReason.UNKNOWN"):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
 
     # Provider returns an unknown error (a selector not present in the ABI)
 
-    def eth_estimate_gas(*_args, **_kwargs):
-        # Invalid selector
-        data = b"1234" + encode_args((abi.uint(256), 1))
-        raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data))
+    def mock_rpc(method, *args):
+        if method == "eth_estimateGas":
+            # Invalid selector
+            data = b"1234" + encode_args((abi.uint(256), 1))
+            raise RPCError(
+                RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
+            )
+        return orig_rpc(method, *args)
 
-    with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
+    with monkeypatched(local_provider, "rpc", mock_rpc):
         with pytest.raises(
             ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
         ):
@@ -1082,11 +1127,13 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
 
     # Provider returns an error with an unknown RPC code
 
-    def eth_estimate_gas(*_args, **_kwargs):
-        # Invalid selector
-        data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
-        raise RPCError(12345, "execution reverted", rpc_encode_data(data))
+    def mock_rpc(method, *args):
+        if method == "eth_estimateGas":
+            # Invalid selector
+            data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
+            raise RPCError(12345, "execution reverted", rpc_encode_data(data))
+        return orig_rpc(method, *args)
 
-    with monkeypatched(local_provider, "eth_estimate_gas", eth_estimate_gas):
+    with monkeypatched(local_provider, "rpc", mock_rpc):
         with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))

@@ -21,7 +21,5 @@ def root_signer(local_provider):
 
 
 @pytest.fixture
-def another_signer(local_provider):
-    signer = AccountSigner.create()
-    local_provider.add_account(signer)
-    return signer
+def another_signer():
+    return AccountSigner.create()
