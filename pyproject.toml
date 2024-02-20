@@ -27,9 +27,7 @@ compiler = [
     "py-solc-x>=2",
 ]
 test-rpc-provider = [
-    # eth-tester only has pre-releases, so we can't set a range.
-    # TODO: make our own mock around Pyevm.
-    "eth-tester[pyevm]==0.10.0-beta.1",
+    "alysis>=0.1.2",
     "starlette",
     "hypercorn",
 ]
@@ -42,7 +40,7 @@ tests = [
     # from `compiler` feature
     "py-solc-x>=2",
     # from `test-rpc-provider` feature
-    "eth-tester[pyevm]==0.10.0-beta.1",
+    "alysis>=0.1.2",
     "starlette",
     "hypercorn",
 ]
