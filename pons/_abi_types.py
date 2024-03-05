@@ -3,22 +3,13 @@
 
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Mapping, Sequence
 from functools import cached_property
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from types import EllipsisType
+from typing import Any
 
-import eth_abi  # type: ignore[import-untyped]
-from eth_abi.exceptions import DecodingError  # type: ignore[import-untyped]
+import eth_abi
+from eth_abi.exceptions import DecodingError
 from eth_utils import keccak
 
 from ._entities import Address
@@ -34,26 +25,11 @@ class ABIDecodingError(Exception):
     """Raised on an error when decoding a value in an Eth ABI encoded bytestring."""
 
 
-ABIType = Union[int, str, bytes, bool, List["ABIType"]]
+ABIType = int | str | bytes | bool | list["ABIType"]
 """
 Represents the argument type that can be received from ``eth_abi.decode()``,
 or passed to ``eth_abi.encode()``.
 """
-
-
-def encode_typed(types: Iterable[str], args: Iterable[ABIType]) -> bytes:
-    # ``eth_abi.encode()`` does not have type annotations.
-    # This is a typed wrapper (easier than making custom stubs).
-    # Remove when typing is added in ``eth_abi``.
-    return cast(bytes, eth_abi.encode(types, args))
-
-
-def decode_typed(types: Iterable[str], data: bytes) -> Tuple[ABIType, ...]:
-    # ``eth_abi.decode()`` does not have type annotations.
-    # This is a typed wrapper (easier than making custom stubs).
-    # Remove when typing is added in ``eth_abi``.
-    decoded = eth_abi.decode(types, data)
-    return cast(Tuple[ABIType, ...], decoded)
 
 
 class Type(ABC):
@@ -80,7 +56,7 @@ class Type(ABC):
 
     def encode(self, val: Any) -> bytes:
         """Encodes the given value in the contract ABI format."""
-        return encode_typed([self.canonical_form], [val])
+        return eth_abi.encode([self.canonical_form], [val])
 
     def encode_to_topic(self, val: Any) -> bytes:
         """Encodes the given value as an event topic."""
@@ -107,7 +83,7 @@ class Type(ABC):
         # May be overridden.
         return self.encode(val)
 
-    def decode_from_topic(self, val: bytes) -> Optional[Any]:
+    def decode_from_topic(self, val: bytes) -> Any | None:
         """
         Decodes an encoded topic.
         Returns ``None`` if the decoding is impossible
@@ -119,12 +95,12 @@ class Type(ABC):
 
         # By default it's just the decoding of the value type.
         # May be overridden.
-        return self._denormalize(decode_typed([self.canonical_form], val)[0])
+        return self._denormalize(eth_abi.decode([self.canonical_form], val)[0])
 
     def __str__(self) -> str:
         return self.canonical_form
 
-    def __getitem__(self, array_size: Union[int, Any]) -> "Array":
+    def __getitem__(self, array_size: int | EllipsisType) -> "Array":
         # In Py3.10 they added EllipsisType which would work better here.
         # For now, relying on the documentation.
         if isinstance(array_size, int):
@@ -213,7 +189,7 @@ class Int(Type):
 class Bytes(Type):
     """Corresponds to the Solidity ``bytes<size>`` type."""
 
-    def __init__(self, size: Optional[int] = None):
+    def __init__(self, size: None | int = None):
         if size is not None and (size <= 0 or size > MAX_BYTES_SIZE):
             raise ValueError(f"Incorrect `bytes` size: {size}")
         self._size = size
@@ -253,7 +229,7 @@ class Bytes(Type):
         # Sized `bytes` is a value type, falls back to the base implementation.
         return super()._encode_to_topic_inner(val)
 
-    def decode_from_topic(self, val: bytes) -> Optional[bytes]:
+    def decode_from_topic(self, val: bytes) -> None | bytes:
         if self._size is None:
             # Cannot recover a hashed value.
             return None
@@ -353,7 +329,7 @@ class Bool(Type):
 class Array(Type):
     """Corresponds to the Solidity array (``[<size>]``) type."""
 
-    def __init__(self, element_type: Type, size: Optional[int] = None):
+    def __init__(self, element_type: Type, size: None | int = None):
         self._element_type = element_type
         self._size = size
 
@@ -370,10 +346,10 @@ class Array(Type):
             raise ValueError(f"Expected {self._size} elements, got {len(val)}")
         return val
 
-    def _normalize(self, val: Any) -> List[ABIType]:
+    def _normalize(self, val: Any) -> list[ABIType]:
         return [self._element_type._normalize(item) for item in self._check_val(val)]
 
-    def _denormalize(self, val: ABIType) -> List[ABIType]:
+    def _denormalize(self, val: ABIType) -> list[ABIType]:
         return [self._element_type._denormalize(item) for item in self._check_val(val)]
 
     def _encode_to_topic_outer(self, val: Any) -> bytes:
@@ -410,7 +386,7 @@ class Struct(Type):
             raise ValueError(f"Expected {len(self._fields)} elements, got {len(val)}")
         return val
 
-    def _normalize(self, val: Any) -> List[ABIType]:
+    def _normalize(self, val: Any) -> list[ABIType]:
         if isinstance(val, Mapping):
             if val.keys() != self._fields.keys():
                 raise ValueError(
@@ -418,13 +394,14 @@ class Struct(Type):
                 )
             return [tp._normalize(val[name]) for name, tp in self._fields.items()]
         return [
-            tp._normalize(item) for item, tp in zip(self._check_val(val), self._fields.values())
+            tp._normalize(item)
+            for item, tp in zip(self._check_val(val), self._fields.values(), strict=True)
         ]
 
-    def _denormalize(self, val: ABIType) -> Dict[str, ABIType]:
+    def _denormalize(self, val: ABIType) -> dict[str, ABIType]:
         return {
             name: tp._denormalize(item)
-            for item, (name, tp) in zip(self._check_val(val), self._fields.items())
+            for item, (name, tp) in zip(self._check_val(val), self._fields.items(), strict=True)
         }
 
     def _encode_to_topic_outer(self, val: Any) -> bytes:
@@ -432,7 +409,8 @@ class Struct(Type):
 
     def _encode_to_topic_inner(self, val: Any) -> bytes:
         return b"".join(
-            tp._encode_to_topic_inner(elem) for elem, tp in zip(val, self._fields.values())
+            tp._encode_to_topic_inner(elem)
+            for elem, tp in zip(val, self._fields.values(), strict=True)
         )
 
     def decode_from_topic(self, _val: Any) -> None:
@@ -502,7 +480,7 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
     return type_from_abi_string(element_type_name)
 
 
-def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Union[List[Type], Dict[str, Type]]:
+def dispatch_types(abi_entry: Iterable[dict[str, Any]]) -> list[Type] | dict[str, Type]:
     names = [entry["name"] for entry in abi_entry]
 
     # Unnamed arguments; treat as positional arguments
@@ -518,21 +496,21 @@ def dispatch_types(abi_entry: Iterable[Dict[str, Any]]) -> Union[List[Type], Dic
     return {entry["name"]: dispatch_type(entry) for entry in abi_entry}
 
 
-def encode_args(*types_and_args: Tuple[Type, Any]) -> bytes:
+def encode_args(*types_and_args: tuple[Type, Any]) -> bytes:
     if types_and_args:
-        types, args = zip(*types_and_args)
+        types, args = zip(*types_and_args, strict=True)
     else:
         types, args = (), ()
-    return encode_typed(
+    return eth_abi.encode(
         [tp.canonical_form for tp in types],
-        tuple(tp._normalize(arg) for tp, arg in zip(types, args)),
+        tuple(tp._normalize(arg) for tp, arg in zip(types, args, strict=True)),
     )
 
 
-def decode_args(types: Iterable[Type], data: bytes) -> Tuple[ABIType, ...]:
+def decode_args(types: Iterable[Type], data: bytes) -> tuple[ABIType, ...]:
     canonical_types = [tp.canonical_form for tp in types]
     try:
-        values = decode_typed(canonical_types, data)
+        values = eth_abi.decode(canonical_types, data)
     except DecodingError as exc:
         # wrap possible `eth_abi` errors
         signature = "(" + ",".join(canonical_types) + ")"
@@ -541,4 +519,4 @@ def decode_args(types: Iterable[Type], data: bytes) -> Tuple[ABIType, ...]:
         )
         raise ABIDecodingError(message) from exc
 
-    return tuple(tp._denormalize(value) for tp, value in zip(types, values))
+    return tuple(tp._denormalize(value) for tp, value in zip(types, values, strict=True))

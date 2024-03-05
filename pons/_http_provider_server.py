@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Dict, List, Tuple, cast
+from typing import cast
 
 import trio
 from hypercorn.config import Config
@@ -14,8 +14,8 @@ from trio_typing import TaskStatus
 from ._provider import JSON, HTTPProvider, Provider, RPCError
 
 
-def parse_request(request: JSON) -> Tuple[JSON, str, List[JSON]]:
-    request = cast(Dict[str, JSON], request)
+def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
+    request = cast(dict[str, JSON], request)
     request_id = request["id"]
     method = request["method"]
     if not isinstance(method, str):
@@ -26,7 +26,7 @@ def parse_request(request: JSON) -> Tuple[JSON, str, List[JSON]]:
     return (request_id, method, params)
 
 
-async def process_request_inner(provider: Provider, request: JSON) -> Tuple[JSON, JSON]:
+async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON, JSON]:
     try:
         request_id, method, params = parse_request(request)
     except (KeyError, TypeError) as exc:
@@ -38,7 +38,7 @@ async def process_request_inner(provider: Provider, request: JSON) -> Tuple[JSON
     return request_id, result
 
 
-async def process_request(provider: Provider, request: JSON) -> Tuple[HTTPStatus, JSON]:
+async def process_request(provider: Provider, request: JSON) -> tuple[HTTPStatus, JSON]:
     """
     Partially parses the incoming JSON RPC request, passes it to the VM wrapper,
     and wraps the results in a JSON RPC formatted response.

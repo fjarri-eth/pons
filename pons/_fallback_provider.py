@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Iterable
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import AsyncIterator, Iterable, List, Optional, Tuple
 
 from ._provider import JSON, InvalidResponse, Provider, ProviderSession, RPCError
 
@@ -9,7 +9,7 @@ class FallbackStrategy(ABC):
     """An abstract class defining a fallback strategy for multiple providers."""
 
     @abstractmethod
-    def get_provider_order(self) -> List[int]:
+    def get_provider_order(self) -> list[int]:
         """
         Returns the suggested order of providers to query, based on the accumulated data.
         This method is called once on every high-level request to the provider.
@@ -29,12 +29,12 @@ class FallbackStrategyFactory(ABC):
 
 
 class CycleFallbackStrategy(FallbackStrategy):
-    def __init__(self, weights: List[int]):
+    def __init__(self, weights: list[int]):
         self._providers = list(range(len(weights)))
         self._weights = weights
         self._counter = 0
 
-    def get_provider_order(self) -> List[int]:
+    def get_provider_order(self) -> list[int]:
         if self._counter == self._weights[0]:
             self._counter = 0
             self._providers = self._providers[1:] + [self._providers[0]]
@@ -53,8 +53,8 @@ class CycleFallback(FallbackStrategyFactory):
     If ``weights`` is not given, a list of ``1`` will be used.
     """
 
-    def __init__(self, weights: Optional[Iterable[int]] = None):
-        self._weights: Optional[List[int]]
+    def __init__(self, weights: None | Iterable[int] = None):
+        self._weights: None | list[int]
         if weights:
             self._weights = list(weights)
         else:
@@ -81,7 +81,7 @@ class PriorityFallbackStrategy(FallbackStrategy):
     def __init__(self, num_providers: int):
         self._providers = list(range(num_providers))
 
-    def get_provider_order(self) -> List[int]:
+    def get_provider_order(self) -> list[int]:
         return self._providers
 
 
@@ -127,14 +127,14 @@ class FallbackProvider(Provider):
 
 class FallbackProviderSession(ProviderSession):
     def __init__(
-        self, sessions: List[ProviderSession], strategy: FallbackStrategy, *, same_provider: bool
+        self, sessions: list[ProviderSession], strategy: FallbackStrategy, *, same_provider: bool
     ):
         self._sessions = sessions
         self._strategy = strategy
         self._same_provider = same_provider
 
-    async def rpc_and_pin(self, method: str, *args: JSON) -> Tuple[JSON, Tuple[int, ...]]:
-        exceptions: List[Exception] = []
+    async def rpc_and_pin(self, method: str, *args: JSON) -> tuple[JSON, tuple[int, ...]]:
+        exceptions: list[Exception] = []
         provider_idxs = self._strategy.get_provider_order()
         for provider_idx in provider_idxs:
             try:
@@ -171,7 +171,7 @@ class FallbackProviderSession(ProviderSession):
         result, _provider = await self.rpc_and_pin(method, *args)
         return result
 
-    async def rpc_at_pin(self, path: Tuple[int, ...], method: str, *args: JSON) -> JSON:
+    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: JSON) -> JSON:
         if self._same_provider:
             return await self.rpc(method, *args)
         if not path or path[0] < 0 or path[0] >= len(self._sessions):

@@ -14,6 +14,7 @@ Changed
 - ``AccountSigner`` takes ``LocalSigner`` specifically and not just any ``BaseSigner``. (PR_62_)
 - ``ClientSession.estimate_transact()`` and ``estimate_deploy()`` now require a ``sender_address`` parameter. (PR_62_)
 - Switched to ``alysis`` from ``eth-tester`` for the backend of ``LocalProvider``. (PR_70_)
+- Bumped the minimum Python version to 3.10. (PR_72_)
 
 
 Added
@@ -63,6 +64,7 @@ Fixed
 .. _PR_67: https://github.com/fjarri/pons/pull/67
 .. _PR_68: https://github.com/fjarri/pons/pull/68
 .. _PR_70: https://github.com/fjarri/pons/pull/70
+.. _PR_72: https://github.com/fjarri/pons/pull/72
 
 
 0.7.0 (09-07-2023)

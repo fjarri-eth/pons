@@ -1,18 +1,8 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Sequence
 from enum import Enum
 from functools import cached_property
-from typing import (
-    Any,
-    Iterable,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, NamedTuple, TypeVar, cast
 
 from eth_utils import to_canonical_address, to_checksum_address
 
@@ -49,7 +39,7 @@ class TypedData(ABC):
         return rpc_encode_data(self._value)
 
     @classmethod
-    def rpc_decode(cls: Type[TypedDataLike], val: Any) -> TypedDataLike:
+    def rpc_decode(cls: type[TypedDataLike], val: Any) -> TypedDataLike:
         try:
             return cls(rpc_decode_data(val))
         except ValueError as exc:
@@ -87,7 +77,7 @@ class TypedQuantity:
         return rpc_encode_quantity(self._value)
 
     @classmethod
-    def rpc_decode(cls: Type[TypedQuantityLike], val: Any) -> TypedQuantityLike:
+    def rpc_decode(cls: type[TypedQuantityLike], val: Any) -> TypedQuantityLike:
         # `rpc_decode_quantity` will raise RPCDecodingError on any error,
         # and if it succeeds, constructor won't raise anything -
         # the value is already guaranteed to be `int` and non-negative
@@ -125,17 +115,17 @@ class Amount(TypedQuantity):
     """
 
     @classmethod
-    def wei(cls: Type[CustomAmount], value: int) -> CustomAmount:
+    def wei(cls: type[CustomAmount], value: int) -> CustomAmount:
         """Creates a sum from the amount in wei (``10^(-18)`` of the main unit)."""
         return cls(value)
 
     @classmethod
-    def gwei(cls: Type[CustomAmount], value: float) -> CustomAmount:
+    def gwei(cls: type[CustomAmount], value: float) -> CustomAmount:
         """Creates a sum from the amount in gwei (``10^(-9)`` of the main unit)."""
         return cls(int(10**9 * value))
 
     @classmethod
-    def ether(cls: Type[CustomAmount], value: float) -> CustomAmount:
+    def ether(cls: type[CustomAmount], value: float) -> CustomAmount:
         """Creates a sum from the amount in the main currency unit."""
         return cls(int(10**18 * value))
 
@@ -194,7 +184,7 @@ class Address(TypedData):
         return 20
 
     @classmethod
-    def from_hex(cls: Type[CustomAddress], address_str: str) -> CustomAddress:
+    def from_hex(cls: type[CustomAddress], address_str: str) -> CustomAddress:
         """
         Creates the address from a hex representation
         (with or without the ``0x`` prefix, checksummed or not).
@@ -251,17 +241,17 @@ class LogFilterId(TypedQuantity):
 
 class BlockFilter(NamedTuple):
     id_: BlockFilterId
-    provider_path: Tuple[int, ...]
+    provider_path: tuple[int, ...]
 
 
 class PendingTransactionFilter(NamedTuple):
     id_: PendingTransactionFilterId
-    provider_path: Tuple[int, ...]
+    provider_path: tuple[int, ...]
 
 
 class LogFilter(NamedTuple):
     id_: LogFilterId
-    provider_path: Tuple[int, ...]
+    provider_path: tuple[int, ...]
 
 
 class LogTopic(TypedData):
@@ -295,19 +285,19 @@ class TxInfo(NamedTuple):
     hash_: TxHash
     """Transaction hash."""
 
-    block_hash: Optional[BlockHash]
+    block_hash: None | BlockHash
     """The hash of the block this transaction belongs to. ``None`` for pending transactions."""
 
     block_number: int
     """The number of the block this transaction belongs to. May be a pending block."""
 
-    transaction_index: Optional[int]
+    transaction_index: None | int
     """Transaction index. ``None`` for pending transactions."""
 
     from_: Address
     """Transaction sender."""
 
-    to: Optional[Address]
+    to: None | Address
     """
     Transaction recipient.
     ``None`` when it's a contract creation transaction.
@@ -328,10 +318,10 @@ class TxInfo(NamedTuple):
     # TODO: we may want to have a separate derived class for EIP1559 transactions,
     # but for now this will do.
 
-    max_fee_per_gas: Optional[Amount]
+    max_fee_per_gas: None | Amount
     """``maxFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
 
-    max_priority_fee_per_gas: Optional[Amount]
+    max_priority_fee_per_gas: None | Amount
     """``maxPriorityFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
 
     @classmethod
@@ -367,22 +357,22 @@ class BlockInfo(NamedTuple):
     number: int
     """Block number."""
 
-    hash_: Optional[BlockHash]
+    hash_: None | BlockHash
     """Block hash. ``None`` for pending blocks."""
 
     parent_hash: BlockHash
     """Parent block's hash."""
 
-    nonce: Optional[int]
+    nonce: None | int
     """Block's nonce. ``None`` for pending blocks."""
 
-    miner: Optional[Address]
+    miner: None | Address
     """Block's miner. ``None`` for pending blocks."""
 
     difficulty: int
     """Block's difficulty."""
 
-    total_difficulty: Optional[int]
+    total_difficulty: None | int
     """Block's totat difficulty. ``None`` for pending blocks."""
 
     size: int
@@ -400,10 +390,10 @@ class BlockInfo(NamedTuple):
     timestamp: int
     """Block's timestamp."""
 
-    transaction_hashes: Tuple[TxHash, ...]
+    transaction_hashes: tuple[TxHash, ...]
     """A list of transaction hashes in this block."""
 
-    transactions: Optional[Tuple[TxInfo, ...]]
+    transactions: None | tuple[TxInfo, ...]
     """
     A list of details of transactions in this block.
     Only present if it was requested.
@@ -411,8 +401,8 @@ class BlockInfo(NamedTuple):
 
     @classmethod
     def rpc_decode(cls, val: ResponseDict) -> "BlockInfo":
-        transactions: Optional[Tuple[TxInfo, ...]]
-        transaction_hashes: Tuple[TxHash, ...]
+        transactions: None | tuple[TxInfo, ...]
+        transaction_hashes: tuple[TxHash, ...]
         transactions_raw = val["transactions"]
         if not isinstance(transactions_raw, Sequence):
             raise RPCDecodingError(
@@ -467,7 +457,7 @@ class LogEntry(NamedTuple):
     data: bytes
     """ABI-packed non-indexed arguments of the event."""
 
-    topics: Tuple[LogTopic, ...]
+    topics: tuple[LogTopic, ...]
     """
     Values of indexed event fields.
     For a named event, the first topic is the event's selector.
@@ -520,7 +510,7 @@ class TxReceipt(NamedTuple):
     block_number: int
     """Block number including this transaction."""
 
-    contract_address: Optional[Address]
+    contract_address: None | Address
     """
     If it was a successful deployment transaction,
     contains the address of the deployed contract.
@@ -538,7 +528,7 @@ class TxReceipt(NamedTuple):
     gas_used: int
     """The amount of gas used by the transaction."""
 
-    to: Optional[Address]
+    to: None | Address
     """
     Address of the receiver.
     ``None`` when the transaction is a contract creation transaction.
@@ -557,7 +547,7 @@ class TxReceipt(NamedTuple):
     succeeded: bool
     """Whether the transaction was successful."""
 
-    logs: Tuple[LogEntry, ...]
+    logs: tuple[LogEntry, ...]
     """An array of log objects generated by this transaction."""
 
     @classmethod
@@ -592,7 +582,7 @@ def rpc_encode_data(val: bytes) -> str:
     return "0x" + val.hex()
 
 
-def rpc_encode_block(val: Union[int, Block]) -> str:
+def rpc_encode_block(val: int | Block) -> str:
     if isinstance(val, Block):
         return val.value
     return rpc_encode_quantity(val)
@@ -620,7 +610,7 @@ def rpc_decode_data(val: Any) -> bytes:
         raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
 
 
-def rpc_decode_block(val: Any) -> Union[int, str]:
+def rpc_decode_block(val: Any) -> int | str:
     try:
         Block(val)  # check if it's one of the enum's values
         # `Block` only has string values

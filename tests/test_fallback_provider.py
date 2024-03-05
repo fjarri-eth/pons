@@ -1,7 +1,7 @@
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import AsyncIterator
 
 import pytest
 

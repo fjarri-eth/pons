@@ -1,34 +1,15 @@
 import inspect
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from enum import Enum
 from functools import cached_property
 from inspect import BoundArguments
 from itertools import chain
 from keyword import iskeyword
-from typing import (
-    AbstractSet,
-    Any,
-    Dict,
-    Generic,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Generic, TypeVar
 
 from . import abi
-from ._abi_types import (
-    Type,
-    decode_args,
-    dispatch_type,
-    dispatch_types,
-    encode_args,
-    keccak,
-)
+from ._abi_types import Type, decode_args, dispatch_type, dispatch_types, encode_args, keccak
 from ._entities import LogEntry, LogTopic
 from ._provider import JSON
 
@@ -55,7 +36,7 @@ def make_name_safe(name: str) -> str:
 class Signature:
     """Generalized signature of either inputs or outputs of a method."""
 
-    def __init__(self, parameters: Union[Mapping[str, Type], Sequence[Type]]):
+    def __init__(self, parameters: Mapping[str, Type] | Sequence[Type]):
         if isinstance(parameters, Mapping):
             self._signature = inspect.Signature(
                 parameters=[
@@ -88,7 +69,7 @@ class Signature:
         return self._signature.bind(*args, **kwargs)
 
     def encode_bound(self, bound_args: BoundArguments) -> bytes:
-        return encode_args(*zip(self._types, bound_args.args))
+        return encode_args(*zip(self._types, bound_args.args, strict=True))
 
     def encode(self, *args: Any, **kwargs: Any) -> bytes:
         """
@@ -98,20 +79,20 @@ class Signature:
         bound_args = self.bind(*args, **kwargs)
         return self.encode_bound(bound_args)
 
-    def decode_into_tuple(self, value_bytes: bytes) -> Tuple[Any, ...]:
+    def decode_into_tuple(self, value_bytes: bytes) -> tuple[Any, ...]:
         """Decodes the packed bytestring into a list of values."""
         return decode_args(self._types, value_bytes)
 
-    def decode_into_dict(self, value_bytes: bytes) -> Dict[str, Any]:
+    def decode_into_dict(self, value_bytes: bytes) -> dict[str, Any]:
         """Decodes the packed bytestring into a dict of values."""
         decoded = self.decode_into_tuple(value_bytes)
-        return dict(zip(self._signature.parameters, decoded))
+        return dict(zip(self._signature.parameters, decoded, strict=True))
 
     def __str__(self) -> str:
         if self._named_parameters:
             params = ", ".join(
                 f"{tp.canonical_form} {name}"
-                for name, tp in zip(self._signature.parameters, self._types)
+                for name, tp in zip(self._signature.parameters, self._types, strict=True)
             )
         else:
             params = ", ".join(f"{tp.canonical_form}" for tp in self._types)
@@ -144,16 +125,14 @@ class EventSignature:
         }
         self._indexed = indexed
 
-    def encode_to_topics(
-        self, *args: Any, **kwargs: Any
-    ) -> Tuple[Optional[Tuple[bytes, ...]], ...]:
+    def encode_to_topics(self, *args: Any, **kwargs: Any) -> tuple[None | tuple[bytes, ...], ...]:
         """
         Binds given arguments to event's indexed parameters
         and encodes them as log topics.
         """
         bound_args = self._signature.bind_partial(*args, **kwargs)
 
-        encoded_topics: List[Optional[Tuple[bytes, ...]]] = []
+        encoded_topics: list[None | tuple[bytes, ...]] = []
         for param_name in self._signature.parameters:
             if param_name not in bound_args.arguments:
                 encoded_topics.append(None)
@@ -176,7 +155,7 @@ class EventSignature:
 
         return tuple(encoded_topics)
 
-    def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> Dict[str, Any]:
+    def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> dict[str, Any]:
         """Decodes the event fields from the given log entry data."""
         if len(topics) != len(self._indexed):
             raise ValueError(
@@ -186,11 +165,11 @@ class EventSignature:
 
         decoded_topics = {
             name: self._types[name].decode_from_topic(topic)
-            for name, topic in zip(self._signature.parameters, topics)
+            for name, topic in zip(self._signature.parameters, topics, strict=True)
         }
 
         decoded_data_tuple = decode_args(self._types_nonindexed.values(), data)
-        decoded_data = dict(zip(self._types_nonindexed, decoded_data_tuple))
+        decoded_data = dict(zip(self._types_nonindexed, decoded_data_tuple, strict=True))
 
         result = {}
         for name in self._types:
@@ -236,7 +215,7 @@ class Constructor:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> "Constructor":
+    def from_json(cls, method_entry: dict[str, Any]) -> "Constructor":
         """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "constructor":
             raise ValueError(
@@ -254,7 +233,7 @@ class Constructor:
         payable = method_entry["stateMutability"] == "payable"
         return cls(inputs, payable=payable)
 
-    def __init__(self, inputs: Union[Mapping[str, Type], Sequence[Type]], *, payable: bool = False):
+    def __init__(self, inputs: Mapping[str, Type] | Sequence[Type], *, payable: bool = False):
         self.inputs = Signature(inputs)
         self.payable = payable
 
@@ -323,7 +302,7 @@ class Method:
     """Whether this method may mutate the contract state."""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> "Method":
+    def from_json(cls, method_entry: dict[str, Any]) -> "Method":
         """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "function":
             raise ValueError("Method object must be created from a JSON entry with type='function'")
@@ -334,7 +313,7 @@ class Method:
         mutability = Mutability.from_json(method_entry["stateMutability"])
 
         # Outputs can be anonymous
-        outputs: Union[Dict[str, Type], List[Type]]
+        outputs: dict[str, Type] | list[Type]
         if "outputs" not in method_entry:
             outputs = []
         elif all(entry["name"] == "" for entry in method_entry["outputs"]):
@@ -348,8 +327,8 @@ class Method:
         self,
         name: str,
         mutability: Mutability,
-        inputs: Union[Mapping[str, Type], Sequence[Type]],
-        outputs: Union[Mapping[str, Type], Sequence[Type], Type, None] = None,
+        inputs: Mapping[str, Type] | Sequence[Type],
+        outputs: None | Mapping[str, Type] | Sequence[Type] | Type = None,
     ):
         self._name = name
         self._inputs = Signature(inputs)
@@ -440,7 +419,7 @@ class MultiMethod:
         return self._name
 
     @property
-    def methods(self) -> Dict[str, Method]:
+    def methods(self) -> dict[str, Method]:
         """All the overloaded methods, indexed by the canonical form of their input signatures."""
         return self._methods
 
@@ -491,7 +470,7 @@ class Event:
     """
 
     @classmethod
-    def from_json(cls, event_entry: Dict[str, Any]) -> "Event":
+    def from_json(cls, event_entry: dict[str, Any]) -> "Event":
         """Creates this object from a JSON ABI method entry."""
         if event_entry["type"] != "event":
             raise ValueError("Event object must be created from a JSON entry with type='event'")
@@ -542,7 +521,7 @@ class Event:
         """
         encoded_topics = self.fields.encode_to_topics(*args, **kwargs)
 
-        log_topics: List[Optional[Tuple[LogTopic, ...]]] = []
+        log_topics: list[None | tuple[LogTopic, ...]] = []
         if not self.anonymous:
             log_topics.append((self._topic,))
         for topic in encoded_topics:
@@ -553,7 +532,7 @@ class Event:
 
         return EventFilter(tuple(log_topics))
 
-    def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+    def decode_log_entry(self, log_entry: LogEntry) -> dict[str, Any]:
         """
         Decodes the event fields from the given log entry.
         Fields that cannot be decoded (indexed reference types,
@@ -574,9 +553,9 @@ class Event:
 class EventFilter:
     """A filter for events coming from any contract address."""
 
-    topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]
+    topics: tuple[None | tuple[LogTopic, ...], ...]
 
-    def __init__(self, topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]):
+    def __init__(self, topics: tuple[None | tuple[LogTopic, ...], ...]):
         self.topics = topics
 
 
@@ -584,7 +563,7 @@ class Error:
     """A custom contract error."""
 
     @classmethod
-    def from_json(cls, error_entry: Dict[str, Any]) -> "Error":
+    def from_json(cls, error_entry: dict[str, Any]) -> "Error":
         """Creates this object from a JSON ABI method entry."""
         if error_entry["type"] != "error":
             raise ValueError("Error object must be created from a JSON entry with type='error'")
@@ -609,7 +588,7 @@ class Error:
         """Error's selector."""
         return keccak(self.name.encode() + self.fields.canonical_form.encode())[:SELECTOR_LENGTH]
 
-    def decode_fields(self, data_bytes: bytes) -> Dict[str, Any]:
+    def decode_fields(self, data_bytes: bytes) -> dict[str, Any]:
         """Decodes the error fields from the given packed data."""
         return self.fields.decode_into_dict(data_bytes)
 
@@ -624,7 +603,7 @@ class Fallback:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> "Fallback":
+    def from_json(cls, method_entry: dict[str, Any]) -> "Fallback":
         """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "fallback":
             raise ValueError(
@@ -651,7 +630,7 @@ class Receive:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: Dict[str, Any]) -> "Receive":
+    def from_json(cls, method_entry: dict[str, Any]) -> "Receive":
         """Creates this object from a JSON ABI method entry."""
         if method_entry["type"] != "receive":
             raise ValueError(
@@ -745,13 +724,13 @@ class ContractABI:
     constructor: Constructor
     """Contract's constructor."""
 
-    fallback: Optional[Fallback]
+    fallback: None | Fallback
     """Contract's fallback method."""
 
-    receive: Optional[Receive]
+    receive: None | Receive
     """Contract's receive method."""
 
-    method: Methods[Union[Method, MultiMethod]]
+    method: Methods[Method | MultiMethod]
     """Contract's regular methods."""
 
     event: Methods[Event]
@@ -761,12 +740,12 @@ class ContractABI:
     """Contract's errors."""
 
     @classmethod
-    def from_json(cls, json_abi: List[Dict[str, JSON]]) -> "ContractABI":  # noqa: C901, PLR0912
+    def from_json(cls, json_abi: list[dict[str, JSON]]) -> "ContractABI":  # noqa: C901, PLR0912
         """Creates this object from a JSON ABI (e.g. generated by a Solidity compiler)."""
         constructor = None
         fallback = None
         receive = None
-        methods: Dict[Any, Union[Method, MultiMethod]] = {}
+        methods: dict[Any, Method | MultiMethod] = {}
         events = {}
         errors = {}
 
@@ -821,12 +800,12 @@ class ContractABI:
 
     def __init__(
         self,
-        constructor: Optional[Constructor] = None,
-        fallback: Optional[Fallback] = None,
-        receive: Optional[Receive] = None,
-        methods: Optional[Iterable[Union[Method, MultiMethod]]] = None,
-        events: Optional[Iterable[Event]] = None,
-        errors: Optional[Iterable[Error]] = None,
+        constructor: None | Constructor = None,
+        fallback: None | Fallback = None,
+        receive: None | Receive = None,
+        methods: None | Iterable[Method | MultiMethod] = None,
+        events: None | Iterable[Event] = None,
+        errors: None | Iterable[Error] = None,
     ):
         if constructor is None:
             constructor = Constructor(inputs=[])
@@ -842,7 +821,7 @@ class ContractABI:
             error.selector: error for error in chain([PANIC_ERROR, LEGACY_ERROR], self.error)
         }
 
-    def resolve_error(self, error_data: bytes) -> Tuple[Error, Dict[str, Any]]:
+    def resolve_error(self, error_data: bytes) -> tuple[Error, dict[str, Any]]:
         """
         Given the packed error data, attempts to find the error in the ABI
         and decode the data into its fields.
@@ -861,7 +840,7 @@ class ContractABI:
 
     def __str__(self) -> str:
         all_methods: Iterable[
-            Union[Constructor, Fallback, Receive, Method, MultiMethod, Event, Error]
+            Constructor | Fallback | Receive | Method | MultiMethod | Event | Error
         ] = chain(
             [self.constructor] if self.constructor else [],
             [self.fallback] if self.fallback else [],
