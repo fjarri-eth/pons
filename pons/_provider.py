@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from enum import Enum
 from http import HTTPStatus
 from json import JSONDecodeError
-from typing import AsyncIterator, Dict, Iterable, Mapping, Optional, Tuple, Union, cast
+from typing import cast
 
 import httpx
 
 # TODO: the doc entry had to be written manually for this type because of Sphinx limitations.
-JSON = Union[bool, int, float, str, None, Iterable["JSON"], Mapping[str, "JSON"]]
+JSON = None | bool | int | float | str | Iterable["JSON"] | Mapping[str, "JSON"]
 
 
 class RPCErrorCode(Enum):
@@ -114,7 +115,7 @@ class RPCError(Exception):
             f"The method {method} does not exist/is not available",
         )
 
-    def __init__(self, code: int, message: str, data: Optional[str] = None):
+    def __init__(self, code: int, message: str, data: None | str = None):
         # Taking an integer and not `RPCErrorCode` here
         # since the codes may differ between providers.
         super().__init__(code, message, data)
@@ -153,7 +154,7 @@ class ResponseDict:
     def __init__(self, obj: JSON):
         if not isinstance(obj, dict):
             raise InvalidResponse(f"Expected a dictionary as a response, got {type(obj).__name__}")
-        self._obj = cast(Dict[str, JSON], obj)
+        self._obj = cast(dict[str, JSON], obj)
 
     def __contains__(self, field: str) -> bool:
         return field in self._obj
@@ -185,14 +186,14 @@ class ProviderSession(ABC):
         """Calls the given RPC method with the already json-ified arguments."""
         ...
 
-    async def rpc_and_pin(self, method: str, *args: JSON) -> Tuple[JSON, Tuple[int, ...]]:
+    async def rpc_and_pin(self, method: str, *args: JSON) -> tuple[JSON, tuple[int, ...]]:
         """
         Calls the given RPC method and returns the path to the provider it succeded on.
         This method will be typically overriden by multi-provider implementations.
         """
         return await self.rpc(method, *args), ()
 
-    async def rpc_at_pin(self, path: Tuple[int, ...], method: str, *args: JSON) -> JSON:
+    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: JSON) -> JSON:
         """
         Calls the given RPC method at the provider by the given path
         (obtained previously from ``rpc_and_pin()``).
@@ -202,7 +203,7 @@ class ProviderSession(ABC):
             raise ValueError(f"Unexpected provider path: {path}")
         return await self.rpc(method, *args)
 
-    async def rpc_dict(self, method: str, *args: JSON) -> Optional[ResponseDict]:
+    async def rpc_dict(self, method: str, *args: JSON) -> None | ResponseDict:
         """Calls the given RPC method expecting to get a dictionary (or ``null``) in response."""
         result = await self.rpc(method, *args)
         if result is None:

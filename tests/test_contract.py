@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import pytest
 
@@ -113,7 +113,7 @@ def test_api_binding(compiled_contracts):
     class FakeLogEntry(NamedTuple):
         data: bytes
         address: Address
-        topics: Tuple[LogTopic, ...]
+        topics: tuple[LogTopic, ...]
 
     decoded = event_filter.decode_log_entry(
         FakeLogEntry(

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from ._contract_abi import (
     ContractABI,
@@ -55,7 +55,7 @@ class BoundMethod:
         self,
         contract_abi: ContractABI,
         contract_address: Address,
-        method: Union[Method, MultiMethod],
+        method: Method | MultiMethod,
     ):
         self._contract_abi = contract_abi
         self._contract_address = contract_address
@@ -124,7 +124,7 @@ class BoundEventFilter:
     contract_address: Address
     """The contract address."""
 
-    topics: Tuple[Optional[Tuple[LogTopic, ...]], ...]
+    topics: tuple[None | tuple[LogTopic, ...], ...]
     """Encoded topics for filtering."""
 
     def __init__(self, contract_address: Address, event: Event, event_filter: EventFilter):
@@ -132,7 +132,7 @@ class BoundEventFilter:
         self.topics = event_filter.topics
         self._event = event
 
-    def decode_log_entry(self, log_entry: LogEntry) -> Dict[str, Any]:
+    def decode_log_entry(self, log_entry: LogEntry) -> dict[str, Any]:
         if log_entry.address != self.contract_address:
             raise ValueError("Log entry originates from a different contract")
         return self._event.decode_log_entry(log_entry)
@@ -149,7 +149,7 @@ class CompiledContract:
 
     @classmethod
     def from_compiler_output(
-        cls, json_abi: List[Dict[str, JSON]], bytecode: bytes
+        cls, json_abi: list[dict[str, JSON]], bytecode: bytes
     ) -> "CompiledContract":
         """Creates a compiled contract object from the output of a Solidity compiler."""
         abi = ContractABI.from_json(json_abi)

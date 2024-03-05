@@ -9,13 +9,12 @@ dependencies = [
     "httpx>=0.22",
     "eth-account>=0.6",
     "eth-utils>=2",
-    "eth-abi>=4",
+    "eth-abi>=5.0.1",
     "anyio>=3",
     "setuptools", # required by eth-utils, but it just assumes that it's already installed
-    "typing_extensions>=4.2",
     "trio-typing>=0.9.0",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"
 
@@ -27,7 +26,7 @@ compiler = [
     "py-solc-x>=2",
 ]
 local-provider = [
-    "alysis>=0.1.2",
+    "alysis>=0.2.0",
     "starlette",
     "hypercorn",
 ]
@@ -76,8 +75,18 @@ source-includes = [
 requires = ["pdm-pep517"]
 build-backend = "pdm.pep517.api"
 
+[tool.mypy]
+plugins = "trio_typing.plugin"
+strict = true
+warn_unreachable = true
+# otherwise mypy fails to pick up signatures from eth_* packages
+implicit_reexport = true
+
+[tool.pytest.ini_options]
+trio_mode = true
+
 [tool.ruff]
-target-version = "py38"
+target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
@@ -95,9 +104,6 @@ ignore = [
     "ANN204",
     # The type of `cls` in classmethods is derived automatically.
     "ANN102",
-    # `Tuple` is deprecated since Python 3.9, but we still support 3.8.
-    # When we only support 3.9+, use `tuple` instead and remove this ignore.
-    "FA100",
     # Doesn't mesh well with the way `black` puts the final parenthesis on a separate line
     # in functions with one parameter and a long argument.
     "COM812",

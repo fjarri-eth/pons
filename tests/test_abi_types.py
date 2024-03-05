@@ -338,7 +338,7 @@ def test_encode_to_topic():
 def test_encode_decode_args():
     args = ("some string", b"bytestring", 1234)
     types = [abi.string, abi.bytes(), abi.uint(256)]
-    encoded = encode_args(*zip(types, args))
+    encoded = encode_args(*zip(types, args, strict=True))
     assert decode_args(types, encoded) == args
 
     # empty types/args list

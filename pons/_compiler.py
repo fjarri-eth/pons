@@ -1,6 +1,6 @@
+from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Union
 
 import solcx
 
@@ -27,12 +27,12 @@ class EVMVersion(Enum):
 
 
 def compile_contract_file(
-    path: Union[str, Path],
+    path: str | Path,
     *,
-    import_remappings: Mapping[str, Union[str, Path]] = {},
+    import_remappings: Mapping[str, str | Path] = {},
     optimize: bool = False,
-    evm_version: Optional[EVMVersion] = None,
-) -> Dict[str, CompiledContract]:
+    evm_version: None | EVMVersion = None,
+) -> dict[str, CompiledContract]:
     """
     Compiles the Solidity file at the given ``path`` and returns a dictionary of compiled contracts
     keyed by the contract name.

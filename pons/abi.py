@@ -3,8 +3,6 @@
 
 """Aliases for various Solidity types."""
 
-from typing import Optional
-
 from ._abi_types import AddressType, Bool, Bytes, Int, String, Struct, Type, UInt
 
 _PyInt = int
@@ -20,7 +18,7 @@ def int(bits: _PyInt) -> Int:
     return Int(bits)
 
 
-def bytes(size: Optional[_PyInt] = None) -> Bytes:
+def bytes(size: None | _PyInt = None) -> Bytes:
     """Returns the ``bytes<size>`` type, or ``bytes`` if ``size`` is ``None``."""
     return Bytes(size)
 

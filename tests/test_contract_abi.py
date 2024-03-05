@@ -1,5 +1,5 @@
 import re
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import pytest
 
@@ -627,7 +627,7 @@ def test_event_encode():
 def test_event_decode():
     # We only need a couple of fields
     class FakeLogEntry(NamedTuple):
-        topics: Tuple[LogTopic, ...]
+        topics: tuple[LogTopic, ...]
         data: bytes
 
     event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()), {"a", "b"})

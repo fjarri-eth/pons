@@ -1,7 +1,8 @@
 """PyEVM-based provider for tests."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 from alysis import Node, RPCNode
 from alysis import RPCError as AlysisRPCError
@@ -54,7 +55,7 @@ class LocalProvider(Provider):
         try:
             return self._rpc_node.rpc(method, *args)
         except AlysisRPCError as exc:
-            raise RPCError(exc.code.value, exc.message, exc.data) from exc
+            raise RPCError(exc.code, exc.message, exc.data) from exc
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator["LocalProviderSession"]:

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from functools import cached_property
-from typing import Mapping
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
