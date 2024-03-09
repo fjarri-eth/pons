@@ -285,6 +285,9 @@ class TxInfo(NamedTuple):
     hash_: TxHash
     """Transaction hash."""
 
+    input_: None | bytes
+    """The data sent along with the transaction."""
+
     block_hash: None | BlockHash
     """The hash of the block this transaction belongs to. ``None`` for pending transactions."""
 
@@ -335,6 +338,7 @@ class TxInfo(NamedTuple):
         return cls(
             type_=rpc_decode_quantity(val["type"]),
             hash_=TxHash.rpc_decode(val["hash"]),
+            input_=rpc_decode_data(val["input"]) or None,
             block_hash=BlockHash.rpc_decode(val["blockHash"]) if val["blockHash"] else None,
             block_number=rpc_decode_quantity(val["blockNumber"]),
             transaction_index=(

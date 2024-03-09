@@ -1,7 +1,9 @@
 """PyEVM-based provider for tests."""
 
+import itertools
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from typing import Any
 
 from alysis import Node, RPCNode
@@ -31,6 +33,8 @@ class LocalProvider(Provider):
         self._rpc_node = RPCNode(self._local_node)
         self.root = AccountSigner(Account.from_key(self._local_node.root_private_key))
         self._default_address = self.root.address
+        self._snapshot_counter = itertools.count()
+        self._snapshots: dict[int, Node] = {}
 
     def disable_auto_mine_transactions(self) -> None:
         """Disable mining a new block after each transaction."""
@@ -45,11 +49,14 @@ class LocalProvider(Provider):
 
     def take_snapshot(self) -> SnapshotID:
         """Creates a snapshot of the chain state internally and returns its ID."""
-        return SnapshotID(self._local_node.take_snapshot())
+        snapshot_id = next(self._snapshot_counter)
+        self._snapshots[snapshot_id] = deepcopy(self._local_node)
+        return SnapshotID(snapshot_id)
 
     def revert_to_snapshot(self, snapshot_id: SnapshotID) -> None:
         """Restores the chain state to the snapshot with the given ID."""
-        self._local_node.revert_to_snapshot(snapshot_id.id_)
+        self._local_node = self._snapshots[snapshot_id.id_]
+        self._rpc_node = RPCNode(self._local_node)
 
     def rpc(self, method: str, *args: Any) -> JSON:
         try:
