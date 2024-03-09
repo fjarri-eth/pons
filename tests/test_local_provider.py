@@ -105,9 +105,9 @@ async def test_snapshots(provider, session, root_signer, another_signer):
     dest = another_signer.address
     latest = rpc_encode_block(Block.LATEST)
 
-    await session.broadcast_transfer(root_signer, dest, amount)
+    await session.transfer(root_signer, dest, amount)
     snapshot_id = provider.take_snapshot()
-    await session.broadcast_transfer(root_signer, dest, amount)
+    await session.transfer(root_signer, dest, amount)
     assert provider.rpc("eth_getBalance", dest.rpc_encode(), latest) == double_amount.rpc_encode()
 
     provider.revert_to_snapshot(snapshot_id)

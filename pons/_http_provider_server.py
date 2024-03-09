@@ -30,7 +30,7 @@ async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON
     try:
         request_id, method, params = parse_request(request)
     except (KeyError, TypeError) as exc:
-        raise RPCError.invalid_request() from exc  # noqa: RSE102
+        raise RPCError.invalid_request() from exc
 
     async with provider.session() as session:
         result = await session.rpc(method, *params)

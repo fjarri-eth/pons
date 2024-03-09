@@ -285,6 +285,7 @@ def test_decode_block_info():
                 "gas": "0xd0b3",
                 "gasPrice": "0xcf7b50fb6",
                 "hash": "0x4eeae930617ad553af25a809f11051451e7f4a2597af6e8eae6ed446b94d6532",
+                "input": "0x632a5607",
                 "maxFeePerGas": "0xcfad7001d",
                 "maxPriorityFeePerGas": "0x12a05f200",
                 "nonce": "0x1317",
