@@ -137,6 +137,8 @@ ignore = [
     "PLR0913",
     # Conflicts with the formatter, according to the warning.
     "ISC001",
+    # Too many false positives, since Ruff cannot tell that the object is immutable.
+    "RUF009",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

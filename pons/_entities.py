@@ -1,17 +1,10 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Any, NamedTuple, TypeVar, cast
+from typing import Any, NewType, TypeVar, cast
 
 from eth_utils import to_canonical_address, to_checksum_address
-
-from ._provider import ResponseDict
-
-
-class RPCDecodingError(Exception):
-    """Raised on an error when decoding a value in an RPC response."""
-
 
 TypedDataLike = TypeVar("TypedDataLike", bound="TypedData")
 
@@ -34,16 +27,6 @@ class TypedData(ABC):
     @abstractmethod
     def _length(self) -> int:
         """Returns the length of this type's values representation in bytes."""
-
-    def rpc_encode(self) -> str:
-        return rpc_encode_data(self._value)
-
-    @classmethod
-    def rpc_decode(cls: type[TypedDataLike], val: Any) -> TypedDataLike:
-        try:
-            return cls(rpc_decode_data(val))
-        except ValueError as exc:
-            raise RPCDecodingError(str(exc)) from exc
 
     def __bytes__(self) -> bytes:
         return self._value
@@ -73,18 +56,11 @@ class TypedQuantity:
             raise ValueError(f"{self.__class__.__name__} must be non-negative, got {value}")
         self._value = value
 
-    def rpc_encode(self) -> str:
-        return rpc_encode_quantity(self._value)
-
-    @classmethod
-    def rpc_decode(cls: type[TypedQuantityLike], val: Any) -> TypedQuantityLike:
-        # `rpc_decode_quantity` will raise RPCDecodingError on any error,
-        # and if it succeeds, constructor won't raise anything -
-        # the value is already guaranteed to be `int` and non-negative
-        return cls(rpc_decode_quantity(val))
-
     def __hash__(self) -> int:
         return hash(self._value)
+
+    def __int__(self) -> int:
+        return self._value
 
     def _check_type(self: TypedQuantityLike, other: Any) -> TypedQuantityLike:
         if type(self) != type(other):
@@ -196,11 +172,6 @@ class Address(TypedData):
         """Retunrs the checksummed hex representation of the address."""
         return to_checksum_address(self._value)
 
-    def rpc_encode(self) -> str:
-        # Overriding the base class method to encode into a checksummed address -
-        # some providers require it.
-        return self.checksum
-
     def __str__(self) -> str:
         return self.checksum
 
@@ -239,17 +210,20 @@ class LogFilterId(TypedQuantity):
     """A log filter identifier (returned by ``eth_newFilter``)."""
 
 
-class BlockFilter(NamedTuple):
+@dataclass
+class BlockFilter:
     id_: BlockFilterId
     provider_path: tuple[int, ...]
 
 
-class PendingTransactionFilter(NamedTuple):
+@dataclass
+class PendingTransactionFilter:
     id_: PendingTransactionFilterId
     provider_path: tuple[int, ...]
 
 
-class LogFilter(NamedTuple):
+@dataclass
+class LogFilter:
     id_: LogFilterId
     provider_path: tuple[int, ...]
 
@@ -275,7 +249,8 @@ class TxHash(TypedData):
         return 32
 
 
-class TxInfo(NamedTuple):
+@dataclass
+class TxInfo:
     """Transaction info."""
 
     # TODO: make an enum?
@@ -327,35 +302,9 @@ class TxInfo(NamedTuple):
     max_priority_fee_per_gas: None | Amount
     """``maxPriorityFeePerGas`` value specified by the sender. Only for EIP1559 transactions."""
 
-    @classmethod
-    def rpc_decode(cls, val: ResponseDict) -> "TxInfo":
-        max_fee_per_gas = Amount.rpc_decode(val["maxFeePerGas"]) if "maxFeePerGas" in val else None
-        max_priority_fee_per_gas = (
-            Amount.rpc_decode(val["maxPriorityFeePerGas"])
-            if "maxPriorityFeePerGas" in val
-            else None
-        )
-        return cls(
-            type_=rpc_decode_quantity(val["type"]),
-            hash_=TxHash.rpc_decode(val["hash"]),
-            input_=rpc_decode_data(val["input"]) or None,
-            block_hash=BlockHash.rpc_decode(val["blockHash"]) if val["blockHash"] else None,
-            block_number=rpc_decode_quantity(val["blockNumber"]),
-            transaction_index=(
-                rpc_decode_quantity(val["transactionIndex"]) if val["transactionIndex"] else None
-            ),
-            from_=Address.rpc_decode(val["from"]),
-            to=Address.rpc_decode(val["to"]) if val["to"] else None,
-            value=Amount.rpc_decode(val["value"]),
-            nonce=rpc_decode_quantity(val["nonce"]),
-            max_fee_per_gas=max_fee_per_gas,
-            max_priority_fee_per_gas=max_priority_fee_per_gas,
-            gas=rpc_decode_quantity(val["gas"]),
-            gas_price=Amount.rpc_decode(val["gasPrice"]),
-        )
 
-
-class BlockInfo(NamedTuple):
+@dataclass
+class BlockInfo:
     """Block info."""
 
     number: int
@@ -394,57 +343,15 @@ class BlockInfo(NamedTuple):
     timestamp: int
     """Block's timestamp."""
 
-    transaction_hashes: tuple[TxHash, ...]
-    """A list of transaction hashes in this block."""
-
-    transactions: None | tuple[TxInfo, ...]
+    transactions: tuple[TxInfo, ...] | tuple[TxHash, ...]
     """
-    A list of details of transactions in this block.
-    Only present if it was requested.
+    A list of transaction hashes in this block, or a list of details of transactions in this block,
+    depending on what was requested.
     """
 
-    @classmethod
-    def rpc_decode(cls, val: ResponseDict) -> "BlockInfo":
-        transactions: None | tuple[TxInfo, ...]
-        transaction_hashes: tuple[TxHash, ...]
-        transactions_raw = val["transactions"]
-        if not isinstance(transactions_raw, Sequence):
-            raise RPCDecodingError(
-                f"`transactions` in a block info must be an iterable, got {transactions_raw}"
-            )
-        if len(transactions_raw) == 0:
-            transactions = ()
-            transaction_hashes = ()
-        elif isinstance(transactions_raw[0], str):
-            transactions = None
-            transaction_hashes = tuple(TxHash.rpc_decode(tx_hash) for tx_hash in transactions_raw)
-        else:
-            transactions = tuple(
-                TxInfo.rpc_decode(ResponseDict(tx_info)) for tx_info in transactions_raw
-            )
-            transaction_hashes = tuple(tx.hash_ for tx in transactions)
 
-        return cls(
-            number=rpc_decode_quantity(val["number"]),
-            hash_=BlockHash.rpc_decode(val["hash"]) if val["hash"] else None,
-            parent_hash=BlockHash.rpc_decode(val["parentHash"]),
-            nonce=rpc_decode_quantity(val["nonce"]) if val["nonce"] is not None else None,
-            difficulty=rpc_decode_quantity(val["difficulty"]),
-            total_difficulty=rpc_decode_quantity(val["totalDifficulty"])
-            if val["totalDifficulty"] is not None
-            else None,
-            size=rpc_decode_quantity(val["size"]),
-            gas_limit=rpc_decode_quantity(val["gasLimit"]),
-            gas_used=rpc_decode_quantity(val["gasUsed"]),
-            base_fee_per_gas=Amount.rpc_decode(val["baseFeePerGas"]),
-            timestamp=rpc_decode_quantity(val["timestamp"]),
-            miner=Address.rpc_decode(val["miner"]) if val["miner"] else None,
-            transactions=transactions,
-            transaction_hashes=transaction_hashes,
-        )
-
-
-class LogEntry(NamedTuple):
+@dataclass
+class LogEntry:
     """Log entry metadata."""
 
     removed: bool
@@ -486,26 +393,9 @@ class LogEntry(NamedTuple):
     block_number: int
     """The block number where this log was."""
 
-    @classmethod
-    def rpc_decode(cls, val: ResponseDict) -> "LogEntry":
-        topics = val["topics"]
-        if not isinstance(topics, Iterable):
-            raise RPCDecodingError(f"`topics` in a log entry must be an iterable, got {topics}")
 
-        return cls(
-            removed=rpc_decode_bool(val["removed"]),
-            log_index=rpc_decode_quantity(val["logIndex"]),
-            transaction_index=rpc_decode_quantity(val["transactionIndex"]),
-            transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
-            block_hash=BlockHash.rpc_decode(val["blockHash"]),
-            block_number=rpc_decode_quantity(val["blockNumber"]),
-            address=Address.rpc_decode(val["address"]),
-            data=rpc_decode_data(val["data"]),
-            topics=tuple(LogTopic.rpc_decode(topic) for topic in topics),
-        )
-
-
-class TxReceipt(NamedTuple):
+@dataclass
+class TxReceipt:
     """Transaction receipt."""
 
     block_hash: BlockHash
@@ -548,84 +438,111 @@ class TxReceipt(NamedTuple):
     type_: int
     """Transaction type: 0 for legacy transactions, 2 for EIP1559 transactions."""
 
-    succeeded: bool
-    """Whether the transaction was successful."""
+    status: int
+    """1 if the transaction was successful, 0 otherwise."""
 
     logs: tuple[LogEntry, ...]
     """An array of log objects generated by this transaction."""
 
+    @property
+    def succeeded(self) -> bool:
+        """``True`` if the transaction succeeded."""
+        return self.status == 1
+
+
+class RPCErrorCode(Enum):
+    """Known RPC error codes returned by providers."""
+
+    # This is our placeholder value, shouldn't be encountered in a remote server response
+    UNKNOWN_REASON = 0
+    """An error code whose description is not present in this enum."""
+
+    SERVER_ERROR = -32000
+    """Reserved for implementation-defined server-errors. See the message for details."""
+
+    INVALID_REQUEST = -32600
+    """The JSON sent is not a valid Request object."""
+
+    METHOD_NOT_FOUND = -32601
+    """The method does not exist / is not available."""
+
+    INVALID_PARAMETER = -32602
+    """Invalid method parameter(s)."""
+
+    EXECUTION_ERROR = 3
+    """Contract transaction failed during execution. See the data for details."""
+
     @classmethod
-    def rpc_decode(cls, val: ResponseDict) -> "TxReceipt":
-        contract_address = val["contractAddress"]
-        logs = val["logs"]
-        if not isinstance(logs, Iterable):
-            raise RPCDecodingError(f"`logs` in a tx receipt must be an iterable, got {logs}")
-
-        return cls(
-            block_hash=BlockHash.rpc_decode(val["blockHash"]),
-            block_number=rpc_decode_quantity(val["blockNumber"]),
-            contract_address=Address.rpc_decode(contract_address) if contract_address else None,
-            cumulative_gas_used=rpc_decode_quantity(val["cumulativeGasUsed"]),
-            effective_gas_price=Amount.rpc_decode(val["effectiveGasPrice"]),
-            from_=Address.rpc_decode(val["from"]),
-            gas_used=rpc_decode_quantity(val["gasUsed"]),
-            to=Address.rpc_decode(val["to"]) if val["to"] else None,
-            transaction_hash=TxHash.rpc_decode(val["transactionHash"]),
-            transaction_index=rpc_decode_quantity(val["transactionIndex"]),
-            type_=rpc_decode_quantity(val["type"]),
-            succeeded=(rpc_decode_quantity(val["status"]) == 1),
-            logs=tuple(LogEntry.rpc_decode(ResponseDict(entry)) for entry in logs),
-        )
+    def from_int(cls, val: int) -> "RPCErrorCode":
+        try:
+            return cls(val)
+        except ValueError:
+            return cls.UNKNOWN_REASON
 
 
-def rpc_encode_quantity(val: int) -> str:
-    return hex(val)
+# Need a newtype because unlike all other integers, this one is not hexified on serialization.
+ErrorCode = NewType("ErrorCode", int)
 
 
-def rpc_encode_data(val: bytes) -> str:
-    return "0x" + val.hex()
+@dataclass
+class RPCError(Exception):
+    """A wrapper for a call execution error returned as a proper RPC response."""
+
+    # Taking an integer and not `RPCErrorCode` here
+    # since the codes may differ between providers.
+    code: ErrorCode
+    message: str
+    data: None | bytes = None
+
+    @classmethod
+    def invalid_request(cls) -> "RPCError":
+        return cls(ErrorCode(RPCErrorCode.INVALID_REQUEST.value), "invalid json request")
 
 
-def rpc_encode_block(val: int | Block) -> str:
-    if isinstance(val, Block):
-        return val.value
-    return rpc_encode_quantity(val)
+# EIP-2930 transaction
+@dataclass
+class Type2Transaction:
+    # "type": 2
+    chain_id: int
+    value: Amount
+    gas: int
+    max_fee_per_gas: Amount
+    max_priority_fee_per_gas: Amount
+    nonce: int
+    to: None | Address = None
+    data: None | bytes = None
 
 
-def rpc_decode_quantity(val: Any) -> int:
-    if not isinstance(val, str):
-        raise RPCDecodingError("Encoded quantity must be a string")
-    if not val.startswith("0x"):
-        raise RPCDecodingError("Encoded quantity must start with `0x`")
-    try:
-        return int(val, 16)
-    except ValueError as exc:
-        raise RPCDecodingError(f"Could not convert encoded quantity to an integer: {exc}") from exc
+@dataclass
+class EthCallParams:
+    """Transaction fields for ``eth_call``."""
+
+    to: Address
+    from_: None | Address = None
+    gas: None | int = None
+    gas_price: int = 0
+    value: Amount = Amount(0)
+    data: None | bytes = None
 
 
-def rpc_decode_data(val: Any) -> bytes:
-    if not isinstance(val, str):
-        raise RPCDecodingError("Encoded data must be a string")
-    if not val.startswith("0x"):
-        raise RPCDecodingError("Encoded data must start with `0x`")
-    try:
-        return bytes.fromhex(val[2:])
-    except ValueError as exc:
-        raise RPCDecodingError(f"Could not convert encoded data to bytes: {exc}") from exc
+@dataclass
+class EstimateGasParams:
+    """Transaction fields for ``eth_estimateGas``."""
+
+    from_: Address
+    to: None | Address = None
+    gas: None | int = None
+    gas_price: int = 0
+    nonce: None | int = None
+    value: Amount = Amount(0)
+    data: None | bytes = None
 
 
-def rpc_decode_block(val: Any) -> int | str:
-    try:
-        Block(val)  # check if it's one of the enum's values
-        # `Block` only has string values
-        return cast(str, val)
-    except ValueError:
-        pass
+@dataclass
+class FilterParams:
+    """Filter parameters for ``eth_getLogs`` or ``eth_newFilter``."""
 
-    return rpc_decode_quantity(val)
-
-
-def rpc_decode_bool(val: Any) -> bool:
-    if not isinstance(val, bool):
-        raise RPCDecodingError("Encoded boolean must be `true` or `false`")
-    return val
+    from_block: None | int | Block = None
+    to_block: None | int | Block = None
+    address: None | Address | tuple[Address, ...] = None
+    topics: None | tuple[None | LogTopic | tuple[LogTopic, ...], ...] = None

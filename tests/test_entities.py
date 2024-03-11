@@ -2,21 +2,8 @@ import os
 
 import pytest
 
-from pons import Address, Amount, Block, BlockHash, TxHash
-from pons._entities import (
-    BlockInfo,
-    LogEntry,
-    LogTopic,
-    RPCDecodingError,
-    TxReceipt,
-    rpc_decode_block,
-    rpc_decode_bool,
-    rpc_decode_data,
-    rpc_decode_quantity,
-    rpc_encode_block,
-    rpc_encode_data,
-    rpc_encode_quantity,
-)
+from pons import Address, Amount, BlockHash, TxHash
+from pons._entities import LogTopic
 
 
 def test_amount():
@@ -37,10 +24,6 @@ def test_amount():
 
     with pytest.raises(ValueError, match="Amount must be non-negative, got -100"):
         Amount.wei(-100)
-
-    # Encoding
-    assert Amount.wei(100).rpc_encode() == "0x64"
-    assert Amount.rpc_decode("0x64") == Amount.wei(100)
 
     assert Amount.wei(100) + Amount.wei(50) == Amount.wei(150)
     assert Amount.wei(100) - Amount.wei(50) == Amount.wei(50)
@@ -91,8 +74,6 @@ def test_address():
 
     assert Address(random_addr).checksum == random_addr_checksum
 
-    assert Address(random_addr).rpc_encode() == random_addr_checksum
-    assert Address.rpc_decode(random_addr_checksum) == Address(random_addr)
     assert Address(random_addr) == Address(random_addr)
     assert Address(random_addr) != Address(os.urandom(20))
 
@@ -125,16 +106,12 @@ def test_address():
     with pytest.raises(ValueError):  # noqa: PT011
         Address.from_hex(random_addr_checksum[:-1])
 
-    with pytest.raises(RPCDecodingError, match="Address must be 20 bytes long, got 19"):
-        Address.rpc_decode("0x" + random_addr[:-1].hex())
-
 
 def test_typed_data():
     # This is not covered by Address tests, since it overrides those methods
     data = os.urandom(32)
     tx_hash = TxHash(data)
     assert repr(tx_hash) == f'TxHash(bytes.fromhex("{data.hex()}"))'
-    assert tx_hash.rpc_encode() == "0x" + data.hex()
 
 
 def test_typed_data_lengths():
@@ -144,212 +121,3 @@ def test_typed_data_lengths():
     TxHash(os.urandom(32))
     BlockHash(os.urandom(32))
     LogTopic(os.urandom(32))
-
-
-def test_decode_tx_receipt():
-    address = Address(os.urandom(20))
-
-    tx_receipt_json = {
-        "transactionHash": "0xf105e4ee72d1538a4e10ee9584581e2b6f13cd9be82acd14e8edd65d954483c5",
-        "blockHash": "0x3f62ac76f9551dbf878c334657ce19a86881734cbf53f8ecd9c3afb9a22d5bee",
-        "blockNumber": "0xa38696",
-        "contractAddress": address.rpc_encode(),
-        "cumulativeGasUsed": "0x43641c",
-        "effectiveGasPrice": "0x45463c1c",
-        "from": "0x8d75f6db12c444e290db995f2650a68159364e25",
-        "gasUsed": "0x55f0",
-        "status": "0x1",
-        "to": None,
-        "transactionIndex": "0x18",
-        "type": "0x0",
-        "logs": [
-            {
-                "address": "0x388c818ca8b9251b393131c08a736a67ccb19297",
-                "blockHash": "0x0a79eca9f5ca58a1d5d5030a0fabfdd8e815b8b77a9f223f74d59aa39596e1c7",
-                "blockNumber": "0x11e5883",
-                "data": "0x00000000000000000000000000000000000000000000000011b6b79503fb875d",
-                "logIndex": "0x187",
-                "removed": False,
-                "topics": ["0x27f12abfe35860a9a927b465bb3d4a9c23c8428174b83f278fe45ed7b4da2662"],
-                "transactionHash": (
-                    "0x7114b4da1a6ed391d5d781447ed443733dcf2b508c515b81c17379dea8a3c9af"
-                ),
-                "transactionIndex": "0x76",
-            }
-        ],
-    }
-
-    tx_receipt = TxReceipt.rpc_decode(tx_receipt_json)
-
-    assert tx_receipt.succeeded
-    assert tx_receipt.contract_address == address
-
-    tx_receipt_json["contractAddress"] = None
-    tx_receipt_json["to"] = address.rpc_encode()
-    tx_receipt_json["status"] = "0x0"
-
-    tx_receipt = TxReceipt.rpc_decode(tx_receipt_json)
-
-    assert not tx_receipt.succeeded
-    assert tx_receipt.contract_address is None
-    assert tx_receipt.to == address
-
-    tx_receipt_json["logs"] = 1
-    with pytest.raises(RPCDecodingError, match="`logs` in a tx receipt must be an iterable, got 1"):
-        TxReceipt.rpc_decode(tx_receipt_json)
-
-
-def test_encode_decode_quantity():
-    val = 100
-    assert rpc_encode_quantity(val) == hex(val)
-    assert rpc_decode_quantity(hex(val)) == val
-
-    with pytest.raises(RPCDecodingError, match="Encoded quantity must be a string"):
-        rpc_decode_quantity(100)
-
-    with pytest.raises(RPCDecodingError, match="Encoded quantity must start with `0x`"):
-        rpc_decode_quantity("616263")
-
-    with pytest.raises(RPCDecodingError, match="Could not convert encoded quantity to an integer"):
-        rpc_decode_quantity("0xefgh")
-
-
-def test_encode_decode_data():
-    assert rpc_encode_data(b"abc") == "0x616263"
-    assert rpc_decode_data("0x616263") == b"abc"
-
-    with pytest.raises(RPCDecodingError, match="Encoded data must be a string"):
-        rpc_decode_data(616263)
-
-    with pytest.raises(RPCDecodingError, match="Encoded data must start with `0x`"):
-        rpc_decode_data("616263")
-
-    with pytest.raises(RPCDecodingError, match="Could not convert encoded data to bytes"):
-        rpc_decode_data("0xefgh")
-
-
-def test_encode_decode_block():
-    val = 123
-    assert rpc_encode_block(Block.LATEST) == "latest"
-    assert rpc_encode_block(Block.EARLIEST) == "earliest"
-    assert rpc_encode_block(Block.PENDING) == "pending"
-    assert rpc_encode_block(Block.SAFE) == "safe"
-    assert rpc_encode_block(Block.FINALIZED) == "finalized"
-    assert rpc_encode_block(val) == hex(val)
-    assert rpc_decode_block("latest") == "latest"
-    assert rpc_decode_block("earliest") == "earliest"
-    assert rpc_decode_block("pending") == "pending"
-    assert rpc_decode_block(hex(val)) == val
-
-
-def test_decode_bool():
-    assert rpc_decode_bool(True) is True
-
-    with pytest.raises(RPCDecodingError, match="Encoded boolean must be `true` or `false`"):
-        rpc_decode_bool(1)
-
-
-def test_decode_block_info():
-    json_result = {
-        "baseFeePerGas": "0xbcdaf1db6",
-        "difficulty": "0x2c72989f9145c8",
-        "gasLimit": "0x1cb2a73",
-        "gasUsed": "0x50c7cc",
-        "hash": "0x477a8386bbcc43f54b0231317d6a95f62ab10909d2d985ac5957633090ae69a8",
-        "miner": "0x7f101fe45e6649a6fb8f3f8b43ed03d353f2b90c",
-        "nonce": "0x2c4139002b04ac83",
-        "number": "0xda5f7a",
-        "parentHash": "0xa6fc86d8fc22aa8c164fa713b010b71a9071a2b2bc75f39cd6ec1256a4291e33",
-        "size": "0x65ad",
-        "timestamp": "0x6220267c",
-        "totalDifficulty": "0x911c203aa627addcf39",
-        "transactions": [
-            {
-                "blockHash": "0x477a8386bbcc43f54b0231317d6a95f62ab10909d2d985ac5957633090ae69a8",
-                "blockNumber": "0xda5f7a",
-                "from": "0x4ac69ded1859e5ead2bf2ed8875d9c65012ce198",
-                "gas": "0x5208",
-                "gasPrice": "0x13b9b49c00",
-                "hash": "0x62581a4b947c113ecfb463df4d268c9f5791d95c91993e052a110731e8542140",
-                "input": "0x",
-                "nonce": "0x7",
-                "to": "0xe925433cf352cdc9c80df0a84641f3906758f4dc",
-                "transactionIndex": "0x0",
-                "type": "0x0",
-                "value": "0x6851a3a375d1ec",
-            },
-            {
-                "blockHash": "0x477a8386bbcc43f54b0231317d6a95f62ab10909d2d985ac5957633090ae69a8",
-                "blockNumber": "0xda5f7a",
-                "from": "0xf1fb5dea21337feb46963c29d04a95f6ca8b71e6",
-                "gas": "0xd0b3",
-                "gasPrice": "0xcf7b50fb6",
-                "hash": "0x4eeae930617ad553af25a809f11051451e7f4a2597af6e8eae6ed446b94d6532",
-                "input": "0x632a5607",
-                "maxFeePerGas": "0xcfad7001d",
-                "maxPriorityFeePerGas": "0x12a05f200",
-                "nonce": "0x1317",
-                "to": "0x2e9d63788249371f1dfc918a52f8d799f4a38c94",
-                "transactionIndex": "0x3",
-                "type": "0x2",
-                "value": "0x0",
-            },
-        ],
-    }
-
-    # Parse output with the transaction info
-    block_info = BlockInfo.rpc_decode(json_result)
-    assert block_info.transactions[0].block_hash == BlockHash.rpc_decode(
-        json_result["transactions"][0]["blockHash"]
-    )
-    assert block_info.transaction_hashes[0] == TxHash.rpc_decode(
-        json_result["transactions"][0]["hash"]
-    )
-
-    # Parse output without the transaction info
-    json_result["transactions"] = [
-        json_result["transactions"][0]["hash"],
-        json_result["transactions"][1]["hash"],
-    ]
-    block_info = BlockInfo.rpc_decode(json_result)
-    assert block_info.transactions is None
-    assert block_info.transaction_hashes[0] == TxHash.rpc_decode(json_result["transactions"][0])
-
-    # Parse output without any transactions
-    json_result["transactions"] = []
-    block_info = BlockInfo.rpc_decode(json_result)
-    assert block_info.transactions == ()
-    assert block_info.transaction_hashes == ()
-
-    json_result["transactions"] = 1
-    with pytest.raises(
-        RPCDecodingError, match="`transactions` in a block info must be an iterable, got 1"
-    ):
-        BlockInfo.rpc_decode(json_result)
-
-
-def test_decode_log_entry():
-    log_entry_json = {
-        "address": "0x6ef0f6ca7a8f01e02593df24f7097889a249c31e",
-        "topics": [
-            "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x000000000000000000000000e2b8651bf50913057ff47fc4f02a8e12146083b8",
-        ],
-        "data": "0x",
-        "blockNumber": "0xa386df",
-        "transactionHash": "0x7c0301cec59c65dce24fe7bd007dd4ab1dbe6c7c0f029deb76f4fb2d4c004379",
-        "transactionIndex": "0x0",
-        "blockHash": "0x14fb839d874ee80c020e7f087f8e57d4c6a94d6af1e6c7c9544d1ef219b0873b",
-        "logIndex": "0x0",
-        "removed": False,
-    }
-
-    log_entry = LogEntry.rpc_decode(log_entry_json)
-    assert log_entry.data == b""
-
-    log_entry_json["topics"] = 1
-    with pytest.raises(
-        RPCDecodingError, match="`topics` in a log entry must be an iterable, got 1"
-    ):
-        LogEntry.rpc_decode(log_entry_json)

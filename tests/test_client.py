@@ -29,8 +29,7 @@ from pons import (
 from pons._abi_types import encode_args, keccak
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
-from pons._entities import rpc_encode_data
-from pons._provider import RPCError
+from pons._entities import RPCError, TxInfo
 
 
 @pytest.fixture
@@ -73,7 +72,7 @@ async def test_net_version(local_provider, session):
 async def test_net_version_type_check(local_provider, session):
     # Provider returning a bad value
     with monkeypatched(local_provider, "rpc", lambda *_args: 0):
-        with pytest.raises(BadResponseFormat, match="net_version: expected a string result"):
+        with pytest.raises(BadResponseFormat, match="net_version: The value must be a string"):
             await session.net_version()
 
 
@@ -495,14 +494,14 @@ async def test_get_block(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
     block_info = await session.eth_get_block_by_number(1, with_transactions=True)
-    assert block_info.transactions is not None
+    assert all(isinstance(tx, TxInfo) for tx in block_info.transactions)
 
     block_info2 = await session.eth_get_block_by_hash(block_info.hash_, with_transactions=True)
     assert block_info2 == block_info
 
     # no transactions
     block_info = await session.eth_get_block_by_number(1)
-    assert block_info.transactions is None
+    assert all(isinstance(tx, TxHash) for tx in block_info.transactions)
 
     # non-existent block
     block_info = await session.eth_get_block_by_number(100, with_transactions=True)
@@ -532,8 +531,8 @@ async def test_get_block_pending(local_provider, session, root_signer, another_s
     assert block_info.transactions[0].value == Amount.ether(10)
 
     block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=False)
-    assert len(block_info.transaction_hashes) == 1
-    assert block_info.transaction_hashes[0] == tx_hash
+    assert len(block_info.transactions) == 1
+    assert block_info.transactions[0] == tx_hash
 
 
 async def test_eth_get_transaction_by_hash(local_provider, session, root_signer, another_signer):
@@ -609,7 +608,8 @@ async def test_eth_get_filter_changes_bad_response(local_provider, session, monk
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(
-        BadResponseFormat, match=r"eth_getFilterChanges: Expected a list as a response, got dict"
+        BadResponseFormat,
+        match=r"eth_getFilterChanges: Can only structure a tuple or a list into a tuple generic",
     ):
         await session.eth_get_filter_changes(block_filter)
 
@@ -669,6 +669,21 @@ async def test_eth_get_logs(
         == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
     )
 
+    entries = await session.eth_get_logs(
+        source=[contract1.address, contract2.address], from_block=0
+    )
+    assert len(entries) == 2
+    assert entries[0].address == contract1.address
+    assert entries[1].address == contract2.address
+    assert (
+        normalize_topics(entries[0].topics)
+        == contract1.abi.event.Deposit(root_signer.address, b"1234").topics
+    )
+    assert (
+        normalize_topics(entries[1].topics)
+        == contract2.abi.event.Deposit2(another_signer.address, b"4567").topics
+    )
+
     # Test an invalid response
 
     def mock_rpc(_method, *_args):
@@ -677,7 +692,8 @@ async def test_eth_get_logs(
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(
-        BadResponseFormat, match=r"eth_getLogs: Expected a list as a response, got dict"
+        BadResponseFormat,
+        match=r"eth_getLogs: Can only structure a tuple or a list into a tuple generic",
     ):
         await session.eth_get_logs(source=contract2.address)
 
@@ -1099,9 +1115,7 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
         if method == "eth_estimateGas":
             # Invalid selector
             data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
-            raise RPCError(
-                RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
-            )
+            raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", data)
         return orig_rpc(method, *args)
 
     with monkeypatched(local_provider, "rpc", mock_rpc):
@@ -1114,9 +1128,7 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
         if method == "eth_estimateGas":
             # Invalid selector
             data = b"1234" + encode_args((abi.uint(256), 1))
-            raise RPCError(
-                RPCErrorCode.EXECUTION_ERROR, "execution reverted", rpc_encode_data(data)
-            )
+            raise RPCError(RPCErrorCode.EXECUTION_ERROR, "execution reverted", data)
         return orig_rpc(method, *args)
 
     with monkeypatched(local_provider, "rpc", mock_rpc):
@@ -1131,7 +1143,7 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
         if method == "eth_estimateGas":
             # Invalid selector
             data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
-            raise RPCError(12345, "execution reverted", rpc_encode_data(data))
+            raise RPCError(12345, "execution reverted", data)
         return orig_rpc(method, *args)
 
     with monkeypatched(local_provider, "rpc", mock_rpc):

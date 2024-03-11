@@ -11,7 +11,9 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 from trio_typing import TaskStatus
 
-from ._provider import JSON, HTTPProvider, Provider, RPCError
+from ._entities import RPCError
+from ._provider import JSON, HTTPProvider, Provider
+from ._serialization import unstructure
 
 
 def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
@@ -46,7 +48,7 @@ async def process_request(provider: Provider, request: JSON) -> tuple[HTTPStatus
     try:
         request_id, result = await process_request_inner(provider, request)
     except RPCError as exc:
-        return HTTPStatus.BAD_REQUEST, {"jsonrpc": "2.0", "error": exc.to_json()}
+        return HTTPStatus.BAD_REQUEST, {"jsonrpc": "2.0", "error": unstructure(exc)}
 
     return HTTPStatus.OK, {"jsonrpc": "2.0", "id": request_id, "result": result}
 
