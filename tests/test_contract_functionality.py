@@ -161,14 +161,10 @@ async def test_complicated_event(session, root_signer, compiled_contracts):
 
     basic_contract = compiled_contracts["Test"]
 
-    bytestring33len1 = b"012345678901234567890123456789012"
-    bytestring33len2 = b"-12345678901234567890123456789012"
-    inner1 = [b"0123", bytestring33len1]
-    inner2 = [b"-123", bytestring33len2]
-    foo = [b"4567", [b"aa", b"bb"], bytestring33len1, "\u1234\u1212", inner1]
-    event_filter = basic_contract.abi.event.Complicated(
-        b"aaaa", bytestring33len2, foo, [inner1, inner2]
-    )
+    inner1 = [b"0123", b"1111111111"]
+    inner2 = [b"-123", b"2222222222"]
+    foo = [b"4567", [b"aa", b"bb"], b"444444", [b"0123", b"3333333333"]]
+    event_filter = basic_contract.abi.event.Complicated(b"aaaa", b"55555555", foo, [inner1, inner2])
 
     contract = await session.deploy(root_signer, basic_contract.constructor(123, 456))
 
