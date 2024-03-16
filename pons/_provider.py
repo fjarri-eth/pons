@@ -1,45 +1,14 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
-from enum import Enum
 from http import HTTPStatus
 from json import JSONDecodeError
 from typing import cast
 
 import httpx
 
-# TODO: the doc entry had to be written manually for this type because of Sphinx limitations.
-JSON = None | bool | int | float | str | Iterable["JSON"] | Mapping[str, "JSON"]
-
-
-class RPCErrorCode(Enum):
-    """Known RPC error codes returned by providers."""
-
-    # This is our placeholder value, shouldn't be encountered in a remote server response
-    UNKNOWN_REASON = 0
-    """An error code whose description is not present in this enum."""
-
-    SERVER_ERROR = -32000
-    """Reserved for implementation-defined server-errors. See the message for details."""
-
-    INVALID_REQUEST = -32600
-    """The JSON sent is not a valid Request object."""
-
-    METHOD_NOT_FOUND = -32601
-    """The method does not exist / is not available."""
-
-    INVALID_PARAMETER = -32602
-    """Invalid method parameter(s)."""
-
-    EXECUTION_ERROR = 3
-    """Contract transaction failed during execution. See the data for details."""
-
-    @classmethod
-    def from_int(cls, val: int) -> "RPCErrorCode":
-        try:
-            return cls(val)
-        except ValueError:
-            return cls.UNKNOWN_REASON
+from ._entities import RPCError
+from ._serialization import JSON, StructuringError, structure
 
 
 class InvalidResponse(Exception):
@@ -70,66 +39,6 @@ class HTTPError(ProtocolError):
         return f"HTTP status {self.status}: {self.message}"
 
 
-class RPCError(Exception):
-    """A wrapper for a call execution error returned as a proper RPC response."""
-
-    @classmethod
-    def from_json(cls, response: JSON) -> "RPCError":
-        error = ResponseDict(response)
-        if "data" in error:
-            data = error["data"]
-            if data is not None and not isinstance(data, str):
-                raise InvalidResponse(
-                    f"Error data must be a string or None, got {type(data)} ({data})"
-                )
-        else:
-            data = None
-
-        error_code = error["code"]
-        if isinstance(error_code, str):
-            code = int(error_code)
-        elif isinstance(error_code, int):
-            code = error_code
-        else:
-            raise InvalidResponse(
-                "Error code must be an integer (possibly string-encoded), "
-                f"got {type(error_code)} ({error_code})"
-            )
-
-        message = error["message"]
-        if not isinstance(message, str):
-            raise InvalidResponse(
-                f"Error message must be a string, got {type(message)} ({message})"
-            )
-
-        return cls(code, message, data)
-
-    @classmethod
-    def invalid_request(cls) -> "RPCError":
-        return cls(RPCErrorCode.INVALID_REQUEST.value, "invalid json request")
-
-    @classmethod
-    def method_not_found(cls, method: str) -> "RPCError":
-        return cls(
-            RPCErrorCode.METHOD_NOT_FOUND.value,
-            f"The method {method} does not exist/is not available",
-        )
-
-    def __init__(self, code: int, message: str, data: None | str = None):
-        # Taking an integer and not `RPCErrorCode` here
-        # since the codes may differ between providers.
-        super().__init__(code, message, data)
-        self.code = code
-        self.message = message
-        self.data = data
-
-    def to_json(self) -> JSON:
-        result = {"code": self.code, "message": self.message}
-        if self.data:
-            result["data"] = self.data
-        return result
-
-
 class Provider(ABC):
     """The base class for JSON RPC providers."""
 
@@ -143,28 +52,6 @@ class Provider(ABC):
         # mypy does not work with abstract generators correctly.
         # See https://github.com/python/mypy/issues/5070
         yield  # type: ignore[misc]
-
-
-class ResponseDict:
-    """
-    A wrapper for dictionaries allowing as to narrow down KeyErrors
-    resulting from a JSON object of an incorrect format.
-    """
-
-    def __init__(self, obj: JSON):
-        if not isinstance(obj, dict):
-            raise InvalidResponse(f"Expected a dictionary as a response, got {type(obj).__name__}")
-        self._obj = cast(dict[str, JSON], obj)
-
-    def __contains__(self, field: str) -> bool:
-        return field in self._obj
-
-    def __getitem__(self, field: str) -> JSON:
-        try:
-            contents = self._obj[field]
-        except KeyError as exc:
-            raise InvalidResponse(f"Expected field `{field}` is missing from the result") from exc
-        return contents
 
 
 class ProviderSession(ABC):
@@ -202,13 +89,6 @@ class ProviderSession(ABC):
         if path != ():
             raise ValueError(f"Unexpected provider path: {path}")
         return await self.rpc(method, *args)
-
-    async def rpc_dict(self, method: str, *args: JSON) -> None | ResponseDict:
-        """Calls the given RPC method expecting to get a dictionary (or ``null``) in response."""
-        result = await self.rpc(method, *args)
-        if result is None:
-            return None
-        return ResponseDict(result)
 
 
 class HTTPProvider(Provider):
@@ -255,7 +135,14 @@ class HTTPSession(ProviderSession):
         # Note that the Eth-side errors (e.g. transaction having been reverted)
         # will have the HTTP status 200, so we are checking for the "error" field first.
         if "error" in response_json:
-            raise RPCError.from_json(response_json["error"])
+            try:
+                error = structure(RPCError, response_json["error"])
+            except StructuringError as exc:
+                raise InvalidResponse(
+                    f"Failed to parse an error response: {response_json}"
+                ) from exc
+
+            raise error
 
         if status == HTTPStatus.OK:
             if "result" in response_json:

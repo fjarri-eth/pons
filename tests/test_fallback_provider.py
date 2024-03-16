@@ -6,8 +6,9 @@ from enum import Enum
 import pytest
 
 from pons import CycleFallback, FallbackProvider, PriorityFallback, Unreachable
+from pons._entities import RPCError
 from pons._fallback_provider import PriorityFallbackStrategy
-from pons._provider import JSON, InvalidResponse, Provider, ProviderSession, RPCError
+from pons._provider import JSON, InvalidResponse, Provider, ProviderSession
 
 
 def random_request():

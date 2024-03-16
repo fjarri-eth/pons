@@ -13,14 +13,8 @@ from pons import (
     _http_provider_server,  # For monkeypatching purposes
 )
 from pons._client import BadResponseFormat, ProviderError
-from pons._provider import (
-    HTTPError,
-    InvalidResponse,
-    Provider,
-    ProviderSession,
-    RPCError,
-    RPCErrorCode,
-)
+from pons._entities import RPCErrorCode
+from pons._provider import HTTPError, Provider, ProviderSession
 
 
 @pytest.fixture
@@ -46,47 +40,6 @@ async def test_dict_request(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, Amount.ether(10))
 
 
-def test_rpc_error():
-    error_code = 2
-
-    error = RPCError.from_json({"code": error_code, "message": "error", "data": "additional data"})
-    assert error.code == error_code
-    assert error.data == "additional data"
-    assert error.to_json() == {"code": error_code, "message": "error", "data": "additional data"}
-
-    error = RPCError.from_json({"code": error_code, "message": "error"})
-    assert error.data is None
-    assert error.to_json() == {"code": error_code, "message": "error"}
-
-    error = RPCError.from_json({"code": str(error_code), "message": "error"})
-    assert error.code == error_code
-
-    error = RPCError.invalid_request()
-    assert error.code == RPCErrorCode.INVALID_REQUEST.value
-
-    error = RPCError.method_not_found("abc")
-    assert error.code == RPCErrorCode.METHOD_NOT_FOUND.value
-
-    with pytest.raises(
-        InvalidResponse, match=r"Error data must be a string or None, got <class 'int'> \(1\)"
-    ):
-        RPCError.from_json({"data": 1, "code": 2, "message": "error"})
-
-    with pytest.raises(
-        InvalidResponse,
-        match=(
-            r"Error code must be an integer \(possibly string-encoded\), "
-            r"got <class 'float'> \(1\.0\)"
-        ),
-    ):
-        RPCError.from_json({"code": 1.0, "message": "error"})
-
-    with pytest.raises(
-        InvalidResponse, match=r"Error message must be a string, got <class 'int'> \(1\)"
-    ):
-        RPCError.from_json({"code": 2, "message": 1})
-
-
 async def test_dict_request_introspection(session, root_signer, another_signer):
     # This test covers the __contains__ method of ResponseDict.
     # It is invoked when the error response is checked for the "data" field,
@@ -110,7 +63,7 @@ async def test_unexpected_response_type(
 
     monkeypatch.setattr(local_provider, "rpc", lambda _method, *_args: "something")
 
-    with pytest.raises(BadResponseFormat, match="Expected a dictionary as a response, got str"):
+    with pytest.raises(BadResponseFormat, match="Cannot structure into"):
         await session.eth_get_transaction_receipt(tx_hash)
 
 
@@ -129,9 +82,7 @@ async def test_missing_field(local_provider, session, monkeypatch, root_signer, 
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
-    with pytest.raises(
-        BadResponseFormat, match="Expected field `status` is missing from the result"
-    ):
+    with pytest.raises(BadResponseFormat, match="status: Missing field"):
         await session.eth_get_transaction_receipt(tx_hash)
 
 
@@ -180,7 +131,7 @@ async def test_no_result_field(session, monkeypatch):
 
 
 async def test_no_error_field(session, monkeypatch):
-    # Tests the handling of a badly formed success response without the "error" field.
+    # Tests the handling of a badly formed error response without the "error" field.
 
     orig_process_request = _http_provider_server.process_request
 
@@ -192,6 +143,24 @@ async def test_no_error_field(session, monkeypatch):
     monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(HTTPError, match=r"HTTP status 400: {\"jsonrpc\":\"2.0\",\"id\":0}"):
+        await session.net_version()
+
+
+async def test_malformed_error_field(session, monkeypatch):
+    # Tests the handling of a badly formed error response
+    # where the "error" field cannot be parsed as an RPCError.
+
+    orig_process_request = _http_provider_server.process_request
+
+    async def faulty_process_request(*args, **kwargs):
+        status, response = await orig_process_request(*args, **kwargs)
+        del response["result"]
+        response["error"] = {"something_weird": 1}
+        return (HTTPStatus.BAD_REQUEST, response)
+
+    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
+
+    with pytest.raises(BadResponseFormat, match=r"Failed to parse an error response"):
         await session.net_version()
 
 

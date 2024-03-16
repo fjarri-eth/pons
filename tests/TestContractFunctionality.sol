@@ -68,35 +68,38 @@ contract Test {
 
     struct ByteInner {
         bytes4 inner1;
-        bytes inner2;
+        bytes10 inner2;
     }
 
     struct Foo {
         bytes4 foo1;
         bytes2[2] foo2;
-        bytes foo3;
-        string foo4;
+        bytes6 foo3;
         ByteInner inner;
     }
 
     event Complicated(
         bytes4 indexed x,
-        bytes indexed y,
+        bytes8 indexed y,
         Foo indexed u,
         ByteInner[2] indexed v
     ) anonymous;
 
     function emitComplicated() public {
-        bytes memory bytestring33len1 = "012345678901234567890123456789012";
-        bytes memory bytestring33len2 = "-12345678901234567890123456789012";
-        ByteInner memory inner1 = ByteInner("0123", bytestring33len1);
-        ByteInner memory inner2 = ByteInner("-123", bytestring33len2);
         bytes2 x = "aa";
         bytes2 y = "bb";
-        bytes2[2] memory foo2 = [x, y];
-        Foo memory foo = Foo("4567", foo2, bytestring33len1, "\u1234\u1212", inner1);
-        ByteInner[2] memory inner_arr = [inner1, inner2];
-        emit Complicated("aaaa", bytestring33len2, foo, inner_arr);
+        emit Complicated(
+            "aaaa",
+            "55555555",
+            Foo(
+                "4567", [x, y],
+                "444444",
+                ByteInner("0123", "3333333333")
+            ),
+            [
+                ByteInner("0123", "1111111111"),
+                ByteInner("-123", "2222222222")
+            ]);
     }
 
     error MyError(address sender);

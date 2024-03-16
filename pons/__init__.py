@@ -38,7 +38,7 @@ from ._contract_abi import (
     Mutability,
     Receive,
 )
-from ._entities import Address, Amount, Block, BlockHash, TxHash
+from ._entities import Address, Amount, Block, BlockHash, RPCError, RPCErrorCode, TxHash
 from ._fallback_provider import (
     CycleFallback,
     FallbackProvider,
@@ -48,15 +48,8 @@ from ._fallback_provider import (
 )
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
-from ._provider import (
-    JSON,
-    HTTPProvider,
-    ProtocolError,
-    Provider,
-    RPCError,
-    RPCErrorCode,
-    Unreachable,
-)
+from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
+from ._serialization import JSON
 from ._signer import AccountSigner, Signer
 
 __all__ = [
