@@ -2,7 +2,7 @@
 
 import pytest
 
-from pons import AccountSigner, Amount, Client, LocalProvider
+from pons import AccountSigner, Amount, Client, LocalProvider, RPCError
 
 
 # Masking the global fixtures to make this test self-contained
@@ -77,6 +77,11 @@ async def test_snapshots(provider, session, root_signer, another_signer):
 
 async def test_net_version(session):
     assert await session.net_version() == "1"
+
+
+def test_rpc_error(provider):
+    with pytest.raises(RPCError, match="Unknown method: eth_nonexistentMethod"):
+        provider.rpc("eth_nonexistentMethod")
 
 
 def test_eth_chain_id():
