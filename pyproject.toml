@@ -7,7 +7,7 @@ authors = [
 ]
 dependencies = [
     "httpx>=0.22",
-    "eth-account>=0.6",
+    "eth-account>=0.13",
     "eth-utils>=2",
     "eth-abi>=5.0.1",
     "anyio>=3",

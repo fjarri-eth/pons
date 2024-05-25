@@ -16,6 +16,7 @@ Changed
 - Switched to ``alysis`` from ``eth-tester`` for the backend of ``LocalProvider``. (PR_70_)
 - Bumped the minimum Python version to 3.10. (PR_72_)
 - The entities are now dataclasses instead of namedtuples. (PR_75_)
+- Bumped ``eth-account`` to ``0.13``. (PR_76_)
 
 
 Added
@@ -67,6 +68,7 @@ Fixed
 .. _PR_70: https://github.com/fjarri/pons/pull/70
 .. _PR_72: https://github.com/fjarri/pons/pull/72
 .. _PR_75: https://github.com/fjarri/pons/pull/75
+.. _PR_76: https://github.com/fjarri/pons/pull/76
 
 
 0.7.0 (09-07-2023)
