@@ -1,4 +1,5 @@
 import pytest
+from alysis import EVMVersion
 from ethereum_rpc import Amount
 
 from pons import AccountSigner, Client, LocalProvider
@@ -6,7 +7,7 @@ from pons import AccountSigner, Client, LocalProvider
 
 @pytest.fixture
 def local_provider():
-    return LocalProvider(root_balance=Amount.ether(100))
+    return LocalProvider(root_balance=Amount.ether(100), evm_version=EVMVersion.CANCUN)
 
 
 @pytest.fixture
