@@ -3,9 +3,9 @@ from http import HTTPStatus
 
 import pytest
 import trio
+from ethereum_rpc import Amount
 
 from pons import (
-    Amount,
     Client,
     HTTPProvider,
     HTTPProviderServer,
@@ -13,7 +13,6 @@ from pons import (
     _http_provider_server,  # For monkeypatching purposes
 )
 from pons._client import BadResponseFormat, ProviderError
-from pons._entities import RPCErrorCode
 from pons._provider import HTTPError, Provider, ProviderSession
 
 
@@ -208,7 +207,3 @@ async def test_default_implementations():
 
         with pytest.raises(ValueError, match=r"Unexpected provider path: \(1,\)"):
             await session.rpc_at_pin((1,), "3")
-
-
-def test_unknown_rpc_error_code():
-    assert RPCErrorCode.from_int(-12345) == RPCErrorCode.UNKNOWN_REASON

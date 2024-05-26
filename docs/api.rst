@@ -55,12 +55,6 @@ Errors
 
 .. autoclass:: pons.TransactionFailed
 
-.. autoclass:: pons._provider.RPCError
-   :members:
-
-.. autoclass:: pons._provider.RPCErrorCode
-   :members:
-
 .. autoclass:: pons.ProviderError()
    :show-inheritance:
    :members:
@@ -131,13 +125,30 @@ Testing utilities
 
 ``pons`` exposes several types useful for testing applications that connect to Ethereum RPC servers. Not intended for the production environment.
 
+Install with the feature ``local-provider`` for it to be available.
+
+
 .. autoclass:: LocalProvider
    :show-inheritance:
    :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot
 
+.. autoclass:: SnapshotID
+
 .. autoclass:: HTTPProviderServer
    :members:
    :special-members: __call__
+
+
+Compiler
+--------
+
+Install with the feature ``compiler`` for it to be available.
+
+
+.. autofunction:: compile_contract_file
+
+.. autoclass:: EVMVersion
+   :members:
 
 
 Secondary classes
@@ -205,56 +216,14 @@ Compiled and deployed contracts
    :members:
 
 
-Entities
---------
+Filter objects
+--------------
 
-.. autoclass:: Amount
-   :members:
+.. autoclass:: pons._client.BlockFilter()
 
-.. class:: pons._entities.CustomAmount
+.. autoclass:: pons._client.PendingTransactionFilter()
 
-   A type derived from :py:class:`Amount`.
-
-.. autoclass:: Address
-   :members:
-
-.. class:: pons._entities.CustomAddress
-
-   A type derived from :py:class:`Address`.
-
-.. autoclass:: Block()
-   :members:
-
-.. autoclass:: TxHash
-   :members:
-
-.. autoclass:: BlockHash
-   :members:
-
-.. autoclass:: pons._entities.TxReceipt()
-   :members:
-
-.. autoclass:: pons._entities.BlockInfo()
-   :members:
-
-.. autoclass:: pons._entities.TxInfo()
-   :members:
-
-.. autoclass:: pons._entities.BlockFilter()
-
-.. autoclass:: pons._entities.PendingTransactionFilter()
-
-.. autoclass:: pons._entities.LogFilter()
-
-.. autoclass:: pons._entities.LogTopic()
-
-.. autoclass:: pons._entities.LogEntry()
-   :members:
-
-.. class:: JSON
-
-   A JSON-ifiable object (``bool``, ``int``, ``float``, ``str``, ``None``,
-   iterable of ``JSON``, or mapping of ``str`` to ``JSON``).
+.. autoclass:: pons._client.LogFilter()
 
 
 Solidity types

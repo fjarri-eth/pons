@@ -6,9 +6,8 @@ from json import JSONDecodeError
 from typing import cast
 
 import httpx
-
-from ._entities import RPCError
-from ._serialization import JSON, StructuringError, structure
+from compages import StructuringError
+from ethereum_rpc import JSON, RPCError, structure
 
 
 class InvalidResponse(Exception):

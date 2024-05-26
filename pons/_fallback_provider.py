@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from ._entities import RPCError
+from ethereum_rpc import RPCError
+
 from ._provider import JSON, InvalidResponse, Provider, ProviderSession
 
 

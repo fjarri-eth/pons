@@ -11,8 +11,10 @@ A quick usage example:
     import trio
     import pons
     import eth_account
+    import ethereum_rpc
 
-    from pons import LocalProvider, HTTPProviderServer, Amount
+    from ethereum_rpc import Amount
+    from pons import LocalProvider, HTTPProviderServer
 
     # Run examples with our test server in the background
 
@@ -46,7 +48,7 @@ A quick usage example:
 
     # So that we don't have to use real addresses
 
-    orig_Address_from_hex = pons.Address.from_hex
+    orig_Address_from_hex = ethereum_rpc.Address.from_hex
 
     def mock_Address_from_hex(address_hex):
         if address_hex == "0x<another_address>":
@@ -54,7 +56,7 @@ A quick usage example:
         else:
             return orig_Address_from_hex(address_hex)
 
-    pons.Address.from_hex = mock_Address_from_hex
+    ethereum_rpc.Address.from_hex = mock_Address_from_hex
 
     # This function will start a test server and fill in some global variables
 
@@ -77,7 +79,8 @@ A quick usage example:
     import trio
 
     from eth_account import Account
-    from pons import Client, HTTPProvider, AccountSigner, Address, Amount
+    from ethereum_rpc import Address, Amount
+    from pons import Client, HTTPProvider, AccountSigner
 
     async def main():
 

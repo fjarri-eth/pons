@@ -38,7 +38,6 @@ from ._contract_abi import (
     Mutability,
     Receive,
 )
-from ._entities import Address, Amount, Block, BlockHash, RPCError, RPCErrorCode, TxHash
 from ._fallback_provider import (
     CycleFallback,
     FallbackProvider,
@@ -49,16 +48,11 @@ from ._fallback_provider import (
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
 from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
-from ._serialization import JSON
 from ._signer import AccountSigner, Signer
 
 __all__ = [
     "ABIDecodingError",
     "AccountSigner",
-    "Address",
-    "Amount",
-    "Block",
-    "BlockHash",
     "BoundConstructor",
     "BoundConstructorCall",
     "BoundEvent",
@@ -78,16 +72,15 @@ __all__ = [
     "DeployedContract",
     "Either",
     "Error",
+    "EVMVersion",
     "LocalProvider",
     "Event",
     "EventFilter",
-    "EVMVersion",
     "Fallback",
     "FallbackProvider",
     "FallbackStrategy",
     "FallbackStrategyFactory",
     "HTTPProvider",
-    "JSON",
     "Method",
     "MethodCall",
     "MultiMethod",
@@ -98,13 +91,10 @@ __all__ = [
     "Provider",
     "Receive",
     "RemoteError",
-    "RPCError",
-    "RPCErrorCode",
     "HTTPProviderServer",
     "Signer",
     "SnapshotID",
     "TransactionFailed",
-    "TxHash",
     "Unreachable",
     "abi",
     "compile_contract_file",

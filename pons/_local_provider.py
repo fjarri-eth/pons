@@ -7,10 +7,9 @@ from copy import deepcopy
 from typing import Any
 
 from alysis import Node, RPCNode
-from alysis import RPCError as AlysisRPCError
 from eth_account import Account
+from ethereum_rpc import Amount
 
-from ._entities import Amount, ErrorCode, RPCError
 from ._provider import JSON, Provider, ProviderSession
 from ._signer import AccountSigner, Signer
 
@@ -59,10 +58,7 @@ class LocalProvider(Provider):
         self._rpc_node = RPCNode(self._local_node)
 
     def rpc(self, method: str, *args: Any) -> JSON:
-        try:
-            return self._rpc_node.rpc(method, *args)
-        except AlysisRPCError as exc:
-            raise RPCError(ErrorCode(exc.code), exc.message, exc.data) from exc
+        return self._rpc_node.rpc(method, *args)
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator["LocalProviderSession"]:

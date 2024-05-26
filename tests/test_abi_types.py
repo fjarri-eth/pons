@@ -1,15 +1,15 @@
 import os
 
 import pytest
+from ethereum_rpc import Address, keccak
 
-from pons import Address, abi
+from pons import abi
 from pons._abi_types import (
     ABIDecodingError,
     decode_args,
     dispatch_type,
     dispatch_types,
     encode_args,
-    keccak,
     type_from_abi_string,
 )
 

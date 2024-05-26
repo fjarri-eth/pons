@@ -8,9 +8,10 @@ from itertools import chain
 from keyword import iskeyword
 from typing import Any, Generic, TypeVar
 
+from ethereum_rpc import LogEntry, LogTopic, keccak
+
 from . import abi
-from ._abi_types import Type, decode_args, dispatch_type, dispatch_types, encode_args, keccak
-from ._entities import LogEntry, LogTopic
+from ._abi_types import Type, decode_args, dispatch_type, dispatch_types, encode_args
 from ._provider import JSON
 
 # Anonymous events can have at most 4 indexed fields

@@ -31,7 +31,7 @@ Amounts and addresses
 ---------------------
 
 Native currency amounts and network addresses are typed in ``pons``.
-All methods expect and return only :py:class:`~pons.Amount` and :py:class:`~pons.Address` objects --- no integers or strings allowed.
+All methods expect and return only :py:class:`ethereum_rpc.Amount` and :py:class:`ethereum_rpc.Address` objects --- no integers or strings allowed.
 
 In an application using ``pons`` one can superclass these classes to distinguish between different types of currencies, or addresses from different networks.
 Note though that all the arithmetic and comparison functions require **strict** type equality and raise an exception if it is not the case, to protect from accidental usage of addresses/amounts from wrong domains.

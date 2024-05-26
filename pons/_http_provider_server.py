@@ -2,6 +2,7 @@ from http import HTTPStatus
 from typing import cast
 
 import trio
+from ethereum_rpc import RPCError, RPCErrorCode, unstructure
 from hypercorn.config import Config
 from hypercorn.trio import serve
 from hypercorn.typing import ASGIFramework
@@ -11,9 +12,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 from trio_typing import TaskStatus
 
-from ._entities import RPCError
 from ._provider import JSON, HTTPProvider, Provider
-from ._serialization import unstructure
 
 
 def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
@@ -32,7 +31,9 @@ async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON
     try:
         request_id, method, params = parse_request(request)
     except (KeyError, TypeError) as exc:
-        raise RPCError.invalid_request() from exc
+        raise RPCError.with_code(
+            RPCErrorCode.INVALID_REQUEST, "Cannot parse the request as JSON"
+        ) from exc
 
     async with provider.session() as session:
         result = await session.rpc(method, *params)

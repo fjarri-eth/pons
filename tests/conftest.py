@@ -1,6 +1,7 @@
 import pytest
+from ethereum_rpc import Amount
 
-from pons import AccountSigner, Amount, Client, LocalProvider
+from pons import AccountSigner, Client, LocalProvider
 
 
 @pytest.fixture

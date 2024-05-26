@@ -39,10 +39,9 @@ jobs:
         pdm run py.test --cov=pons --cov-report=xml tests
     - name: Upload coverage
       if: matrix.python-version == '3.10'
-      run: |
-        curl -Os https://uploader.codecov.io/latest/linux/codecov
-        chmod +x codecov
-        ./codecov
+      uses: codecov/codecov-action@v4.0.1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   doctest:
     runs-on: ubuntu-latest

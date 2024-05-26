@@ -10,9 +10,7 @@ from typing import Any
 
 import eth_abi
 from eth_abi.exceptions import DecodingError
-from eth_utils import keccak
-
-from ._entities import Address
+from ethereum_rpc import Address, keccak
 
 # Maximum bits in an `int` or `uint` type in Solidity.
 MAX_INTEGER_BITS = 256
@@ -242,7 +240,7 @@ class Bytes(Type):
 class AddressType(Type):
     """
     Corresponds to the Solidity ``address`` type.
-    Not to be confused with :py:class:`~pons.Address` which represents an address value.
+    Not to be confused with :py:class:`ethereum_rpc.Address` which represents an address value.
     """
 
     @property

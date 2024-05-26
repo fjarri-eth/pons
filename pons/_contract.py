@@ -1,5 +1,7 @@
 from typing import Any
 
+from ethereum_rpc import Address, LogEntry, LogTopic
+
 from ._contract_abi import (
     ContractABI,
     Error,
@@ -9,7 +11,6 @@ from ._contract_abi import (
     Methods,
     MultiMethod,
 )
-from ._entities import Address, LogEntry, LogTopic
 from ._provider import JSON
 
 
