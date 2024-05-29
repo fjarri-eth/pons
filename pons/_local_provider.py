@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from copy import deepcopy
 from typing import Any
 
-from alysis import Node, RPCNode
+from alysis import EVMVersion, Node, RPCNode
 from eth_account import Account
 from ethereum_rpc import Amount
 
@@ -27,8 +27,16 @@ class LocalProvider(Provider):
     root: Signer
     """The signer for the pre-created account."""
 
-    def __init__(self, *, root_balance: Amount, chain_id: int = 1):
-        self._local_node = Node(root_balance_wei=root_balance.as_wei(), chain_id=chain_id)
+    def __init__(
+        self,
+        *,
+        root_balance: Amount,
+        chain_id: int = 1,
+        evm_version: EVMVersion = EVMVersion.CANCUN,
+    ):
+        self._local_node = Node(
+            root_balance_wei=root_balance.as_wei(), chain_id=chain_id, evm_version=evm_version
+        )
         self._rpc_node = RPCNode(self._local_node)
         self.root = AccountSigner(Account.from_key(self._local_node.root_private_key))
         self._default_address = self.root.address

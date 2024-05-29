@@ -38,6 +38,7 @@ Added
 - Support for the ``logs`` field in ``TxReceipt``. (PR_68_)
 - ``ClientSession.eth_get_logs()`` and ``eth_get_filter_logs()``. (PR_68_)
 - Support for a custom block number in gas estimation methods. (PR_70_)
+- ``LocalProvider`` accepts an ``evm_version`` parameter. (PR_78_)
 
 
 Fixed
@@ -71,6 +72,7 @@ Fixed
 .. _PR_75: https://github.com/fjarri-eth/pons/pull/75
 .. _PR_76: https://github.com/fjarri-eth/pons/pull/76
 .. _PR_77: https://github.com/fjarri-eth/pons/pull/77
+.. _PR_78: https://github.com/fjarri-eth/pons/pull/78
 
 
 0.7.0 (09-07-2023)
