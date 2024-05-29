@@ -1,9 +1,32 @@
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ParamSpec, TypeVar, cast
 
 import anyio
+from compages import StructuringError
+from ethereum_rpc import (
+    JSON,
+    Address,
+    Amount,
+    Block,
+    BlockHash,
+    BlockInfo,
+    BlockLabel,
+    EstimateGasParams,
+    EthCallParams,
+    FilterParams,
+    LogEntry,
+    RPCError,
+    RPCErrorCode,
+    TxHash,
+    TxInfo,
+    TxReceipt,
+    Type2Transaction,
+    structure,
+    unstructure,
+)
 
 from ._contract import (
     BoundConstructorCall,
@@ -20,32 +43,26 @@ from ._contract_abi import (
     EventFilter,
     UnknownError,
 )
-from ._entities import (
-    Address,
-    Amount,
-    Block,
-    BlockFilter,
-    BlockFilterId,
-    BlockHash,
-    BlockInfo,
-    EstimateGasParams,
-    EthCallParams,
-    FilterParams,
-    LogEntry,
-    LogFilter,
-    LogFilterId,
-    PendingTransactionFilter,
-    PendingTransactionFilterId,
-    RPCError,
-    RPCErrorCode,
-    TxHash,
-    TxInfo,
-    TxReceipt,
-    Type2Transaction,
-)
 from ._provider import InvalidResponse, Provider, ProviderSession
-from ._serialization import JSON, StructuringError, structure, unstructure
 from ._signer import Signer
+
+
+@dataclass
+class BlockFilter:
+    id_: int
+    provider_path: tuple[int, ...]
+
+
+@dataclass
+class PendingTransactionFilter:
+    id_: int
+    provider_path: tuple[int, ...]
+
+
+@dataclass
+class LogFilter:
+    id_: int
+    provider_path: tuple[int, ...]
 
 
 class Client:
@@ -90,8 +107,8 @@ class ProviderError(RemoteError):
     raw_code: int
     """The error code returned by the server."""
 
-    code: RPCErrorCode
-    """The parsed error code."""
+    code: None | RPCErrorCode
+    """The parsed error code (if known)."""
 
     message: str
     """The error message."""
@@ -101,10 +118,11 @@ class ProviderError(RemoteError):
 
     @classmethod
     def from_rpc_error(cls, exc: RPCError) -> "ProviderError":
-        parsed_code = RPCErrorCode.from_int(exc.code)
-        return cls(exc.code, parsed_code, exc.message, exc.data)
+        return cls(exc.code, exc.parsed_code, exc.message, exc.data)
 
-    def __init__(self, raw_code: int, code: RPCErrorCode, message: str, data: None | bytes = None):
+    def __init__(
+        self, raw_code: int, code: None | RPCErrorCode, message: str, data: None | bytes = None
+    ):
         super().__init__(raw_code, code, message, data)
         self.raw_code = raw_code
         self.code = code
@@ -113,7 +131,7 @@ class ProviderError(RemoteError):
 
     def __str__(self) -> str:
         # Substitute the known code if any, or report the raw integer value otherwise
-        code = self.raw_code if self.code == RPCErrorCode.UNKNOWN_REASON else self.code.name
+        code = self.code or self.raw_code
         return f"Provider error ({code}): {self.message}" + (
             f" (data: {self.data.hex()})" if self.data else ""
         )
@@ -302,7 +320,7 @@ class ClientSession:
             self._chain_id = await rpc_call(self._provider_session, "eth_chainId", int)
         return self._chain_id
 
-    async def eth_get_balance(self, address: Address, block: int | Block = Block.LATEST) -> Amount:
+    async def eth_get_balance(self, address: Address, block: Block = BlockLabel.LATEST) -> Amount:
         """Calls the ``eth_getBalance`` RPC method."""
         return await rpc_call(self._provider_session, "eth_getBalance", Amount, address, block)
 
@@ -335,7 +353,7 @@ class ClientSession:
         )
 
     async def eth_get_transaction_count(
-        self, address: Address, block: int | Block = Block.LATEST
+        self, address: Address, block: Block = BlockLabel.LATEST
     ) -> int:
         """Calls the ``eth_getTransactionCount`` RPC method."""
         return await rpc_call(
@@ -346,12 +364,12 @@ class ClientSession:
             block,
         )
 
-    async def eth_get_code(self, address: Address, block: int | Block = Block.LATEST) -> bytes:
+    async def eth_get_code(self, address: Address, block: Block = BlockLabel.LATEST) -> bytes:
         """Calls the ``eth_getCode`` RPC method."""
         return await rpc_call(self._provider_session, "eth_getCode", bytes, address, block)
 
     async def eth_get_storage_at(
-        self, address: Address, position: int, block: int | Block = Block.LATEST
+        self, address: Address, position: int, block: Block = BlockLabel.LATEST
     ) -> bytes:
         """Calls the ``eth_getCode`` RPC method."""
         return await rpc_call(
@@ -376,7 +394,7 @@ class ClientSession:
     async def eth_call(
         self,
         call: BoundMethodCall,
-        block: int | Block = Block.LATEST,
+        block: Block = BlockLabel.LATEST,
         sender_address: None | Address = None,
     ) -> Any:
         """
@@ -401,7 +419,7 @@ class ClientSession:
         """Sends a signed and serialized transaction."""
         return await rpc_call(self._provider_session, "eth_sendRawTransaction", TxHash, tx_bytes)
 
-    async def _estimate_gas(self, params: EstimateGasParams, block: int | Block) -> int:
+    async def _estimate_gas(self, params: EstimateGasParams, block: Block) -> int:
         return await rpc_call(self._provider_session, "eth_estimateGas", int, params, block)
 
     async def estimate_deploy(
@@ -409,7 +427,7 @@ class ClientSession:
         sender_address: Address,
         call: BoundConstructorCall,
         amount: None | Amount = None,
-        block: int | Block = Block.LATEST,
+        block: Block = BlockLabel.LATEST,
     ) -> int:
         """
         Estimates the amount of gas required to deploy the contract with the given args.
@@ -433,7 +451,7 @@ class ClientSession:
         source_address: Address,
         destination_address: Address,
         amount: Amount,
-        block: int | Block = Block.LATEST,
+        block: Block = BlockLabel.LATEST,
     ) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
@@ -449,7 +467,7 @@ class ClientSession:
         sender_address: Address,
         call: BoundMethodCall,
         amount: None | Amount = None,
-        block: int | Block = Block.LATEST,
+        block: Block = BlockLabel.LATEST,
     ) -> int:
         """
         Estimates the amount of gas required to transact with a contract.
@@ -498,7 +516,7 @@ class ClientSession:
         )
 
     async def eth_get_block_by_number(
-        self, block: int | Block = Block.LATEST, *, with_transactions: bool = False
+        self, block: Block = BlockLabel.LATEST, *, with_transactions: bool = False
     ) -> None | BlockInfo:
         """Calls the ``eth_getBlockByNumber`` RPC method."""
         # Need an explicit cast, mypy doesn't work with union types correctly.
@@ -532,7 +550,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
+        nonce = await self.eth_get_transaction_count(signer.address, BlockLabel.PENDING)
         tx = cast(
             dict[str, JSON],
             unstructure(
@@ -602,7 +620,7 @@ class ClientSession:
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
+        nonce = await self.eth_get_transaction_count(signer.address, BlockLabel.PENDING)
         tx = cast(
             dict[str, JSON],
             unstructure(
@@ -655,12 +673,12 @@ class ClientSession:
         chain_id = await self.eth_chain_id()
         if gas is None:
             gas = await self.estimate_transact(
-                signer.address, call, amount=amount, block=Block.PENDING
+                signer.address, call, amount=amount, block=BlockLabel.PENDING
             )
         # TODO (#19): implement gas strategies
         max_gas_price = await self.eth_gas_price()
         max_tip = min(Amount.gwei(1), max_gas_price)
-        nonce = await self.eth_get_transaction_count(signer.address, Block.PENDING)
+        nonce = await self.eth_get_transaction_count(signer.address, BlockLabel.PENDING)
         tx = cast(
             dict[str, JSON],
             unstructure(
@@ -737,8 +755,8 @@ class ClientSession:
         self,
         source: None | Address | Iterable[Address] = None,
         event_filter: None | EventFilter = None,
-        from_block: int | Block = Block.LATEST,
-        to_block: int | Block = Block.LATEST,
+        from_block: Block = BlockLabel.LATEST,
+        to_block: Block = BlockLabel.LATEST,
     ) -> tuple[LogEntry, ...]:
         """Calls the ``eth_getLogs`` RPC method."""
         if isinstance(source, Iterable):
@@ -754,14 +772,14 @@ class ClientSession:
     async def eth_new_block_filter(self) -> BlockFilter:
         """Calls the ``eth_newBlockFilter`` RPC method."""
         result, provider_path = await rpc_call_pin(
-            self._provider_session, "eth_newBlockFilter", BlockFilterId
+            self._provider_session, "eth_newBlockFilter", int
         )
         return BlockFilter(id_=result, provider_path=provider_path)
 
     async def eth_new_pending_transaction_filter(self) -> PendingTransactionFilter:
         """Calls the ``eth_newPendingTransactionFilter`` RPC method."""
         result, provider_path = await rpc_call_pin(
-            self._provider_session, "eth_newPendingTransactionFilter", PendingTransactionFilterId
+            self._provider_session, "eth_newPendingTransactionFilter", int
         )
         return PendingTransactionFilter(id_=result, provider_path=provider_path)
 
@@ -769,8 +787,8 @@ class ClientSession:
         self,
         source: None | Address | Iterable[Address] = None,
         event_filter: None | EventFilter = None,
-        from_block: int | Block = Block.LATEST,
-        to_block: int | Block = Block.LATEST,
+        from_block: Block = BlockLabel.LATEST,
+        to_block: Block = BlockLabel.LATEST,
     ) -> LogFilter:
         """Calls the ``eth_newFilter`` RPC method."""
         if isinstance(source, Iterable):
@@ -782,7 +800,7 @@ class ClientSession:
             topics=event_filter.topics if event_filter is not None else None,
         )
         result, provider_path = await rpc_call_pin(
-            self._provider_session, "eth_newFilter", LogFilterId, params
+            self._provider_session, "eth_newFilter", int, params
         )
         return LogFilter(id_=result, provider_path=provider_path)
 
@@ -854,8 +872,8 @@ class ClientSession:
         self,
         event_filter: BoundEventFilter,
         poll_interval: int = 1,
-        from_block: int | Block = Block.LATEST,
-        to_block: int | Block = Block.LATEST,
+        from_block: Block = BlockLabel.LATEST,
+        to_block: Block = BlockLabel.LATEST,
     ) -> AsyncIterator[dict[str, Any]]:
         """
         Yields decoded log entries produced by the filter.

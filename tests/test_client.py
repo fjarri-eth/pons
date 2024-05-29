@@ -4,13 +4,20 @@ from pathlib import Path
 
 import pytest
 import trio
+from ethereum_rpc import (
+    Address,
+    Amount,
+    BlockHash,
+    BlockLabel,
+    RPCError,
+    RPCErrorCode,
+    TxHash,
+    TxInfo,
+    keccak,
+)
 
 from pons import (
     ABIDecodingError,
-    Address,
-    Amount,
-    Block,
-    BlockHash,
     Client,
     ContractABI,
     ContractError,
@@ -21,15 +28,12 @@ from pons import (
     LocalProvider,
     Method,
     Mutability,
-    RPCErrorCode,
-    TxHash,
     abi,
     compile_contract_file,
 )
-from pons._abi_types import encode_args, keccak
+from pons._abi_types import encode_args
 from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
-from pons._entities import RPCError, TxInfo
 
 
 @pytest.fixture
@@ -131,7 +135,7 @@ async def test_eth_get_transaction_count(local_provider, session, root_signer, a
     # Check that pending transactions are accounted for
     local_provider.disable_auto_mine_transactions()
     await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(10))
-    assert await session.eth_get_transaction_count(root_signer.address, Block.PENDING) == 2
+    assert await session.eth_get_transaction_count(root_signer.address, BlockLabel.PENDING) == 2
 
 
 async def test_wait_for_transaction_receipt(
@@ -180,7 +184,7 @@ async def test_eth_call(session, compiled_contracts, root_signer, another_signer
 
     # With a real provider, if `sender_address` is not given, it will default to the zero address.
     result = await session.eth_call(deployed_contract.method.getSender())
-    assert result == (Address.from_hex(b"\x00" * 20),)
+    assert result == (Address(b"\x00" * 20),)
 
     # Seems to be another tester chain limitation: even though `eth_call` does not spend gas,
     # the `sender_address` still needs to be funded.
@@ -204,7 +208,7 @@ async def test_eth_call_pending(local_provider, session, compiled_contracts, roo
     assert result == (123,)
 
     # This also uses the state change introduced by the pending transaction
-    result = await session.eth_call(deployed_contract.method.getState(0), block=Block.PENDING)
+    result = await session.eth_call(deployed_contract.method.getState(0), block=BlockLabel.PENDING)
     assert result == (456,)
 
 
@@ -520,7 +524,7 @@ async def test_get_block_pending(local_provider, session, root_signer, another_s
         root_signer, another_signer.address, Amount.ether(10)
     )
 
-    block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=True)
+    block_info = await session.eth_get_block_by_number(BlockLabel.PENDING, with_transactions=True)
     assert block_info.number == 2
     assert block_info.hash_ is None
     assert block_info.nonce is None
@@ -530,7 +534,7 @@ async def test_get_block_pending(local_provider, session, root_signer, another_s
     assert block_info.transactions[0].hash_ == tx_hash
     assert block_info.transactions[0].value == Amount.ether(10)
 
-    block_info = await session.eth_get_block_by_number(Block.PENDING, with_transactions=False)
+    block_info = await session.eth_get_block_by_number(BlockLabel.PENDING, with_transactions=False)
     assert len(block_info.transactions) == 1
     assert block_info.transactions[0] == tx_hash
 
@@ -559,7 +563,7 @@ async def test_eth_get_transaction_by_hash(local_provider, session, root_signer,
 async def test_eth_get_code(session, root_signer, compiled_contracts):
     compiled_contract = compiled_contracts["EmptyContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
-    bytecode = await session.eth_get_code(deployed_contract.address, block=Block.LATEST)
+    bytecode = await session.eth_get_code(deployed_contract.address, block=BlockLabel.LATEST)
 
     # The bytecode being deployed is not the code that will be stored on chain,
     # but some code that, having been executed, returns the code that will be stored on chain.
@@ -578,7 +582,9 @@ async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
     )
 
     # Get the regular stored value
-    storage = await session.eth_get_storage_at(deployed_contract.address, 0, block=Block.LATEST)
+    storage = await session.eth_get_storage_at(
+        deployed_contract.address, 0, block=BlockLabel.LATEST
+    )
     assert storage == b"\x00" * 31 + x.to_bytes(1, byteorder="big")
 
     # Get the value of the mapping
@@ -594,7 +600,7 @@ async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
         byteorder="big",
     )
     storage = await session.eth_get_storage_at(
-        deployed_contract.address, position, block=Block.LATEST
+        deployed_contract.address, position, block=BlockLabel.LATEST
     )
     assert storage == b"\x00" * 31 + y_val.to_bytes(1, byteorder="big")
 
@@ -624,7 +630,7 @@ async def test_block_filter(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, to_transfer)
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
-    last_block = await session.eth_get_block_by_number(Block.LATEST)
+    last_block = await session.eth_get_block_by_number(BlockLabel.LATEST)
     prev_block = await session.eth_get_block_by_number(last_block.number - 1)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
@@ -633,7 +639,7 @@ async def test_block_filter(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
-    last_block = await session.eth_get_block_by_number(Block.LATEST)
+    last_block = await session.eth_get_block_by_number(BlockLabel.LATEST)
     assert block_hashes == (last_block.hash_,)
 
     block_hashes = await session.eth_get_filter_changes(block_filter)
@@ -1133,7 +1139,8 @@ async def test_unknown_error_reasons(local_provider, session, compiled_contracts
 
     with monkeypatched(local_provider, "rpc", mock_rpc):
         with pytest.raises(
-            ProviderError, match=r"Provider error \(EXECUTION_ERROR\): execution reverted"
+            ProviderError,
+            match=r"Provider error \(RPCErrorCode\.EXECUTION_ERROR\): execution reverted",
         ):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
 

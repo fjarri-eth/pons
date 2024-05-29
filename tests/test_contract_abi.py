@@ -2,6 +2,7 @@ import re
 from typing import NamedTuple
 
 import pytest
+from ethereum_rpc import LogTopic, keccak
 
 from pons import (
     Constructor,
@@ -16,7 +17,7 @@ from pons import (
     Receive,
     abi,
 )
-from pons._abi_types import encode_args, keccak
+from pons._abi_types import encode_args
 from pons._contract_abi import (
     LEGACY_ERROR,
     PANIC_ERROR,
@@ -24,7 +25,6 @@ from pons._contract_abi import (
     Signature,
     UnknownError,
 )
-from pons._entities import LogTopic
 
 
 def test_signature_from_dict():

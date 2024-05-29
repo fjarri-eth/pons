@@ -75,5 +75,6 @@ python_use_unqualified_type_names = True
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
-    "eth_account": ("https://eth-account.readthedocs.io/en/stable/", None),
+    "eth_account": ("https://eth-account.readthedocs.io/en/v0.13.0/", None),
+    "ethereum_rpc": ("https://ethereum-rpc.readthedocs.io/en/v0.1.0", None),
 }

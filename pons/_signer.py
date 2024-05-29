@@ -4,9 +4,7 @@ from functools import cached_property
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-
-from ._entities import Address
-from ._provider import JSON
+from ethereum_rpc import JSON, Address
 
 
 class Signer(ABC):

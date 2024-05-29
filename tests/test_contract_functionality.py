@@ -1,17 +1,17 @@
 from pathlib import Path
 
 import pytest
+from ethereum_rpc import Amount
 
 from pons import (
-    Amount,
     Constructor,
     ContractABI,
     DeployedContract,
     Method,
     Mutability,
     abi,
+    compile_contract_file,
 )
-from pons._compiler import compile_contract_file
 
 
 @pytest.fixture

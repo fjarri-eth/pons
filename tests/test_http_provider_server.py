@@ -2,8 +2,9 @@
 # and don't use high-level API.
 
 import pytest
+from ethereum_rpc import RPCError, RPCErrorCode
 
-from pons import HTTPProviderServer, RPCError, RPCErrorCode
+from pons import HTTPProviderServer
 
 
 @pytest.fixture

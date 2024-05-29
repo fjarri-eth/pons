@@ -17,6 +17,7 @@ Changed
 - Bumped the minimum Python version to 3.10. (PR_72_)
 - The entities are now dataclasses instead of namedtuples. (PR_75_)
 - Bumped ``eth-account`` to ``0.13``. (PR_76_)
+- Use the types from ``ethereum-rpc``. (PR_77_)
 
 
 Added
@@ -52,23 +53,24 @@ Fixed
 - Expect the block number to be non-null even for pending blocks, since that's what providers return. (PR_70_)
 
 
-.. _PR_51: https://github.com/fjarri/pons/pull/51
-.. _PR_52: https://github.com/fjarri/pons/pull/52
-.. _PR_54: https://github.com/fjarri/pons/pull/54
-.. _PR_56: https://github.com/fjarri/pons/pull/56
-.. _PR_57: https://github.com/fjarri/pons/pull/57
-.. _PR_59: https://github.com/fjarri/pons/pull/59
-.. _PR_61: https://github.com/fjarri/pons/pull/61
-.. _PR_62: https://github.com/fjarri/pons/pull/62
-.. _PR_63: https://github.com/fjarri/pons/pull/63
-.. _PR_64: https://github.com/fjarri/pons/pull/64
-.. _PR_65: https://github.com/fjarri/pons/pull/65
-.. _PR_67: https://github.com/fjarri/pons/pull/67
-.. _PR_68: https://github.com/fjarri/pons/pull/68
-.. _PR_70: https://github.com/fjarri/pons/pull/70
-.. _PR_72: https://github.com/fjarri/pons/pull/72
-.. _PR_75: https://github.com/fjarri/pons/pull/75
-.. _PR_76: https://github.com/fjarri/pons/pull/76
+.. _PR_51: https://github.com/fjarri-eth/pons/pull/51
+.. _PR_52: https://github.com/fjarri-eth/pons/pull/52
+.. _PR_54: https://github.com/fjarri-eth/pons/pull/54
+.. _PR_56: https://github.com/fjarri-eth/pons/pull/56
+.. _PR_57: https://github.com/fjarri-eth/pons/pull/57
+.. _PR_59: https://github.com/fjarri-eth/pons/pull/59
+.. _PR_61: https://github.com/fjarri-eth/pons/pull/61
+.. _PR_62: https://github.com/fjarri-eth/pons/pull/62
+.. _PR_63: https://github.com/fjarri-eth/pons/pull/63
+.. _PR_64: https://github.com/fjarri-eth/pons/pull/64
+.. _PR_65: https://github.com/fjarri-eth/pons/pull/65
+.. _PR_67: https://github.com/fjarri-eth/pons/pull/67
+.. _PR_68: https://github.com/fjarri-eth/pons/pull/68
+.. _PR_70: https://github.com/fjarri-eth/pons/pull/70
+.. _PR_72: https://github.com/fjarri-eth/pons/pull/72
+.. _PR_75: https://github.com/fjarri-eth/pons/pull/75
+.. _PR_76: https://github.com/fjarri-eth/pons/pull/76
+.. _PR_77: https://github.com/fjarri-eth/pons/pull/77
 
 
 0.7.0 (09-07-2023)
@@ -88,9 +90,9 @@ Added
 - ``Mutability`` enum for defining contract method mutability. (PR_50_)
 
 
-.. _PR_48: https://github.com/fjarri/pons/pull/48
-.. _PR_49: https://github.com/fjarri/pons/pull/49
-.. _PR_50: https://github.com/fjarri/pons/pull/50
+.. _PR_48: https://github.com/fjarri-eth/pons/pull/48
+.. _PR_49: https://github.com/fjarri-eth/pons/pull/49
+.. _PR_50: https://github.com/fjarri-eth/pons/pull/50
 
 
 
@@ -115,7 +117,7 @@ Fixed
 - Support the existence of outputs in the JSON ABI of a mutating method. (PR_47_)
 
 
-.. _PR_47: https://github.com/fjarri/pons/pull/47
+.. _PR_47: https://github.com/fjarri-eth/pons/pull/47
 
 
 0.5.1 (14-11-2022)
@@ -127,7 +129,7 @@ Fixed
 - A bug in processing keyword arguments to contract calls. (PR_42_)
 
 
-.. _PR_42: https://github.com/fjarri/pons/pull/42
+.. _PR_42: https://github.com/fjarri-eth/pons/pull/42
 
 
 0.5.0 (14-09-2022)
@@ -145,8 +147,8 @@ Fixed
 - Return type of classmethods of ``Amount`` and ``Address`` now provides correct information to ``mypy`` in dependent projects. (PR_37_)
 
 
-.. _PR_37: https://github.com/fjarri/pons/pull/37
-.. _PR_40: https://github.com/fjarri/pons/pull/40
+.. _PR_37: https://github.com/fjarri-eth/pons/pull/37
+.. _PR_40: https://github.com/fjarri-eth/pons/pull/40
 
 
 0.4.2 (05-06-2022)
@@ -170,8 +172,8 @@ Fixed
 - Removed ``TxReceipt`` export (making an exception here and not counting it as a breaking change, since nobody would have any use for creating one manually). (PR_32_)
 
 
-.. _PR_32: https://github.com/fjarri/pons/pull/32
-.. _PR_33: https://github.com/fjarri/pons/pull/33
+.. _PR_32: https://github.com/fjarri-eth/pons/pull/32
+.. _PR_33: https://github.com/fjarri-eth/pons/pull/33
 
 
 0.4.1 (01-05-2022)
@@ -185,9 +187,9 @@ Added
 - Support for gas overrides in ``transfer()``, ``transact()``, and ``deploy()``. (PR_30_)
 
 
-.. _PR_27: https://github.com/fjarri/pons/pull/27
-.. _PR_29: https://github.com/fjarri/pons/pull/29
-.. _PR_30: https://github.com/fjarri/pons/pull/30
+.. _PR_27: https://github.com/fjarri-eth/pons/pull/27
+.. _PR_29: https://github.com/fjarri-eth/pons/pull/29
+.. _PR_30: https://github.com/fjarri-eth/pons/pull/30
 
 
 0.4.0 (23-04-2022)
@@ -214,8 +216,8 @@ Added
 - ``RemoteError`` and ``Unreachable`` exception types to report errors from client sessions in a standardized way. (PR_5_)
 
 
-.. _PR_4: https://github.com/fjarri/pons/pull/4
-.. _PR_5: https://github.com/fjarri/pons/pull/5
+.. _PR_4: https://github.com/fjarri-eth/pons/pull/4
+.. _PR_5: https://github.com/fjarri-eth/pons/pull/5
 
 
 0.3.0 (03-04-2022)
@@ -236,9 +238,9 @@ Fixed
 - Replaced assertions with more informative exceptions. (PR_3_)
 
 
-.. _PR_1: https://github.com/fjarri/pons/pull/1
-.. _PR_2: https://github.com/fjarri/pons/pull/2
-.. _PR_3: https://github.com/fjarri/pons/pull/3
+.. _PR_1: https://github.com/fjarri-eth/pons/pull/1
+.. _PR_2: https://github.com/fjarri-eth/pons/pull/2
+.. _PR_3: https://github.com/fjarri-eth/pons/pull/3
 
 
 0.2.0 (19-03-2022)

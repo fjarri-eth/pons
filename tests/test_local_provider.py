@@ -1,8 +1,9 @@
 # TODO (#60): expand the tests so that this file covered 100% of the respective submodule.
 
 import pytest
+from ethereum_rpc import Amount, RPCError
 
-from pons import AccountSigner, Amount, Client, LocalProvider, RPCError
+from pons import AccountSigner, Client, LocalProvider
 
 
 # Masking the global fixtures to make this test self-contained

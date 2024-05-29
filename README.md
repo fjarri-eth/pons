@@ -13,7 +13,7 @@ For more information see [the documentation](https://pons.readthedocs.io/en/late
 [pypi-license-image]: https://img.shields.io/pypi/l/pons
 [rtd-image]: https://readthedocs.org/projects/pons/badge/?version=latest
 [rtd-link]: https://pons.readthedocs.io/en/latest/
-[cov-image]: https://codecov.io/gh/fjarri/pons/branch/master/graph/badge.svg?token=RZP1LK1HB2
-[cov-link]: https://codecov.io/gh/fjarri/pons
+[cov-image]: https://codecov.io/gh/fjarri-eth/pons/branch/master/graph/badge.svg?token=RZP1LK1HB2
+[cov-link]: https://codecov.io/gh/fjarri-eth/pons
 [black-image]: https://img.shields.io/badge/code%20style-black-000000.svg
 [black-link]: https://github.com/psf/black

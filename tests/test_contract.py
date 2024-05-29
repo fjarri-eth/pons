@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from ethereum_rpc import Address, LogTopic, keccak
 
 from pons import (
-    Address,
     Constructor,
     Event,
     Fallback,
@@ -13,9 +13,8 @@ from pons import (
     abi,
     compile_contract_file,
 )
-from pons._abi_types import encode_args, keccak
+from pons._abi_types import encode_args
 from pons._contract import BoundMethod, DeployedContract
-from pons._entities import LogTopic
 
 
 @pytest.fixture

@@ -1,6 +1,7 @@
 from eth_account import Account
+from ethereum_rpc import Address
 
-from pons import AccountSigner, Address
+from pons import AccountSigner
 
 
 def check_signer(signer):
