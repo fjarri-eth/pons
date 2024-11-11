@@ -206,6 +206,12 @@ Utility classes
    :members:
 
 
+Utility methods
+---------------
+
+.. autofunction:: pons.get_create2_address
+
+
 Compiled and deployed contracts
 -------------------------------
 
