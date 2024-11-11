@@ -49,6 +49,7 @@ from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
 from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
 from ._signer import AccountSigner, Signer
+from ._utils import get_create2_address, get_create_address
 
 __all__ = [
     "ABIDecodingError",
@@ -98,4 +99,6 @@ __all__ = [
     "Unreachable",
     "abi",
     "compile_contract_file",
+    "get_create_address",
+    "get_create2_address",
 ]
