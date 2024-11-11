@@ -209,6 +209,8 @@ Utility classes
 Utility methods
 ---------------
 
+.. autofunction:: pons.get_create_address
+
 .. autofunction:: pons.get_create2_address
 
 

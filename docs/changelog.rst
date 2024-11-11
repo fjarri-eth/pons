@@ -40,6 +40,7 @@ Added
 - Support for a custom block number in gas estimation methods. (PR_70_)
 - ``LocalProvider`` accepts an ``evm_version`` parameter. (PR_78_)
 - ``get_create2_address()``. (PR_80_)
+- ``get_create_address()``. (PR_80_)
 
 
 Fixed
