@@ -2,6 +2,19 @@ Changelog
 ---------
 
 
+0.8.1 (2024-11-12)
+~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+- ``get_create2_address()``. (PR_80_)
+- ``get_create_address()``. (PR_80_)
+
+
+.. _PR_80: https://github.com/fjarri-eth/pons/pull/80
+
+
 0.8.0 (2024-05-28)
 ~~~~~~~~~~~~~~~~~~
 
@@ -39,8 +52,6 @@ Added
 - ``ClientSession.eth_get_logs()`` and ``eth_get_filter_logs()``. (PR_68_)
 - Support for a custom block number in gas estimation methods. (PR_70_)
 - ``LocalProvider`` accepts an ``evm_version`` parameter. (PR_78_)
-- ``get_create2_address()``. (PR_80_)
-- ``get_create_address()``. (PR_80_)
 
 
 Fixed
@@ -75,7 +86,6 @@ Fixed
 .. _PR_76: https://github.com/fjarri-eth/pons/pull/76
 .. _PR_77: https://github.com/fjarri-eth/pons/pull/77
 .. _PR_78: https://github.com/fjarri-eth/pons/pull/78
-.. _PR_80: https://github.com/fjarri-eth/pons/pull/80
 
 
 0.7.0 (09-07-2023)
