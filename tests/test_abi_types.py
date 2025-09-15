@@ -23,6 +23,9 @@ def test_uint():
     assert abi.uint(8) == abi.uint(8)
     assert abi.uint(8) != abi.uint(16)
 
+    assert hash(abi.uint(8)) == hash(abi.uint(8))
+    assert hash(abi.uint(8)) != hash(abi.uint(256))
+
     for bit_size in [-1, 0, 255, 512]:
         with pytest.raises(ValueError, match=f"Incorrect `uint` bit size: {bit_size}"):
             abi.uint(bit_size)
@@ -50,6 +53,9 @@ def test_int():
     assert abi.int(256).canonical_form == "int256"
     assert abi.int(8) == abi.int(8)
     assert abi.int(8) != abi.int(16)
+
+    assert hash(abi.int(8)) == hash(abi.int(8))
+    assert hash(abi.int(8)) != hash(abi.int(256))
 
     for bit_size in [-1, 0, 255, 512]:
         with pytest.raises(ValueError, match=f"Incorrect `int` bit size: {bit_size}"):
@@ -83,6 +89,9 @@ def test_bytes():
     assert abi.bytes(8) == abi.bytes(8)
     assert abi.bytes(8) != abi.bytes(16)
 
+    assert hash(abi.bytes(8)) == hash(abi.bytes(8))
+    assert hash(abi.bytes(8)) != hash(abi.bytes(3))
+
     for size in [-1, 0, 33]:
         with pytest.raises(ValueError, match=f"Incorrect `bytes` size: {size}"):
             abi.bytes(size)
@@ -102,6 +111,8 @@ def test_address():
 
     assert abi.address.canonical_form == "address"
 
+    assert hash(abi.address) == hash(abi.address)
+
     with pytest.raises(
         TypeError, match="`address` must correspond to an `Address`-type value, got str"
     ):
@@ -117,6 +128,8 @@ def test_string():
 
     assert abi.string.canonical_form == "string"
 
+    assert hash(abi.string) == hash(abi.string)
+
     with pytest.raises(
         TypeError, match="`string` must correspond to a `str`-type value, got bytes"
     ):
@@ -128,6 +141,8 @@ def test_bool():
     assert abi.bool._denormalize(True) is True
 
     assert abi.bool.canonical_form == "bool"
+
+    assert hash(abi.bool) == hash(abi.bool)
 
     with pytest.raises(TypeError, match="`bool` must correspond to a `bool`-type value, got int"):
         abi.bool._normalize(1)
@@ -144,6 +159,11 @@ def test_array():
     assert abi.uint(8)[2] == abi.uint(8)[2]
     assert abi.uint(8)[...] == abi.uint(8)[...]
     assert abi.uint(8)[...] != abi.uint(8)[2]
+
+    assert hash(abi.uint(8)[2]) == hash(abi.uint(8)[2])
+    assert hash(abi.uint(8)[...]) == hash(abi.uint(8)[...])
+    assert hash(abi.uint(8)[2]) != hash(abi.uint(8)[3])
+    assert hash(abi.uint(8)[2]) != hash(abi.uint(8)[...])
 
     with pytest.raises(TypeError, match="Expected an iterable, got int"):
         abi.uint(8)[1]._normalize(1)
@@ -166,6 +186,9 @@ def test_struct():
     assert str(s1) == "(uint8 a, bool b)"
     assert s1 == s1_copy
     assert s1 != s2
+
+    assert hash(s1) == hash(s1_copy)
+    assert hash(s1) != hash(s2)
 
     with pytest.raises(TypeError, match="Expected an iterable, got int"):
         s1._normalize(1)

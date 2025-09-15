@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from json import JSONDecodeError
@@ -7,7 +7,10 @@ from typing import cast
 
 import httpx
 from compages import StructuringError
-from ethereum_rpc import JSON, RPCError, structure
+from ethereum_rpc import RPCError, structure
+
+JSON = None | bool | int | float | str | Sequence["JSON"] | Mapping[str, "JSON"]
+"""Values serializable to JSON."""
 
 
 class InvalidResponse(Exception):
@@ -129,7 +132,7 @@ class HTTPSession(ProviderSession):
 
         if not isinstance(response_json, Mapping):
             raise InvalidResponse(f"RPC response must be a dictionary, got: {response_json}")
-        response_json = cast(Mapping[str, JSON], response_json)
+        response_json = cast("Mapping[str, JSON]", response_json)
 
         # Note that the Eth-side errors (e.g. transaction having been reverted)
         # will have the HTTP status 200, so we are checking for the "error" field first.

@@ -2,6 +2,18 @@ Changelog
 ---------
 
 
+0.8.2 (in development)
+~~~~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+- Hash methods for ABI types. (PR_81_)
+
+
+.. _PR_81: https://github.com/fjarri-eth/pons/pull/81
+
+
 0.8.1 (2024-11-12)
 ~~~~~~~~~~~~~~~~~~
 

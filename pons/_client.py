@@ -2,12 +2,11 @@ from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 import anyio
 from compages import StructuringError
 from ethereum_rpc import (
-    JSON,
     Address,
     Amount,
     Block,
@@ -45,6 +44,9 @@ from ._contract_abi import (
 )
 from ._provider import InvalidResponse, Provider, ProviderSession
 from ._signer import Signer
+
+if TYPE_CHECKING:  # pragma: no cover
+    from eth_account.types import TransactionDictType
 
 
 @dataclass
@@ -329,7 +331,7 @@ class ClientSession:
         # Need an explicit cast, mypy doesn't work with union types correctly.
         # See https://github.com/python/mypy/issues/16935
         return cast(
-            None | TxInfo,
+            "None | TxInfo",
             await rpc_call(
                 self._provider_session,
                 "eth_getTransactionByHash",
@@ -343,7 +345,7 @@ class ClientSession:
         # Need an explicit cast, mypy doesn't work with union types correctly.
         # See https://github.com/python/mypy/issues/16935
         return cast(
-            None | TxReceipt,
+            "None | TxReceipt",
             await rpc_call(
                 self._provider_session,
                 "eth_getTransactionReceipt",
@@ -505,7 +507,7 @@ class ClientSession:
         # Need an explicit cast, mypy doesn't work with union types correctly.
         # See https://github.com/python/mypy/issues/16935
         return cast(
-            None | BlockInfo,
+            "None | BlockInfo",
             await rpc_call(
                 self._provider_session,
                 "eth_getBlockByHash",
@@ -522,7 +524,7 @@ class ClientSession:
         # Need an explicit cast, mypy doesn't work with union types correctly.
         # See https://github.com/python/mypy/issues/16935
         return cast(
-            None | BlockInfo,
+            "None | BlockInfo",
             await rpc_call(
                 self._provider_session,
                 "eth_getBlockByNumber",
@@ -552,7 +554,7 @@ class ClientSession:
         max_tip = min(Amount.gwei(1), max_gas_price)
         nonce = await self.eth_get_transaction_count(signer.address, BlockLabel.PENDING)
         tx = cast(
-            dict[str, JSON],
+            "TransactionDictType",
             unstructure(
                 Type2Transaction(
                     chain_id=chain_id,
@@ -622,7 +624,7 @@ class ClientSession:
         max_tip = min(Amount.gwei(1), max_gas_price)
         nonce = await self.eth_get_transaction_count(signer.address, BlockLabel.PENDING)
         tx = cast(
-            dict[str, JSON],
+            "TransactionDictType",
             unstructure(
                 Type2Transaction(
                     chain_id=chain_id,
@@ -680,7 +682,7 @@ class ClientSession:
         max_tip = min(Amount.gwei(1), max_gas_price)
         nonce = await self.eth_get_transaction_count(signer.address, BlockLabel.PENDING)
         tx = cast(
-            dict[str, JSON],
+            "TransactionDictType",
             unstructure(
                 Type2Transaction(
                     chain_id=chain_id,
@@ -854,7 +856,7 @@ class ClientSession:
             for block_hash in block_hashes:
                 # We can't ensure it statically, since `eth_getFilterChanges` return type depends
                 # on the filter passed to it.
-                yield cast(BlockHash, block_hash)
+                yield cast("BlockHash", block_hash)
             await anyio.sleep(poll_interval)
 
     async def iter_pending_transactions(self, poll_interval: int = 1) -> AsyncIterator[TxHash]:
@@ -865,7 +867,7 @@ class ClientSession:
             for tx_hash in tx_hashes:
                 # We can't ensure it statically, since `eth_getFilterChanges` return type depends
                 # on the filter passed to it.
-                yield cast(TxHash, tx_hash)
+                yield cast("TxHash", tx_hash)
             await anyio.sleep(poll_interval)
 
     async def iter_events(
@@ -891,5 +893,5 @@ class ClientSession:
             for log_entry in log_entries:
                 # We can't ensure it statically, since `eth_getFilterChanges` return type depends
                 # on the filter passed to it.
-                yield event_filter.decode_log_entry(cast(LogEntry, log_entry))
+                yield event_filter.decode_log_entry(cast("LogEntry", log_entry))
             await anyio.sleep(poll_interval)

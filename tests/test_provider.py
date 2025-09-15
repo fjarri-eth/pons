@@ -135,7 +135,7 @@ async def test_no_error_field(session, monkeypatch):
     orig_process_request = _http_provider_server.process_request
 
     async def faulty_process_request(*args, **kwargs):
-        status, response = await orig_process_request(*args, **kwargs)
+        _status, response = await orig_process_request(*args, **kwargs)
         del response["result"]
         return (HTTPStatus.BAD_REQUEST, response)
 
@@ -152,7 +152,7 @@ async def test_malformed_error_field(session, monkeypatch):
     orig_process_request = _http_provider_server.process_request
 
     async def faulty_process_request(*args, **kwargs):
-        status, response = await orig_process_request(*args, **kwargs)
+        _status, response = await orig_process_request(*args, **kwargs)
         del response["result"]
         response["error"] = {"something_weird": 1}
         return (HTTPStatus.BAD_REQUEST, response)

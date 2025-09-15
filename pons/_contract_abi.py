@@ -437,7 +437,7 @@ class MultiMethod:
     def with_method(self, method: Method) -> "MultiMethod":
         """Returns a new ``MultiMethod`` with the given method included."""
         new_mm = MultiMethod(*self._methods.values())
-        new_mm._add_method(method)  # noqa: SLF001
+        new_mm._add_method(method)
         return new_mm
 
     def __call__(self, *args: Any, **kwds: Any) -> "MethodCall":

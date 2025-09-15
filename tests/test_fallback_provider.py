@@ -4,11 +4,11 @@ from contextlib import asynccontextmanager
 from enum import Enum
 
 import pytest
-from ethereum_rpc import JSON, RPCError
+from ethereum_rpc import RPCError
 
 from pons import CycleFallback, FallbackProvider, PriorityFallback, Unreachable
 from pons._fallback_provider import PriorityFallbackStrategy
-from pons._provider import InvalidResponse, Provider, ProviderSession
+from pons._provider import JSON, InvalidResponse, Provider, ProviderSession
 
 
 def random_request():
@@ -160,7 +160,7 @@ async def test_nested_providers():
     async with provider.session() as session:
         # All providers operational, provider 0 is pinned
         request = random_request()
-        result, path = await session.rpc_and_pin(request)
+        _result, path = await session.rpc_and_pin(request)
         assert path == (0, 0)
         assert providers[0].requests[-1] == request
 
@@ -171,12 +171,12 @@ async def test_nested_providers():
 
         # Provider 0 is still offline, pinning results in using provider 1
         request = random_request()
-        result, path = await session.rpc_and_pin(request)
+        _result, path = await session.rpc_and_pin(request)
         assert path == (0, 1)
         assert providers[1].requests[-1] == request
 
         request = random_request()
-        result = await session.rpc_at_pin(path, request)
+        _result = await session.rpc_at_pin(path, request)
         assert providers[1].requests[-1] == request
 
         # All but provider 2 are offline
@@ -184,7 +184,7 @@ async def test_nested_providers():
         providers[0].set_state(ProviderState.UNREACHABLE)
         providers[1].set_state(ProviderState.UNREACHABLE)
         providers[3].set_state(ProviderState.UNREACHABLE)
-        result, path = await session.rpc_and_pin(request)
+        _result, path = await session.rpc_and_pin(request)
         assert path == (1, 0)
         assert providers[2].requests[-1] == request
 

@@ -47,7 +47,7 @@ from ._fallback_provider import (
 )
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
-from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
+from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable, JSON
 from ._signer import AccountSigner, Signer
 from ._utils import get_create2_address, get_create_address
 
@@ -71,34 +71,35 @@ __all__ = [
     "ContractPanic",
     "CycleFallback",
     "DeployedContract",
+    "EVMVersion",
     "Either",
     "Error",
-    "EVMVersion",
-    "LocalProvider",
     "Event",
     "EventFilter",
     "Fallback",
     "FallbackProvider",
     "FallbackStrategy",
     "FallbackStrategyFactory",
+    "JSON",
     "HTTPProvider",
+    "HTTPProviderServer",
+    "LocalProvider",
     "Method",
     "MethodCall",
     "MultiMethod",
     "Mutability",
     "PriorityFallback",
     "ProtocolError",
-    "ProviderError",
     "Provider",
+    "ProviderError",
     "Receive",
     "RemoteError",
-    "HTTPProviderServer",
     "Signer",
     "SnapshotID",
     "TransactionFailed",
     "Unreachable",
     "abi",
     "compile_contract_file",
-    "get_create_address",
     "get_create2_address",
+    "get_create_address",
 ]

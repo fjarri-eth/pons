@@ -25,7 +25,7 @@ def check_signer(signer):
     # 0x6666 -> the value
     # 0x80 = 0x80 + 0 -> a value of 0 bytes
     # ... signature values start (v, r, s)
-    assert sig.startswith(bytes.fromhex(f"f8{hex(payload_length)[2:]}8255558244448233338082666680"))
+    assert sig.startswith(bytes.fromhex(f"f8{payload_length:x}8255558244448233338082666680"))
 
 
 def test_signer():

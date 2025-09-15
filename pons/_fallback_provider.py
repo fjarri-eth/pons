@@ -39,8 +39,8 @@ class CycleFallbackStrategy(FallbackStrategy):
     def get_provider_order(self) -> list[int]:
         if self._counter == self._weights[0]:
             self._counter = 0
-            self._providers = self._providers[1:] + [self._providers[0]]
-            self._weights = self._weights[1:] + [self._weights[0]]
+            self._providers = [*self._providers[1:], self._providers[0]]
+            self._weights = [*self._weights[1:], self._weights[0]]
 
         self._counter += 1
         return list(self._providers)

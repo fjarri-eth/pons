@@ -147,6 +147,9 @@ class UInt(Type):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, UInt) and self._bits == other._bits
 
+    def __hash__(self) -> int:
+        return hash((type(self), self._bits))
+
 
 class Int(Type):
     """Corresponds to the Solidity ``int<bits>`` type."""
@@ -183,6 +186,9 @@ class Int(Type):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Int) and self._bits == other._bits
 
+    def __hash__(self) -> int:
+        return hash((type(self), self._bits))
+
 
 class Bytes(Type):
     """Corresponds to the Solidity ``bytes<size>`` type."""
@@ -199,8 +205,7 @@ class Bytes(Type):
     def _check_val(self, val: Any) -> bytes:
         if not isinstance(val, bytes):
             raise TypeError(
-                f"`{self.canonical_form}` must correspond to a bytestring, "
-                f"got {type(val).__name__}"
+                f"`{self.canonical_form}` must correspond to a bytestring, got {type(val).__name__}"
             )
         if self._size is not None and len(val) != self._size:
             raise ValueError(f"Expected {self._size} bytes, got {len(val)}")
@@ -236,6 +241,9 @@ class Bytes(Type):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Bytes) and self._size == other._size
 
+    def __hash__(self) -> int:
+        return hash((type(self), self._size))
+
 
 class AddressType(Type):
     """
@@ -250,8 +258,7 @@ class AddressType(Type):
     def _normalize(self, val: Any) -> str:
         if not isinstance(val, Address):
             raise TypeError(
-                f"`address` must correspond to an `Address`-type value, "
-                f"got {type(val).__name__}"
+                f"`address` must correspond to an `Address`-type value, got {type(val).__name__}"
             )
         return val.checksum
 
@@ -262,6 +269,9 @@ class AddressType(Type):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, AddressType)
+
+    def __hash__(self) -> int:
+        return hash(type(self))
 
 
 class String(Type):
@@ -299,6 +309,9 @@ class String(Type):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, String)
 
+    def __hash__(self) -> int:
+        return hash(type(self))
+
 
 class Bool(Type):
     """Corresponds to the Solidity ``bool`` type."""
@@ -322,6 +335,9 @@ class Bool(Type):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Bool)
+
+    def __hash__(self) -> int:
+        return hash(type(self))
 
 
 class Array(Type):
@@ -365,6 +381,9 @@ class Array(Type):
             and self._element_type == other._element_type
             and self._size == other._size
         )
+
+    def __hash__(self) -> int:
+        return hash((type(self), self._element_type, self._size))
 
 
 class Struct(Type):
@@ -425,6 +444,9 @@ class Struct(Type):
             # structs with the same fields but in different order are not equal
             and list(self._fields) == list(other._fields)
         )
+
+    def __hash__(self) -> int:
+        return hash((type(self), tuple(self._fields.items())))
 
 
 _UINT_RE = re.compile(r"uint(\d+)")
