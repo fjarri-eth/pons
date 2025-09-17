@@ -10,13 +10,12 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
-from trio_typing import TaskStatus
 
-from ._provider import JSON, HTTPProvider, Provider
+from ._provider import RPC_JSON, HTTPProvider, Provider
 
 
-def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
-    request = cast(dict[str, JSON], request)
+def parse_request(request: RPC_JSON) -> tuple[RPC_JSON, str, list[RPC_JSON]]:
+    request = cast("dict[str, RPC_JSON]", request)
     request_id = request["id"]
     method = request["method"]
     if not isinstance(method, str):
@@ -27,7 +26,7 @@ def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
     return (request_id, method, params)
 
 
-async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON, JSON]:
+async def process_request_inner(provider: Provider, request: RPC_JSON) -> tuple[RPC_JSON, RPC_JSON]:
     try:
         request_id, method, params = parse_request(request)
     except (KeyError, TypeError) as exc:
@@ -41,7 +40,7 @@ async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON
     return request_id, result
 
 
-async def process_request(provider: Provider, request: JSON) -> tuple[HTTPStatus, JSON]:
+async def process_request(provider: Provider, request: RPC_JSON) -> tuple[HTTPStatus, RPC_JSON]:
     """
     Partially parses the incoming JSON RPC request, passes it to the VM wrapper,
     and wraps the results in a JSON RPC formatted response.
@@ -77,7 +76,7 @@ def make_app(provider: Provider) -> ASGIFramework:
 
     # We don't have a typing package shared between Starlette and Hypercorn,
     # so this will have to do
-    return cast(ASGIFramework, app)
+    return cast("ASGIFramework", app)
 
 
 class HTTPProviderServer:
@@ -94,7 +93,7 @@ class HTTPProviderServer:
         self._shutdown_finished = trio.Event()
         self.http_provider = HTTPProvider(f"http://{self._host}:{self._port}")
 
-    async def __call__(self, *, task_status: TaskStatus[None] = trio.TASK_STATUS_IGNORED) -> None:
+    async def __call__(self, *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED) -> None:
         """
         Starts the server in an external event loop.
         Useful for the cases when it needs to run in parallel with other servers or clients.
@@ -106,7 +105,11 @@ class HTTPProviderServer:
         config.worker_class = "trio"
         app = make_app(self._provider)
         await serve(
-            app, config, shutdown_trigger=self._shutdown_event.wait, task_status=task_status
+            app,
+            config,
+            shutdown_trigger=self._shutdown_event.wait,
+            # That's what hypercorn API declares, but it's the same type as `trio.TaskStatus`
+            task_status=cast("trio._core._run._TaskStatus", task_status),  # noqa: SLF001
         )
         self._shutdown_finished.set()
 

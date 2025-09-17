@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
 from functools import cached_property
 
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from ethereum_rpc import JSON, Address
+from eth_account.types import TransactionDictType
+from ethereum_rpc import Address
 
 
 class Signer(ABC):
@@ -16,9 +16,9 @@ class Signer(ABC):
         """Returns the address corresponding to the signer's private key."""
 
     @abstractmethod
-    def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
+    def sign_transaction(self, tx_dict: TransactionDictType) -> bytes:
         """
-        Signs the given JSON transaction and returns the RLP-packed transaction
+        Signs the given transaction and returns the RLP-packed transaction
         along with the signature.
         """
 
@@ -51,6 +51,5 @@ class AccountSigner(Signer):
     def address(self) -> Address:
         return Address.from_hex(self._account.address)
 
-    def sign_transaction(self, tx_dict: Mapping[str, JSON]) -> bytes:
-        # Ignoring the type since `sign_transaction()` is untyped
-        return bytes(self._account.sign_transaction(tx_dict).raw_transaction)  # type: ignore[no-untyped-call]
+    def sign_transaction(self, tx_dict: TransactionDictType) -> bytes:
+        return bytes(self._account.sign_transaction(tx_dict).raw_transaction)

@@ -3,6 +3,7 @@ from typing import Any
 from ethereum_rpc import Address, LogEntry, LogTopic
 
 from ._contract_abi import (
+    ABI_JSON,
     ContractABI,
     Error,
     Event,
@@ -11,7 +12,6 @@ from ._contract_abi import (
     Methods,
     MultiMethod,
 )
-from ._provider import JSON
 
 
 class BoundConstructor:
@@ -150,7 +150,7 @@ class CompiledContract:
 
     @classmethod
     def from_compiler_output(
-        cls, json_abi: list[dict[str, JSON]], bytecode: bytes
+        cls, json_abi: list[dict[str, ABI_JSON]], bytecode: bytes
     ) -> "CompiledContract":
         """Creates a compiled contract object from the output of a Solidity compiler."""
         abi = ContractABI.from_json(json_abi)

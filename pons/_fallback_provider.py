@@ -4,7 +4,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 from ethereum_rpc import RPCError
 
-from ._provider import JSON, InvalidResponse, Provider, ProviderSession
+from ._provider import RPC_JSON, InvalidResponse, Provider, ProviderSession
 
 
 class FallbackStrategy(ABC):
@@ -39,8 +39,8 @@ class CycleFallbackStrategy(FallbackStrategy):
     def get_provider_order(self) -> list[int]:
         if self._counter == self._weights[0]:
             self._counter = 0
-            self._providers = self._providers[1:] + [self._providers[0]]
-            self._weights = self._weights[1:] + [self._weights[0]]
+            self._providers = [*self._providers[1:], self._providers[0]]
+            self._weights = [*self._weights[1:], self._weights[0]]
 
         self._counter += 1
         return list(self._providers)
@@ -135,7 +135,7 @@ class FallbackProviderSession(ProviderSession):
         self._strategy = strategy
         self._same_provider = same_provider
 
-    async def rpc_and_pin(self, method: str, *args: JSON) -> tuple[JSON, tuple[int, ...]]:
+    async def rpc_and_pin(self, method: str, *args: RPC_JSON) -> tuple[RPC_JSON, tuple[int, ...]]:
         exceptions: list[Exception] = []
         provider_idxs = self._strategy.get_provider_order()
         for provider_idx in provider_idxs:
@@ -169,11 +169,11 @@ class FallbackProviderSession(ProviderSession):
             raise invalid_responses[0]
         raise exceptions[0]
 
-    async def rpc(self, method: str, *args: JSON) -> JSON:
+    async def rpc(self, method: str, *args: RPC_JSON) -> RPC_JSON:
         result, _provider = await self.rpc_and_pin(method, *args)
         return result
 
-    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: JSON) -> JSON:
+    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: RPC_JSON) -> RPC_JSON:
         if self._same_provider:
             return await self.rpc(method, *args)
         if not path or path[0] < 0 or path[0] >= len(self._sessions):

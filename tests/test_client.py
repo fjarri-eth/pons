@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -314,7 +315,9 @@ async def test_transfer_custom_gas(session, root_signer, another_signer):
     assert root_balance - root_balance_after > to_transfer
 
     # Not enough gas
-    with pytest.raises(ProviderError, match="Insufficient gas"):
+    with pytest.raises(
+        ProviderError, match=re.escape("Invalid transaction: Message.gas cannot be negative")
+    ):
         await session.transfer(root_signer, another_signer.address, to_transfer, gas=20000)
 
 

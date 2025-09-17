@@ -89,6 +89,11 @@ Signers
 Contract ABI
 ------------
 
+.. class:: ABI_JSON
+
+   A JSON-ifiable object (``bool``, ``int``, ``float``, ``str``, ``None``,
+   iterable of ``JSON``, or mapping of ``str`` to ``JSON``).
+
 .. autoclass:: ContractABI
    :members:
 
@@ -124,9 +129,6 @@ Testing utilities
 -----------------
 
 ``pons`` exposes several types useful for testing applications that connect to Ethereum RPC servers. Not intended for the production environment.
-
-Install with the feature ``local-provider`` for it to be available.
-
 
 .. autoclass:: LocalProvider
    :show-inheritance:

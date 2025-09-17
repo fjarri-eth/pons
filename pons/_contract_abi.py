@@ -6,13 +6,12 @@ from functools import cached_property
 from inspect import BoundArguments
 from itertools import chain
 from keyword import iskeyword
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 from ethereum_rpc import LogEntry, LogTopic, keccak
 
 from . import abi
-from ._abi_types import Type, decode_args, dispatch_type, dispatch_types, encode_args
-from ._provider import JSON
+from ._abi_types import ABI_JSON, Type, decode_args, dispatch_type, dispatch_types, encode_args
 
 # Anonymous events can have at most 4 indexed fields
 ANONYMOUS_EVENT_INDEXED_FIELDS = 4
@@ -216,22 +215,25 @@ class Constructor:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: dict[str, Any]) -> "Constructor":
+    def from_json(cls, method_entry: ABI_JSON) -> "Constructor":
+        # TODO (#83): use proper validation
+        method_entry_typed = cast("Mapping[str, ABI_JSON]", method_entry)
+
         """Creates this object from a JSON ABI method entry."""
-        if method_entry["type"] != "constructor":
+        if method_entry_typed["type"] != "constructor":
             raise ValueError(
                 "Constructor object must be created from a JSON entry with type='constructor'"
             )
-        if "name" in method_entry:
+        if "name" in method_entry_typed:
             raise ValueError("Constructor's JSON entry cannot have a `name`")
-        if method_entry.get("outputs"):
+        if method_entry_typed.get("outputs"):
             raise ValueError("Constructor's JSON entry cannot have non-empty `outputs`")
-        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
+        if method_entry_typed["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
                 "Constructor's JSON entry state mutability must be `nonpayable` or `payable`"
             )
-        inputs = dispatch_types(method_entry.get("inputs", []))
-        payable = method_entry["stateMutability"] == "payable"
+        inputs = dispatch_types(method_entry_typed.get("inputs", []))
+        payable = method_entry_typed["stateMutability"] == "payable"
         return cls(inputs, payable=payable)
 
     def __init__(self, inputs: Mapping[str, Type] | Sequence[Type], *, payable: bool = False):
@@ -263,16 +265,19 @@ class Mutability(Enum):
     """
 
     @classmethod
-    def from_json(cls, entry: str) -> "Mutability":
+    def from_json(cls, entry: ABI_JSON) -> "Mutability":
+        # TODO (#83): use proper validation
+        entry_typed = cast("str", entry)
+
         values = dict(
             pure=Mutability.PURE,
             view=Mutability.VIEW,
             nonpayable=Mutability.NONPAYABLE,
             payable=Mutability.PAYABLE,
         )
-        if entry not in values:
+        if entry_typed not in values:
             raise ValueError(f"Unknown mutability identifier: {entry}")
-        return values[entry]
+        return values[entry_typed]
 
     @property
     def payable(self) -> bool:
@@ -303,24 +308,27 @@ class Method:
     """Whether this method may mutate the contract state."""
 
     @classmethod
-    def from_json(cls, method_entry: dict[str, Any]) -> "Method":
+    def from_json(cls, method_entry: ABI_JSON) -> "Method":
         """Creates this object from a JSON ABI method entry."""
-        if method_entry["type"] != "function":
+        # TODO (#83): use proper validation
+        method_entry_typed = cast("Mapping[str, Any]", method_entry)
+
+        if method_entry_typed["type"] != "function":
             raise ValueError("Method object must be created from a JSON entry with type='function'")
 
-        name = method_entry["name"]
-        inputs = dispatch_types(method_entry["inputs"])
+        name = method_entry_typed["name"]
+        inputs = dispatch_types(method_entry_typed["inputs"])
 
-        mutability = Mutability.from_json(method_entry["stateMutability"])
+        mutability = Mutability.from_json(method_entry_typed["stateMutability"])
 
         # Outputs can be anonymous
         outputs: dict[str, Type] | list[Type]
-        if "outputs" not in method_entry:
+        if "outputs" not in method_entry_typed:
             outputs = []
-        elif all(entry["name"] == "" for entry in method_entry["outputs"]):
-            outputs = [dispatch_type(entry) for entry in method_entry["outputs"]]
+        elif all(entry["name"] == "" for entry in method_entry_typed["outputs"]):
+            outputs = [dispatch_type(entry) for entry in method_entry_typed["outputs"]]
         else:
-            outputs = dispatch_types(method_entry["outputs"])
+            outputs = dispatch_types(method_entry_typed["outputs"])
 
         return cls(name=name, inputs=inputs, outputs=outputs, mutability=mutability)
 
@@ -437,7 +445,7 @@ class MultiMethod:
     def with_method(self, method: Method) -> "MultiMethod":
         """Returns a new ``MultiMethod`` with the given method included."""
         new_mm = MultiMethod(*self._methods.values())
-        new_mm._add_method(method)  # noqa: SLF001
+        new_mm._add_method(method)
         return new_mm
 
     def __call__(self, *args: Any, **kwds: Any) -> "MethodCall":
@@ -471,19 +479,24 @@ class Event:
     """
 
     @classmethod
-    def from_json(cls, event_entry: dict[str, Any]) -> "Event":
+    def from_json(cls, event_entry: ABI_JSON) -> "Event":
         """Creates this object from a JSON ABI method entry."""
-        if event_entry["type"] != "event":
+        # TODO (#83): use proper validation
+        event_entry_typed = cast("Mapping[str, Any]", event_entry)
+
+        if event_entry_typed["type"] != "event":
             raise ValueError("Event object must be created from a JSON entry with type='event'")
 
-        name = event_entry["name"]
-        fields = dispatch_types(event_entry["inputs"])
+        name = event_entry_typed["name"]
+        fields = dispatch_types(event_entry_typed["inputs"])
         if isinstance(fields, list):
             raise TypeError("Event fields must be named")
 
-        indexed = {input_["name"] for input_ in event_entry["inputs"] if input_["indexed"]}
+        indexed = {input_["name"] for input_ in event_entry_typed["inputs"] if input_["indexed"]}
 
-        return cls(name=name, fields=fields, indexed=indexed, anonymous=event_entry["anonymous"])
+        return cls(
+            name=name, fields=fields, indexed=indexed, anonymous=event_entry_typed["anonymous"]
+        )
 
     def __init__(
         self,
@@ -564,13 +577,16 @@ class Error:
     """A custom contract error."""
 
     @classmethod
-    def from_json(cls, error_entry: dict[str, Any]) -> "Error":
+    def from_json(cls, error_entry: ABI_JSON) -> "Error":
         """Creates this object from a JSON ABI method entry."""
-        if error_entry["type"] != "error":
+        # TODO (#83): use proper validation
+        error_entry_typed = cast("Mapping[str, Any]", error_entry)
+
+        if error_entry_typed["type"] != "error":
             raise ValueError("Error object must be created from a JSON entry with type='error'")
 
-        name = error_entry["name"]
-        fields = dispatch_types(error_entry["inputs"])
+        name = error_entry_typed["name"]
+        fields = dispatch_types(error_entry_typed["inputs"])
         if isinstance(fields, list):
             raise TypeError("Error fields must be named")
 
@@ -604,17 +620,20 @@ class Fallback:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: dict[str, Any]) -> "Fallback":
+    def from_json(cls, method_entry: ABI_JSON) -> "Fallback":
         """Creates this object from a JSON ABI method entry."""
-        if method_entry["type"] != "fallback":
+        # TODO (#83): use proper validation
+        method_entry_typed = cast("Mapping[str, ABI_JSON]", method_entry)
+
+        if method_entry_typed["type"] != "fallback":
             raise ValueError(
                 "Fallback object must be created from a JSON entry with type='fallback'"
             )
-        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
+        if method_entry_typed["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
                 "Fallback method's JSON entry state mutability must be `nonpayable` or `payable`"
             )
-        payable = method_entry["stateMutability"] == "payable"
+        payable = method_entry_typed["stateMutability"] == "payable"
         return cls(payable=payable)
 
     def __init__(self, *, payable: bool = False):
@@ -631,17 +650,20 @@ class Receive:
     """Whether this method is marked as payable"""
 
     @classmethod
-    def from_json(cls, method_entry: dict[str, Any]) -> "Receive":
+    def from_json(cls, method_entry: ABI_JSON) -> "Receive":
         """Creates this object from a JSON ABI method entry."""
-        if method_entry["type"] != "receive":
+        # TODO (#83): use proper validation
+        method_entry_typed = cast("Mapping[str, ABI_JSON]", method_entry)
+
+        if method_entry_typed["type"] != "receive":
             raise ValueError(
                 "Receive object must be created from a JSON entry with type='fallback'"
             )
-        if method_entry["stateMutability"] not in ("nonpayable", "payable"):
+        if method_entry_typed["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
                 "Receive method's JSON entry state mutability must be `nonpayable` or `payable`"
             )
-        payable = method_entry["stateMutability"] == "payable"
+        payable = method_entry_typed["stateMutability"] == "payable"
         return cls(payable=payable)
 
     def __init__(self, *, payable: bool = False):
@@ -741,8 +763,11 @@ class ContractABI:
     """Contract's errors."""
 
     @classmethod
-    def from_json(cls, json_abi: list[dict[str, JSON]]) -> "ContractABI":  # noqa: C901, PLR0912
+    def from_json(cls, json_abi: ABI_JSON) -> "ContractABI":  # noqa: C901, PLR0912
         """Creates this object from a JSON ABI (e.g. generated by a Solidity compiler)."""
+        # TODO (#83): use proper validation
+        json_abi_typed = cast("Sequence[Mapping[str, ABI_JSON]]", json_abi)
+
         constructor = None
         fallback = None
         receive = None
@@ -750,7 +775,7 @@ class ContractABI:
         events = {}
         errors = {}
 
-        for entry in json_abi:
+        for entry in json_abi_typed:
             if entry["type"] == "constructor":
                 if constructor:
                     raise ValueError("JSON ABI contains more than one constructor declarations")
