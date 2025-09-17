@@ -89,6 +89,11 @@ Signers
 Contract ABI
 ------------
 
+.. class:: ABI_JSON
+
+   A JSON-ifiable object (``bool``, ``int``, ``float``, ``str``, ``None``,
+   iterable of ``JSON``, or mapping of ``str`` to ``JSON``).
+
 .. autoclass:: ContractABI
    :members:
 

@@ -9,8 +9,8 @@ import httpx
 from compages import StructuringError
 from ethereum_rpc import RPCError, structure
 
-JSON = None | bool | int | float | str | Sequence["JSON"] | Mapping[str, "JSON"]
-"""Values serializable to JSON."""
+RPC_JSON = None | bool | int | float | str | Sequence["RPC_JSON"] | Mapping[str, "RPC_JSON"]
+"""RPC requests and responses serializable to JSON."""
 
 
 class InvalidResponse(Exception):
@@ -71,18 +71,18 @@ class ProviderSession(ABC):
     """
 
     @abstractmethod
-    async def rpc(self, method: str, *args: JSON) -> JSON:
+    async def rpc(self, method: str, *args: RPC_JSON) -> RPC_JSON:
         """Calls the given RPC method with the already json-ified arguments."""
         ...
 
-    async def rpc_and_pin(self, method: str, *args: JSON) -> tuple[JSON, tuple[int, ...]]:
+    async def rpc_and_pin(self, method: str, *args: RPC_JSON) -> tuple[RPC_JSON, tuple[int, ...]]:
         """
         Calls the given RPC method and returns the path to the provider it succeded on.
         This method will be typically overriden by multi-provider implementations.
         """
         return await self.rpc(method, *args), ()
 
-    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: JSON) -> JSON:
+    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: RPC_JSON) -> RPC_JSON:
         """
         Calls the given RPC method at the provider by the given path
         (obtained previously from ``rpc_and_pin()``).
@@ -110,10 +110,10 @@ class HTTPSession(ProviderSession):
         self._url = url
         self._client = http_client
 
-    def _prepare_request(self, method: str, *args: JSON) -> JSON:
+    def _prepare_request(self, method: str, *args: RPC_JSON) -> RPC_JSON:
         return {"jsonrpc": "2.0", "method": method, "params": args, "id": 0}
 
-    async def rpc(self, method: str, *args: JSON) -> JSON:
+    async def rpc(self, method: str, *args: RPC_JSON) -> RPC_JSON:
         json = self._prepare_request(method, *args)
         try:
             response = await self._client.post(self._url, json=json)
@@ -132,7 +132,7 @@ class HTTPSession(ProviderSession):
 
         if not isinstance(response_json, Mapping):
             raise InvalidResponse(f"RPC response must be a dictionary, got: {response_json}")
-        response_json = cast("Mapping[str, JSON]", response_json)
+        response_json = cast("Mapping[str, RPC_JSON]", response_json)
 
         # Note that the Eth-side errors (e.g. transaction having been reverted)
         # will have the HTTP status 200, so we are checking for the "error" field first.

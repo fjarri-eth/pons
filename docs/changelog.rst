@@ -2,8 +2,14 @@ Changelog
 ---------
 
 
-0.8.2 (in development)
+0.9.0 (in development)
 ~~~~~~~~~~~~~~~~~~~~~~
+
+Changed
+~~~~~~~
+
+- ``JSON`` removed from the public API, instead we have a more specific ``ABI_JSON``. (PR_82_)
+
 
 Added
 ^^^^^
@@ -12,6 +18,7 @@ Added
 
 
 .. _PR_81: https://github.com/fjarri-eth/pons/pull/81
+.. _PR_82: https://github.com/fjarri-eth/pons/pull/82
 
 
 0.8.1 (2024-11-12)

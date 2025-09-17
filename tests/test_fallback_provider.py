@@ -8,7 +8,7 @@ from ethereum_rpc import RPCError
 
 from pons import CycleFallback, FallbackProvider, PriorityFallback, Unreachable
 from pons._fallback_provider import PriorityFallbackStrategy
-from pons._provider import JSON, InvalidResponse, Provider, ProviderSession
+from pons._provider import RPC_JSON, InvalidResponse, Provider, ProviderSession
 
 
 def random_request():
@@ -39,7 +39,7 @@ class MockSession(ProviderSession):
     def __init__(self, provider: Provider):
         self.provider = provider
 
-    async def rpc(self, method: str, *_args: JSON) -> JSON:
+    async def rpc(self, method: str, *_args: RPC_JSON) -> RPC_JSON:
         self.provider.requests.append(method)
         if self.provider.state == ProviderState.UNREACHABLE:
             raise Unreachable("")

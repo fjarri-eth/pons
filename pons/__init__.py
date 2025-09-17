@@ -1,7 +1,7 @@
 """Async Ethereum RPC client."""
 
 from . import abi
-from ._abi_types import ABIDecodingError
+from ._abi_types import ABI_JSON, ABIDecodingError
 from ._client import (
     Client,
     ClientSession,
@@ -47,11 +47,12 @@ from ._fallback_provider import (
 )
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
-from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable, JSON
+from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
 from ._signer import AccountSigner, Signer
 from ._utils import get_create2_address, get_create_address
 
 __all__ = [
+    "ABI_JSON",
     "ABIDecodingError",
     "AccountSigner",
     "BoundConstructor",
@@ -80,7 +81,6 @@ __all__ = [
     "FallbackProvider",
     "FallbackStrategy",
     "FallbackStrategyFactory",
-    "JSON",
     "HTTPProvider",
     "HTTPProviderServer",
     "LocalProvider",

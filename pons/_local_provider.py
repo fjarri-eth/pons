@@ -10,7 +10,7 @@ from alysis import EVMVersion, Node, RPCNode
 from eth_account import Account
 from ethereum_rpc import Amount
 
-from ._provider import JSON, Provider, ProviderSession
+from ._provider import RPC_JSON, Provider, ProviderSession
 from ._signer import AccountSigner, Signer
 
 
@@ -65,7 +65,7 @@ class LocalProvider(Provider):
         self._local_node = self._snapshots[snapshot_id.id_]
         self._rpc_node = RPCNode(self._local_node)
 
-    def rpc(self, method: str, *args: Any) -> JSON:
+    def rpc(self, method: str, *args: Any) -> RPC_JSON:
         return self._rpc_node.rpc(method, *args)
 
     @asynccontextmanager
@@ -77,5 +77,5 @@ class LocalProviderSession(ProviderSession):
     def __init__(self, provider: LocalProvider):
         self._provider = provider
 
-    async def rpc(self, method: str, *args: JSON) -> JSON:
+    async def rpc(self, method: str, *args: RPC_JSON) -> RPC_JSON:
         return self._provider.rpc(method, *args)

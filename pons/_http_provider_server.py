@@ -11,11 +11,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from ._provider import JSON, HTTPProvider, Provider
+from ._provider import RPC_JSON, HTTPProvider, Provider
 
 
-def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
-    request = cast("dict[str, JSON]", request)
+def parse_request(request: RPC_JSON) -> tuple[RPC_JSON, str, list[RPC_JSON]]:
+    request = cast("dict[str, RPC_JSON]", request)
     request_id = request["id"]
     method = request["method"]
     if not isinstance(method, str):
@@ -26,7 +26,7 @@ def parse_request(request: JSON) -> tuple[JSON, str, list[JSON]]:
     return (request_id, method, params)
 
 
-async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON, JSON]:
+async def process_request_inner(provider: Provider, request: RPC_JSON) -> tuple[RPC_JSON, RPC_JSON]:
     try:
         request_id, method, params = parse_request(request)
     except (KeyError, TypeError) as exc:
@@ -40,7 +40,7 @@ async def process_request_inner(provider: Provider, request: JSON) -> tuple[JSON
     return request_id, result
 
 
-async def process_request(provider: Provider, request: JSON) -> tuple[HTTPStatus, JSON]:
+async def process_request(provider: Provider, request: RPC_JSON) -> tuple[HTTPStatus, RPC_JSON]:
     """
     Partially parses the incoming JSON RPC request, passes it to the VM wrapper,
     and wraps the results in a JSON RPC formatted response.

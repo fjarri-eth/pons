@@ -6,11 +6,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from functools import cached_property
 from types import EllipsisType
-from typing import Any
+from typing import Any, cast
 
 import eth_abi
 from eth_abi.exceptions import DecodingError
 from ethereum_rpc import Address, keccak
+
+ABI_JSON = None | bool | int | float | str | Sequence["ABI_JSON"] | Mapping[str, "ABI_JSON"]
+"""Values serializable to JSON."""
 
 # Maximum bits in an `int` or `uint` type in Solidity.
 MAX_INTEGER_BITS = 256
@@ -473,8 +476,11 @@ def type_from_abi_string(abi_string: str) -> Type:
     raise ValueError(f"Unknown type: {abi_string}")
 
 
-def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
-    type_str = abi_entry["type"]
+def dispatch_type(abi_entry: ABI_JSON) -> Type:
+    # TODO (#83): use proper validation
+    abi_entry_typed = cast("Mapping[str, Any]", abi_entry)
+
+    type_str = abi_entry_typed["type"]
     match = re.match(r"^([\w\d\[\]]*?)(\[(\d+)?\])?$", type_str)
     if not match:
         raise ValueError(f"Incorrect type format: {type_str}")
@@ -486,26 +492,29 @@ def dispatch_type(abi_entry: Mapping[str, Any]) -> Type:
         array_size = int(array_size)
 
     if is_array:
-        element_entry = dict(abi_entry)
+        element_entry = dict(abi_entry_typed)
         element_entry["type"] = element_type_name
         element_type = dispatch_type(element_entry)
         return Array(element_type, array_size)
 
     if element_type_name == "tuple":
         fields = {}
-        for component in abi_entry["components"]:
+        for component in abi_entry_typed["components"]:
             fields[component["name"]] = dispatch_type(component)
         return Struct(fields)
 
     return type_from_abi_string(element_type_name)
 
 
-def dispatch_types(abi_entry: Iterable[dict[str, Any]]) -> list[Type] | dict[str, Type]:
-    names = [entry["name"] for entry in abi_entry]
+def dispatch_types(abi_entry: ABI_JSON) -> list[Type] | dict[str, Type]:
+    # TODO (#83): use proper validation
+    abi_entry_typed = cast("Iterable[dict[str, Any]]", abi_entry)
+
+    names = [entry["name"] for entry in abi_entry_typed]
 
     # Unnamed arguments; treat as positional arguments
     if names and all(not name for name in names):
-        return [dispatch_type(entry) for entry in abi_entry]
+        return [dispatch_type(entry) for entry in abi_entry_typed]
 
     if any(not name for name in names):
         raise ValueError("Arguments must be either all named or all unnamed")
@@ -513,7 +522,7 @@ def dispatch_types(abi_entry: Iterable[dict[str, Any]]) -> list[Type] | dict[str
     # Since we are returning a dictionary, need to be sure we don't silently merge entries
     if len(names) != len(set(names)):
         raise ValueError("All ABI entries must have distinct names")
-    return {entry["name"]: dispatch_type(entry) for entry in abi_entry}
+    return {entry["name"]: dispatch_type(entry) for entry in abi_entry_typed}
 
 
 def encode_args(*types_and_args: tuple[Type, Any]) -> bytes:
