@@ -130,9 +130,6 @@ Testing utilities
 
 ``pons`` exposes several types useful for testing applications that connect to Ethereum RPC servers. Not intended for the production environment.
 
-Install with the feature ``local-provider`` for it to be available.
-
-
 .. autoclass:: LocalProvider
    :show-inheritance:
    :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot

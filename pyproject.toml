@@ -28,8 +28,11 @@ compiler = [
 ]
 local-provider = [
     "alysis>=0.6.0",
-    "starlette",
-    "hypercorn",
+]
+http-provider-server = [
+    "starlette>=0.48",
+    "hypercorn>=0.17",
+    "trio>=0.31",
 ]
 tests = [
     "pytest>=6",

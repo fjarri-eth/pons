@@ -10,6 +10,7 @@ Changed
 
 - ``JSON`` removed from the public API, instead we have a more specific ``ABI_JSON``. (PR_82_)
 - Renamed ``id_`` fields of ``BlockFilter``, ``PendingTransactionFilter``, and ``LogFilter`` to just ``id``. (PR_82_)
+- Split out ``http-provider-server`` feature from ``local-provider``. (PR_82_)
 
 
 Added
