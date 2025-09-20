@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Any
 
 from ethereum_rpc import Address, LogEntry, LogTopic
@@ -70,23 +71,41 @@ class BoundMethod:
         )
 
 
-class BoundMethodCall:
+class BaseBoundMethodCall(ABC):
+    """The base class for contract method calls bound to a specific contract address."""
+
+    @property
+    @abstractmethod
+    def contract_abi(self) -> ContractABI:
+        """The corresponding contract's ABI."""
+
+    @property
+    @abstractmethod
+    def data_bytes(self) -> bytes:
+        """Encoded call arguments with the selector."""
+
+    @property
+    @abstractmethod
+    def payable(self) -> bool:
+        """Whether this method is marked as ``payable``."""
+
+    @property
+    @abstractmethod
+    def mutating(self) -> bool:
+        """Whether this method is marked as ``payable`` or ``nonpayable``."""
+
+    @property
+    @abstractmethod
+    def contract_address(self) -> Address:
+        """The contract address."""
+
+    @abstractmethod
+    def decode_output(self, output_bytes: bytes) -> Any:
+        """Decodes contract output packed into the bytestring."""
+
+
+class BoundMethodCall(BaseBoundMethodCall):
     """A regular method call with encoded arguments bound to a specific contract address."""
-
-    contract_abi: ContractABI
-    """The corresponding contract's ABI"""
-
-    contract_address: Address
-    """The contract address."""
-
-    data_bytes: bytes
-    """Encoded call arguments with the selector."""
-
-    payable: bool
-    """Whether this method is marked as ``payable``."""
-
-    mutating: bool
-    """Whether this method is marked as ``payable`` or ``nonpayable``."""
 
     def __init__(
         self,
@@ -96,14 +115,31 @@ class BoundMethodCall:
         data_bytes: bytes,
     ):
         self._method = method
-        self.contract_abi = contract_abi
-        self.contract_address = contract_address
-        self.data_bytes = data_bytes
-        self.payable = self._method.payable
-        self.mutating = self._method.mutating
+        self._contract_abi = contract_abi
+        self._data_bytes = data_bytes
+        self._contract_address = contract_address
+
+    @property
+    def contract_abi(self) -> ContractABI:
+        return self._contract_abi
+
+    @property
+    def data_bytes(self) -> bytes:
+        return self._data_bytes
+
+    @property
+    def payable(self) -> bool:
+        return self._method.payable
+
+    @property
+    def mutating(self) -> bool:
+        return self._method.mutating
+
+    @property
+    def contract_address(self) -> Address:
+        return self._contract_address
 
     def decode_output(self, output_bytes: bytes) -> Any:
-        """Decodes contract output packed into the bytestring."""
         return self._method.decode_output(output_bytes)
 
 

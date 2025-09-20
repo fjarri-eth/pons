@@ -14,6 +14,7 @@ from ._client import (
 )
 from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
+    BaseBoundMethodCall,
     BoundConstructor,
     BoundConstructorCall,
     BoundEvent,
@@ -47,6 +48,7 @@ from ._fallback_provider import (
 )
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
+from ._multicall import BoundMultiMethodCall, BoundMultiMethodValueCall, Multicall
 from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
 from ._signer import AccountSigner, Signer
 from ._utils import get_create2_address, get_create_address
@@ -55,12 +57,15 @@ __all__ = [
     "ABI_JSON",
     "ABIDecodingError",
     "AccountSigner",
+    "BaseBoundMethodCall",
     "BoundConstructor",
     "BoundConstructorCall",
     "BoundEvent",
     "BoundEventFilter",
     "BoundMethod",
     "BoundMethodCall",
+    "BoundMultiMethodCall",
+    "BoundMultiMethodValueCall",
     "Client",
     "ClientSession",
     "CompiledContract",
@@ -87,6 +92,7 @@ __all__ = [
     "Method",
     "MethodCall",
     "MultiMethod",
+    "Multicall",
     "Mutability",
     "PriorityFallback",
     "ProtocolError",

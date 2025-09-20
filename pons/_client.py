@@ -28,10 +28,10 @@ from ethereum_rpc import (
 )
 
 from ._contract import (
+    BaseBoundMethodCall,
     BoundConstructorCall,
     BoundEvent,
     BoundEventFilter,
-    BoundMethodCall,
     DeployedContract,
 )
 from ._contract_abi import (
@@ -395,7 +395,7 @@ class ClientSession:
 
     async def eth_call(
         self,
-        call: BoundMethodCall,
+        call: BaseBoundMethodCall,
         block: Block = BlockLabel.LATEST,
         sender_address: None | Address = None,
     ) -> Any:
@@ -467,7 +467,7 @@ class ClientSession:
     async def estimate_transact(
         self,
         sender_address: Address,
-        call: BoundMethodCall,
+        call: BaseBoundMethodCall,
         amount: None | Amount = None,
         block: Block = BlockLabel.LATEST,
     ) -> int:
@@ -655,7 +655,7 @@ class ClientSession:
     async def broadcast_transact(
         self,
         signer: Signer,
-        call: BoundMethodCall,
+        call: BaseBoundMethodCall,
         amount: None | Amount = None,
         gas: None | int = None,
     ) -> TxHash:
@@ -702,7 +702,7 @@ class ClientSession:
     async def transact(
         self,
         signer: Signer,
-        call: BoundMethodCall,
+        call: BaseBoundMethodCall,
         amount: None | Amount = None,
         gas: None | int = None,
         return_events: None | Sequence[BoundEvent] = None,

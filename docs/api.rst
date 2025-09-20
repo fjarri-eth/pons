@@ -153,6 +153,25 @@ Install with the feature ``compiler`` for it to be available.
    :members:
 
 
+Multicall contract
+------------------
+
+The library includes a helper for interacting with the Multicall contract (https://github.com/mds1/multicall3).
+
+
+.. autoclass:: Multicall
+   :members:
+
+.. autoclass:: BoundMultiMethodCall
+   :show-inheritance:
+   :members:
+
+.. autoclass:: BoundMultiMethodValueCall
+   :show-inheritance:
+   :members:
+
+
+
 Secondary classes
 -----------------
 
@@ -179,7 +198,11 @@ The instances of these classes are not created by the user directly, but rather 
    :members:
    :special-members: __call__
 
+.. autoclass:: BaseBoundMethodCall()
+   :members:
+
 .. autoclass:: BoundMethodCall()
+   :show-inheritance:
    :members:
 
 .. autoclass:: BoundEvent()
