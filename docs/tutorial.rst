@@ -178,12 +178,12 @@ Interacting with deployed contracts
 A :py:class:`~pons.DeployedContract` object wraps all ABI method objects into "bound" state, similarly to how Python methods are bound to class instances.
 It means that all the method calls created from this object have the contract address inside them, so that it does not need to be provided every time.
 
-For example, to call a non-mutating contract method via :py:meth:`~pons.ClientSession.eth_call`:
+For example, to call a non-mutating contract method via :py:meth:`~pons.ClientSession.call`:
 
 ::
 
     call = deployed_contract.method.getState(1)
-    result = await session.eth_call(call)
+    result = await session.call(call)
 
 Note that when the :py:class:`~pons.ContractABI` object is created from the JSON ABI, even if the method returns a single value, it is still represented as a list of one element in the JSON, so the ``result`` will be a list too.
 If the ABI is declared programmatically, one can provide a single output value instead of the list, and then ``pons`` will unpack that list.

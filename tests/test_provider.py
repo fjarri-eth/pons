@@ -63,7 +63,7 @@ async def test_unexpected_response_type(
     monkeypatch.setattr(local_provider, "rpc", lambda _method, *_args: "something")
 
     with pytest.raises(BadResponseFormat, match="Cannot structure into"):
-        await session.eth_get_transaction_receipt(tx_hash)
+        await session.rpc.eth_get_transaction_receipt(tx_hash)
 
 
 async def test_missing_field(local_provider, session, monkeypatch, root_signer, another_signer):
@@ -82,7 +82,7 @@ async def test_missing_field(local_provider, session, monkeypatch, root_signer, 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
     with pytest.raises(BadResponseFormat, match="status: Missing field"):
-        await session.eth_get_transaction_receipt(tx_hash)
+        await session.rpc.eth_get_transaction_receipt(tx_hash)
 
 
 async def test_none_instead_of_dict(
@@ -98,7 +98,7 @@ async def test_none_instead_of_dict(
     # but we force it here, just in case.
     monkeypatch.setattr(local_provider, "rpc", lambda _method, *_args: None)
 
-    assert await session.eth_get_transaction_receipt(tx_hash) is None
+    assert await session.rpc.eth_get_transaction_receipt(tx_hash) is None
 
 
 async def test_non_json_response(local_provider, session, monkeypatch):
