@@ -77,13 +77,10 @@ class ProviderSession(ABC):
     The base class for provider sessions.
 
     The methods of this class may raise the following exceptions:
-    - :py:class:`RPCError` signifies an error coming from the backend provider;
-    - :py:class:`Unreachable` if the provider is unreachable;
-    - :py:class:`InvalidResponse` if the response was received but could not be parsed;
-    - :py:class:`ProtocolError` if there was an unrecognized error on the protocol level
-      (e.g. an HTTP status code that is not 200 or 400).
-
-    All other exceptions can be considered implementation bugs.
+    :py:class:`RPCError`,
+    :py:class:`Unreachable`,
+    :py:class:`InvalidResponse`,
+    a provider-specific derived class of :py:class:`ProtocolError`.
     """
 
     @abstractmethod

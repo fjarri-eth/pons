@@ -3,17 +3,28 @@ from pathlib import Path
 
 import pytest
 
-from pons import EVMVersion, compile_contract_file, get_create2_address
+from pons import (
+    AccountSigner,
+    ClientSession,
+    CompiledContract,
+    EVMVersion,
+    compile_contract_file,
+    get_create2_address,
+)
 from pons._utils import get_create_address
 
 
 @pytest.fixture
-def compiled_contracts():
+def compiled_contracts() -> dict[str, CompiledContract]:
     path = Path(__file__).resolve().parent / "TestUtils.sol"
     return compile_contract_file(path, evm_version=EVMVersion.CANCUN)
 
 
-async def test_create(session, root_signer, compiled_contracts):
+async def test_create(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_to_deploy = compiled_contracts["ToDeploy"]
 
     # Try deploying the contract with different nonces
@@ -34,7 +45,11 @@ async def test_create(session, root_signer, compiled_contracts):
     assert to_deploy.address == get_create_address(root_signer.address, nonce)
 
 
-async def test_create2(session, root_signer, compiled_contracts):
+async def test_create2(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_deployer = compiled_contracts["Create2Deployer"]
     compiled_to_deploy = compiled_contracts["ToDeploy"]
 

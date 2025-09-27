@@ -3,41 +3,60 @@ from pathlib import Path
 import pytest
 from ethereum_rpc import Amount
 
-from pons import ContractLegacyError, Multicall, compile_contract_file
+from pons import (
+    AccountSigner,
+    ClientSession,
+    CompiledContract,
+    ContractLegacyError,
+    DeployedContract,
+    Multicall,
+    compile_contract_file,
+)
 
 
 @pytest.fixture
-def multicall_compiled():
+def multicall_compiled() -> CompiledContract:
     path = Path(__file__).resolve().parent / "Multicall3.sol"
     compiled = compile_contract_file(path)
     return compiled["Multicall3"]
 
 
 @pytest.fixture
-def target_compiled():
+def target_compiled() -> CompiledContract:
     path = Path(__file__).resolve().parent / "TestMulticall.sol"
     compiled = compile_contract_file(path)
     return compiled["TestMulticall"]
 
 
 @pytest.fixture
-async def multicall(session, root_signer, multicall_compiled):
+async def multicall(
+    session: ClientSession, root_signer: AccountSigner, multicall_compiled: CompiledContract
+) -> Multicall:
     multicall_deployed = await session.deploy(root_signer, multicall_compiled.constructor())
     return Multicall(multicall_deployed.address)
 
 
 @pytest.fixture
-async def target(session, root_signer, target_compiled):
+async def target(
+    session: ClientSession, root_signer: AccountSigner, target_compiled: CompiledContract
+) -> DeployedContract:
     return await session.deploy(root_signer, target_compiled.constructor())
 
 
-async def test_multicall_read(session, multicall, target):
+async def test_multicall_read(
+    session: ClientSession, multicall: Multicall, target: DeployedContract
+) -> None:
     results = await session.call(multicall.aggregate([target.method.x1(), target.method.x2()]))
     assert results[0] == (True, (1,))
     assert results[1] == (True, (2,))
 
 
-async def test_multicall_write(session, root_signer, multicall, target):
+async def test_multicall_write(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    multicall: Multicall,
+    target: DeployedContract,
+) -> None:
     await session.transact(
         root_signer, multicall.aggregate([target.method.write1(3), target.method.write2(4)])
     )
@@ -45,7 +64,9 @@ async def test_multicall_write(session, root_signer, multicall, target):
     assert await session.call(target.method.x2()) == (4,)
 
 
-async def test_multicall_read_error(session, multicall, target):
+async def test_multicall_read_error(
+    session: ClientSession, multicall: Multicall, target: DeployedContract
+) -> None:
     # For now `eth_call` does not decode contract errors, so we get the low-level one.
     with pytest.raises(ContractLegacyError, match="Multicall3: call failed"):
         await session.call(
@@ -59,7 +80,12 @@ async def test_multicall_read_error(session, multicall, target):
     assert results[1] == (False, ())  # errored call
 
 
-async def test_multicall_write_error(session, root_signer, multicall, target):
+async def test_multicall_write_error(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    multicall: Multicall,
+    target: DeployedContract,
+) -> None:
     with pytest.raises(ContractLegacyError, match="Multicall3: call failed"):
         await session.transact(
             root_signer,
@@ -84,7 +110,9 @@ async def test_multicall_write_error(session, root_signer, multicall, target):
     assert await session.call(target.method.x2()) == (2,)
 
 
-async def test_multicall_read_value(session, multicall, target):
+async def test_multicall_read_value(
+    session: ClientSession, multicall: Multicall, target: DeployedContract
+) -> None:
     results = await session.call(
         multicall.aggregate_value(
             [(target.method.x1(), Amount.wei(0)), (target.method.x2(), Amount.wei(0))]
@@ -94,7 +122,12 @@ async def test_multicall_read_value(session, multicall, target):
     assert results[1] == (True, (2,))
 
 
-async def test_multicall_write_value(session, root_signer, multicall, target):
+async def test_multicall_write_value(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    multicall: Multicall,
+    target: DeployedContract,
+) -> None:
     await session.transact(
         root_signer,
         multicall.aggregate_value(
@@ -109,7 +142,12 @@ async def test_multicall_write_value(session, root_signer, multicall, target):
     assert await session.call(target.method.x2()) == (200,)
 
 
-async def test_multicall_write_value_insufficient_funds(session, root_signer, multicall, target):
+async def test_multicall_write_value_insufficient_funds(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    multicall: Multicall,
+    target: DeployedContract,
+) -> None:
     with pytest.raises(ContractLegacyError, match="Multicall3: call failed"):
         await session.transact(
             root_signer,

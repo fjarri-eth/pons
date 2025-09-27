@@ -1,10 +1,10 @@
 import re
-from typing import NamedTuple
 
 import pytest
-from ethereum_rpc import LogTopic, keccak
+from ethereum_rpc import Address, BlockHash, LogEntry, LogTopic, TxHash, keccak
 
 from pons import (
+    ABI_JSON,
     Constructor,
     ContractABI,
     Either,
@@ -27,7 +27,7 @@ from pons._contract_abi import (
 )
 
 
-def test_signature_from_dict():
+def test_signature_from_dict() -> None:
     sig = Signature(dict(a=abi.uint(8), b=abi.bool))
     assert sig.canonical_form == "(uint8,bool)"
     assert str(sig) == "(uint8 a, bool b)"
@@ -36,7 +36,7 @@ def test_signature_from_dict():
     assert sig.decode_into_dict(sig.encode(b=True, a=1)) == dict(b=True, a=1)
 
 
-def test_signature_from_list():
+def test_signature_from_list() -> None:
     sig = Signature([abi.uint(8), abi.bool])
     assert str(sig) == "(uint8, bool)"
     assert sig.canonical_form == "(uint8,bool)"
@@ -44,14 +44,14 @@ def test_signature_from_list():
     assert sig.decode_into_dict(sig.encode(1, True)) == {"_0": 1, "_1": True}
 
 
-def test_event_signature():
+def test_event_signature() -> None:
     sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
     assert str(sig) == "(uint8 indexed a, bool indexed b, bytes4 c)"
     assert sig.canonical_form == "(uint8,bool,bytes4)"
     assert sig.canonical_form_nonindexed == "(bytes4)"
 
 
-def test_event_signature_encode():
+def test_event_signature_encode() -> None:
     sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
 
     # All indexed parameters provided
@@ -74,7 +74,7 @@ def test_event_signature_encode():
     )
 
 
-def test_event_signature_decode():
+def test_event_signature_decode() -> None:
     sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
 
     decoded = sig.decode_log_entry(
@@ -91,7 +91,7 @@ def test_event_signature_decode():
         sig.decode_log_entry([b"1", b"2", b"3"], b"zzz")
 
 
-def test_constructor_from_json():
+def test_constructor_from_json() -> None:
     ctr = Constructor.from_json(
         dict(
             type="constructor",
@@ -107,7 +107,7 @@ def test_constructor_from_json():
     assert str(ctr.inputs) == "(uint8 a, bool b)"
 
 
-def test_constructor_init():
+def test_constructor_init() -> None:
     ctr = Constructor(inputs=dict(a=abi.uint(8), b=abi.bool), payable=True)
     assert ctr.payable
     assert ctr.inputs.canonical_form == "(uint8,bool)"
@@ -122,7 +122,7 @@ def test_constructor_init():
     assert ctr_call.input_bytes == b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x01"
 
 
-def test_constructor_errors():
+def test_constructor_errors() -> None:
     with pytest.raises(
         ValueError,
         match="Constructor object must be created from a JSON entry with type='constructor'",
@@ -147,7 +147,7 @@ def test_constructor_errors():
         Constructor.from_json(dict(type="constructor", stateMutability="view"))
 
 
-def _check_method(method):
+def _check_method(method: Method) -> None:
     assert method.name == "someMethod"
     assert method.inputs.canonical_form == "(uint8,bool)"
     assert str(method.inputs) == "(uint8 a, bool b)"
@@ -167,7 +167,7 @@ def _check_method(method):
     assert call.data_bytes == method.selector + encoded_bytes
 
 
-def test_method_from_json_anonymous_outputs():
+def test_method_from_json_anonymous_outputs() -> None:
     method = Method.from_json(
         dict(
             type="function",
@@ -188,7 +188,7 @@ def test_method_from_json_anonymous_outputs():
     _check_method(method)
 
 
-def test_method_from_json_named_outputs():
+def test_method_from_json_named_outputs() -> None:
     method = Method.from_json(
         dict(
             type="function",
@@ -209,7 +209,7 @@ def test_method_from_json_named_outputs():
     _check_method(method)
 
 
-def test_method_init():
+def test_method_init() -> None:
     method = Method(
         name="someMethod",
         mutability=Mutability.VIEW,
@@ -221,7 +221,7 @@ def test_method_init():
     _check_method(method)
 
 
-def test_method_single_output():
+def test_method_single_output() -> None:
     method = Method(
         name="someMethod",
         mutability=Mutability.VIEW,
@@ -236,13 +236,13 @@ def test_method_single_output():
     assert method.decode_output(encoded_bytes) == 1
 
 
-def test_method_errors():
+def test_method_errors() -> None:
     with pytest.raises(
         ValueError, match="Method object must be created from a JSON entry with type='function'"
     ):
         Method.from_json(dict(type="constructor"))
 
-    json = dict(
+    json: ABI_JSON = dict(
         type="function",
         name="someMethod",
         stateMutability="invalid",
@@ -256,7 +256,7 @@ def test_method_errors():
         Method.from_json(json)
 
 
-def test_multi_method():
+def test_multi_method() -> None:
     method1 = Method(
         name="someMethod",
         mutability=Mutability.VIEW,
@@ -304,7 +304,7 @@ def test_multi_method():
         multi_method(1)
 
 
-def test_multi_method_errors():
+def test_multi_method_errors() -> None:
     with pytest.raises(ValueError, match="`methods` cannot be empty"):
         MultiMethod()
 
@@ -329,12 +329,12 @@ def test_multi_method_errors():
         MultiMethod(method, method)
 
 
-def test_fallback():
+def test_fallback() -> None:
     fallback = Fallback.from_json(dict(type="fallback", stateMutability="payable"))
     assert fallback.payable
 
 
-def test_fallback_errors():
+def test_fallback_errors() -> None:
     with pytest.raises(
         ValueError, match="Fallback object must be created from a JSON entry with type='fallback'"
     ):
@@ -346,12 +346,12 @@ def test_fallback_errors():
         Fallback.from_json(dict(type="fallback", stateMutability="view"))
 
 
-def test_receive():
+def test_receive() -> None:
     receive = Receive.from_json(dict(type="receive", stateMutability="payable"))
     assert receive.payable
 
 
-def test_receive_errors():
+def test_receive_errors() -> None:
     with pytest.raises(
         ValueError, match="Receive object must be created from a JSON entry with type='fallback'"
     ):
@@ -363,8 +363,8 @@ def test_receive_errors():
         Receive.from_json(dict(type="receive", stateMutability="view"))
 
 
-def test_contract_abi_json():
-    constructor_abi = dict(
+def test_contract_abi_json() -> None:
+    constructor_abi: ABI_JSON = dict(
         type="constructor",
         stateMutability="payable",
         inputs=[
@@ -373,7 +373,7 @@ def test_contract_abi_json():
         ],
     )
 
-    read_abi = dict(
+    read_abi: ABI_JSON = dict(
         type="function",
         name="readMethod",
         stateMutability="view",
@@ -387,7 +387,7 @@ def test_contract_abi_json():
         ],
     )
 
-    write_abi = dict(
+    write_abi: ABI_JSON = dict(
         type="function",
         name="writeMethod",
         stateMutability="payable",
@@ -397,7 +397,7 @@ def test_contract_abi_json():
         ],
     )
 
-    event_abi = dict(
+    event_abi: ABI_JSON = dict(
         type="event",
         name="Deposit",
         anonymous=True,
@@ -408,7 +408,7 @@ def test_contract_abi_json():
         ],
     )
 
-    error_abi = dict(
+    error_abi: ABI_JSON = dict(
         type="error",
         name="CustomError",
         inputs=[
@@ -418,8 +418,8 @@ def test_contract_abi_json():
         ],
     )
 
-    fallback_abi = dict(type="fallback", stateMutability="payable")
-    receive_abi = dict(type="receive", stateMutability="payable")
+    fallback_abi: ABI_JSON = dict(type="fallback", stateMutability="payable")
+    receive_abi: ABI_JSON = dict(type="receive", stateMutability="payable")
 
     cabi = ContractABI.from_json(
         [constructor_abi, read_abi, write_abi, fallback_abi, receive_abi, event_abi, error_abi]
@@ -445,7 +445,7 @@ def test_contract_abi_json():
     assert isinstance(cabi.error.CustomError, Error)
 
 
-def test_contract_abi_init():
+def test_contract_abi_init() -> None:
     cabi = ContractABI(
         constructor=Constructor(inputs=dict(a=abi.uint(8), b=abi.bool), payable=True),
         methods=[
@@ -498,8 +498,8 @@ def test_contract_abi_init():
     assert isinstance(cabi.method.writeMethod, Method)
 
 
-def test_overloaded_methods():
-    json_abi = [
+def test_overloaded_methods() -> None:
+    json_abi: ABI_JSON = [
         dict(
             type="function",
             name="readMethod",
@@ -537,13 +537,13 @@ def test_overloaded_methods():
     assert isinstance(cabi.method.readMethod, MultiMethod)
 
 
-def test_no_constructor():
+def test_no_constructor() -> None:
     cabi = ContractABI()
     assert isinstance(cabi.constructor, Constructor)
     assert cabi.constructor.inputs.canonical_form == "()"
 
 
-def test_contract_abi_errors():
+def test_contract_abi_errors() -> None:
     constructor_abi = dict(type="constructor", stateMutability="payable", inputs=[])
     with pytest.raises(
         ValueError, match="JSON ABI contains more than one constructor declarations"
@@ -560,7 +560,7 @@ def test_contract_abi_errors():
     ):
         ContractABI.from_json([receive_abi, receive_abi])
 
-    event_abi = dict(type="event", name="Foo", inputs=[], anonymous=False)
+    event_abi: ABI_JSON = dict(type="event", name="Foo", inputs=[], anonymous=False)
     with pytest.raises(ValueError, match="JSON ABI contains more than one declarations of `Foo`"):
         ContractABI.from_json([event_abi, event_abi])
 
@@ -572,7 +572,7 @@ def test_contract_abi_errors():
         ContractABI.from_json([dict(type="foobar")])
 
 
-def test_event_from_json():
+def test_event_from_json() -> None:
     event = Event.from_json(
         dict(
             anonymous=True,
@@ -591,7 +591,7 @@ def test_event_from_json():
     assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
 
 
-def test_event_init():
+def test_event_init() -> None:
     event = Event(
         "Foo",
         dict(from_=abi.address, foo=abi.bytes(), bar=abi.uint(8)),
@@ -604,7 +604,7 @@ def test_event_init():
     assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
 
 
-def test_event_encode():
+def test_event_encode() -> None:
     event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4)), {"a", "b"})
     event_filter = event(b=Either(1, 2))
     assert event_filter.topics == (
@@ -624,58 +624,77 @@ def test_event_encode():
     )
 
 
-def test_event_decode():
-    # We only need a couple of fields
-    class FakeLogEntry(NamedTuple):
-        topics: tuple[LogTopic, ...]
-        data: bytes
-
+def test_event_decode() -> None:
     event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
-
-    decoded = event.decode_log_entry(
-        FakeLogEntry(
-            [
-                LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),
-                LogTopic(abi.bool.encode(True)),
-                LogTopic(abi.uint(8).encode(2)),
-            ],
-            encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
-        )
+    entry = LogEntry(
+        topics=(
+            LogTopic(keccak(event.name.encode() + event.fields.canonical_form.encode())),
+            LogTopic(abi.bool.encode(True)),
+            LogTopic(abi.uint(8).encode(2)),
+        ),
+        data=encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
+        # these fields do not matter for the test
+        address=Address(b"0" * 20),
+        removed=False,
+        log_index=0,
+        transaction_index=0,
+        transaction_hash=TxHash(b"0" * 32),
+        block_hash=BlockHash(b"0" * 32),
+        block_number=0,
     )
+
+    decoded = event.decode_log_entry(entry)
     assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
 
-    # Wrong selector
+
+def test_event_decode_wrong_selector() -> None:
+    event = Event("Foo", dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
+    entry = LogEntry(
+        topics=(
+            LogTopic(keccak(b"NotFoo" + event.fields.canonical_form.encode())),
+            LogTopic(abi.bool.encode(True)),
+            LogTopic(abi.uint(8).encode(2)),
+        ),
+        data=encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
+        # these fields do not matter for the test
+        address=Address(b"0" * 20),
+        removed=False,
+        log_index=0,
+        transaction_index=0,
+        transaction_hash=TxHash(b"0" * 32),
+        block_hash=BlockHash(b"0" * 32),
+        block_number=0,
+    )
+
     with pytest.raises(ValueError, match="This log entry belongs to a different event"):
-        decoded = event.decode_log_entry(
-            FakeLogEntry(
-                [
-                    LogTopic(keccak(b"NotFoo" + event.fields.canonical_form.encode())),
-                    LogTopic(abi.bool.encode(True)),
-                    LogTopic(abi.uint(8).encode(2)),
-                ],
-                encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
-            )
-        )
+        event.decode_log_entry(entry)
 
-    # Anonymous event
 
+def test_event_decode_anonymous() -> None:
     event = Event(
         "Foo",
         dict(a=abi.bool, b=abi.uint(8), c=abi.bytes(4), d=abi.bytes()),
         {"a", "b"},
         anonymous=True,
     )
-
-    decoded = event.decode_log_entry(
-        FakeLogEntry(
-            [LogTopic(abi.bool.encode(True)), LogTopic(abi.uint(8).encode(2))],
-            encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
-        )
+    entry = LogEntry(
+        topics=(LogTopic(abi.bool.encode(True)), LogTopic(abi.uint(8).encode(2))),
+        data=encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
+        # these fields do not matter for the test
+        address=Address(b"0" * 20),
+        removed=False,
+        log_index=0,
+        transaction_index=0,
+        transaction_hash=TxHash(b"0" * 32),
+        block_hash=BlockHash(b"0" * 32),
+        block_number=0,
     )
+
+    decoded = event.decode_log_entry(entry)
     assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
 
 
-def test_event_errors():
+def test_event_errors() -> None:
     with pytest.raises(
         ValueError,
         match="Event object must be created from a JSON entry with type='event'",
@@ -722,7 +741,7 @@ def test_event_errors():
         )
 
 
-def test_error_from_json():
+def test_error_from_json() -> None:
     error = Error.from_json(
         dict(
             inputs=[
@@ -756,7 +775,7 @@ def test_error_from_json():
         )
 
 
-def test_error_init():
+def test_error_init() -> None:
     error = Error(
         "Foo",
         dict(from_=abi.address, foo=abi.bytes(), bar=abi.uint(8)),
@@ -765,7 +784,7 @@ def test_error_init():
     assert str(error.fields) == "(address from_, bytes foo, uint8 bar)"
 
 
-def test_error_decode():
+def test_error_decode() -> None:
     error = Error(
         "Foo",
         dict(foo=abi.bytes(), bar=abi.uint(8)),
@@ -776,7 +795,7 @@ def test_error_decode():
     assert decoded == dict(foo=b"12345", bar=9)
 
 
-def test_resolve_error():
+def test_resolve_error() -> None:
     error1 = Error("Error1", dict(foo=abi.bytes(), bar=abi.uint(8)))
     error2 = Error("Error2", dict(foo=abi.bool, bar=abi.string))
     contract_abi = ContractABI(errors=[error1, error2])

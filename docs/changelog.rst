@@ -21,11 +21,14 @@ Added
 - A base class for bound calls (``BaseBoundMethodCall``). (PR_84_)
 - A helper class for interacting with the Multicall contract (``Multicall``). (PR_84_)
 - Exporting ``HTTPError`` and ``BadResponseFormat``. (PR_82_)
+- Exporting ``InvalidResponse``. (PR_86_)
+- ``LocalProvider.root`` is now of type ``AccountSigner`` instead of ``Signer``. (PR_86_)
 
 
 .. _PR_81: https://github.com/fjarri-eth/pons/pull/81
 .. _PR_82: https://github.com/fjarri-eth/pons/pull/82
 .. _PR_84: https://github.com/fjarri-eth/pons/pull/84
+.. _PR_86: https://github.com/fjarri-eth/pons/pull/86
 
 
 0.8.1 (2024-11-12)

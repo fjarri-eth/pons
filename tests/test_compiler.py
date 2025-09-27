@@ -3,13 +3,13 @@ from pathlib import Path
 from pons import EVMVersion, compile_contract_file
 
 
-def test_multiple_contracts():
+def test_multiple_contracts() -> None:
     path = Path(__file__).resolve().parent / "TestCompiler.sol"
     contracts = compile_contract_file(path, evm_version=EVMVersion.SHANGHAI, optimize=True)
     assert sorted(contracts) == ["Contract1", "Contract2"]
 
 
-def test_import_remappings():
+def test_import_remappings() -> None:
     root_path = path = Path(__file__).resolve().parent
     path = root_path / "TestCompilerWithImport.sol"
     contracts = compile_contract_file(

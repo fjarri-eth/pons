@@ -11,7 +11,7 @@ from eth_account import Account
 from ethereum_rpc import Amount
 
 from ._provider import RPC_JSON, Provider, ProviderSession
-from ._signer import AccountSigner, Signer
+from ._signer import AccountSigner
 
 
 class SnapshotID:
@@ -24,7 +24,7 @@ class SnapshotID:
 class LocalProvider(Provider):
     """A provider maintaining its own chain state, useful for tests."""
 
-    root: Signer
+    root: AccountSigner
     """The signer for the pre-created account."""
 
     def __init__(

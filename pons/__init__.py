@@ -48,7 +48,14 @@ from ._fallback_provider import (
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
 from ._multicall import BoundMultiMethodCall, BoundMultiMethodValueCall, Multicall
-from ._provider import HTTPError, HTTPProvider, ProtocolError, Provider, Unreachable
+from ._provider import (
+    HTTPError,
+    HTTPProvider,
+    InvalidResponse,
+    ProtocolError,
+    Provider,
+    Unreachable,
+)
 from ._signer import AccountSigner, Signer
 from ._utils import get_create2_address, get_create_address
 
@@ -90,6 +97,7 @@ __all__ = [
     "HTTPError",
     "HTTPProvider",
     "HTTPProviderServer",
+    "InvalidResponse",
     "LocalProvider",
     "Method",
     "MethodCall",

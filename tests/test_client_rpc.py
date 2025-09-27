@@ -1,6 +1,7 @@
 import os
-from contextlib import contextmanager
+from collections.abc import Awaitable, Iterable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from ethereum_rpc import (
@@ -8,6 +9,9 @@ from ethereum_rpc import (
     Amount,
     BlockHash,
     BlockLabel,
+    ErrorCode,
+    LogEntry,
+    LogTopic,
     RPCError,
     RPCErrorCode,
     TxHash,
@@ -15,26 +19,27 @@ from ethereum_rpc import (
     keccak,
 )
 
-from pons import Either, abi, compile_contract_file
+from pons import (
+    AccountSigner,
+    ClientSession,
+    CompiledContract,
+    Either,
+    LocalProvider,
+    abi,
+    compile_contract_file,
+)
 from pons._abi_types import encode_args
 from pons._client_rpc import BadResponseFormat, ProviderError
+from pons._provider import RPC_JSON
 
 
 @pytest.fixture
-def compiled_contracts():
+def compiled_contracts() -> dict[str, CompiledContract]:
     path = Path(__file__).resolve().parent / "TestClient.sol"
     return compile_contract_file(path)
 
 
-@contextmanager
-def monkeypatched(obj, attr, patch):
-    original_value = getattr(obj, attr)
-    setattr(obj, attr, patch)
-    yield obj
-    setattr(obj, attr, original_value)
-
-
-def normalize_topics(topics):
+def normalize_topics(topics: Iterable[LogTopic]) -> tuple[tuple[LogTopic], ...]:
     """
     Reduces visual noise in assertions by bringing the log topics in a log entry
     (a tuple of single elements) to the format used in EventFilter
@@ -43,7 +48,9 @@ def normalize_topics(topics):
     return tuple((elem,) for elem in topics)
 
 
-async def test_eth_get_balance(session, root_signer, another_signer):
+async def test_eth_get_balance(
+    session: ClientSession, root_signer: AccountSigner, another_signer: AccountSigner
+) -> None:
     to_transfer = Amount.ether(10)
     await session.transfer(root_signer, another_signer.address, to_transfer)
     acc1_balance = await session.rpc.eth_get_balance(another_signer.address)
@@ -55,7 +62,12 @@ async def test_eth_get_balance(session, root_signer, another_signer):
     assert balance == Amount.ether(0)
 
 
-async def test_eth_get_transaction_receipt(local_provider, session, root_signer, another_signer):
+async def test_eth_get_transaction_receipt(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     local_provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(
         root_signer, another_signer.address, Amount.ether(10)
@@ -65,6 +77,7 @@ async def test_eth_get_transaction_receipt(local_provider, session, root_signer,
 
     local_provider.enable_auto_mine_transactions()
     receipt = await session.rpc.eth_get_transaction_receipt(tx_hash)
+    assert receipt is not None
     assert receipt.succeeded
 
     # A non-existent transaction
@@ -72,7 +85,12 @@ async def test_eth_get_transaction_receipt(local_provider, session, root_signer,
     assert receipt is None
 
 
-async def test_eth_get_transaction_count(local_provider, session, root_signer, another_signer):
+async def test_eth_get_transaction_count(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     assert await session.rpc.eth_get_transaction_count(root_signer.address) == 0
     await session.transfer(root_signer, another_signer.address, Amount.ether(10))
     assert await session.rpc.eth_get_transaction_count(root_signer.address) == 1
@@ -83,33 +101,42 @@ async def test_eth_get_transaction_count(local_provider, session, root_signer, a
     assert await session.rpc.eth_get_transaction_count(root_signer.address, BlockLabel.PENDING) == 2
 
 
-async def test_eth_gas_price(session):
+async def test_eth_gas_price(session: ClientSession) -> None:
     gas_price = await session.rpc.eth_gas_price()
     assert isinstance(gas_price, Amount)
 
 
-async def test_eth_block_number(session, root_signer, another_signer):
+async def test_eth_block_number(
+    session: ClientSession, root_signer: AccountSigner, another_signer: AccountSigner
+) -> None:
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     await session.transfer(root_signer, another_signer.address, Amount.ether(2))
     await session.transfer(root_signer, another_signer.address, Amount.ether(3))
     block_num = await session.rpc.eth_block_number()
 
     block_info = await session.rpc.eth_get_block_by_number(block_num - 1, with_transactions=True)
+    assert block_info is not None
+    assert isinstance(block_info.transactions[0], TxInfo)
     assert block_info.transactions[0].value == Amount.ether(2)
 
 
-async def test_eth_get_block(session, root_signer, another_signer):
+async def test_eth_get_block(
+    session: ClientSession, root_signer: AccountSigner, another_signer: AccountSigner
+) -> None:
     to_transfer = Amount.ether(10)
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
     block_info = await session.rpc.eth_get_block_by_number(1, with_transactions=True)
+    assert block_info is not None
     assert all(isinstance(tx, TxInfo) for tx in block_info.transactions)
 
+    assert block_info.hash_ is not None
     block_info2 = await session.rpc.eth_get_block_by_hash(block_info.hash_, with_transactions=True)
     assert block_info2 == block_info
 
     # no transactions
     block_info = await session.rpc.eth_get_block_by_number(1)
+    assert block_info is not None
     assert all(isinstance(tx, TxHash) for tx in block_info.transactions)
 
     # non-existent block
@@ -121,7 +148,12 @@ async def test_eth_get_block(session, root_signer, another_signer):
     assert block_info is None
 
 
-async def test_eth_get_block_pending(local_provider, session, root_signer, another_signer):
+async def test_eth_get_block_pending(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
 
     local_provider.disable_auto_mine_transactions()
@@ -132,27 +164,36 @@ async def test_eth_get_block_pending(local_provider, session, root_signer, anoth
     block_info = await session.rpc.eth_get_block_by_number(
         BlockLabel.PENDING, with_transactions=True
     )
+    assert block_info is not None
     assert block_info.number == 2
     assert block_info.hash_ is None
     assert block_info.nonce is None
     assert block_info.miner is None
     assert block_info.total_difficulty is None
     assert len(block_info.transactions) == 1
+    assert isinstance(block_info.transactions[0], TxInfo)
     assert block_info.transactions[0].hash_ == tx_hash
     assert block_info.transactions[0].value == Amount.ether(10)
 
     block_info = await session.rpc.eth_get_block_by_number(
         BlockLabel.PENDING, with_transactions=False
     )
+    assert block_info is not None
     assert len(block_info.transactions) == 1
     assert block_info.transactions[0] == tx_hash
 
 
-async def test_eth_get_transaction_by_hash(local_provider, session, root_signer, another_signer):
+async def test_eth_get_transaction_by_hash(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     to_transfer = Amount.ether(1)
 
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
     tx_info = await session.rpc.eth_get_transaction_by_hash(tx_hash)
+    assert tx_info is not None
     assert tx_info.value == to_transfer
 
     non_existent = TxHash(b"abcd" * 8)
@@ -163,13 +204,18 @@ async def test_eth_get_transaction_by_hash(local_provider, session, root_signer,
     tx_hash = await session.broadcast_transfer(root_signer, another_signer.address, to_transfer)
     tx_info = await session.rpc.eth_get_transaction_by_hash(tx_hash)
 
+    assert tx_info is not None
     assert tx_info.block_number == 2
     assert tx_info.block_hash is None
     assert tx_info.transaction_index is None
     assert tx_info.value == to_transfer
 
 
-async def test_eth_get_code(session, root_signer, compiled_contracts):
+async def test_eth_get_code(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_contract = compiled_contracts["EmptyContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     bytecode = await session.rpc.eth_get_code(deployed_contract.address, block=BlockLabel.LATEST)
@@ -180,7 +226,11 @@ async def test_eth_get_code(session, root_signer, compiled_contracts):
     assert bytecode in compiled_contract.bytecode
 
 
-async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
+async def test_eth_get_storage_at(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     x = 0xAB
     y_key = Address(os.urandom(20))
     y_val = 0xCD
@@ -214,7 +264,12 @@ async def test_eth_get_storage_at(session, root_signer, compiled_contracts):
     assert storage == b"\x00" * 31 + y_val.to_bytes(1, byteorder="big")
 
 
-async def test_eth_call(session, compiled_contracts, root_signer, another_signer):
+async def test_eth_call(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     result = await session.call(deployed_contract.method.getState(456))
@@ -234,7 +289,12 @@ async def test_eth_call(session, compiled_contracts, root_signer, another_signer
     assert result == (another_signer.address,)
 
 
-async def test_eth_call_pending(local_provider, session, compiled_contracts, root_signer):
+async def test_eth_call_pending(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+) -> None:
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
 
@@ -250,10 +310,12 @@ async def test_eth_call_pending(local_provider, session, compiled_contracts, roo
     assert result == (456,)
 
 
-async def test_eth_get_filter_changes_bad_response(local_provider, session, monkeypatch):
+async def test_eth_get_filter_changes_bad_response(
+    local_provider: LocalProvider, session: ClientSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
     block_filter = await session.rpc.eth_new_block_filter()
 
-    def mock_rpc(_method, *_args):
+    def mock_rpc(_method: str, *_args: Any) -> RPC_JSON:
         return {"foo": 1}
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
@@ -265,7 +327,9 @@ async def test_eth_get_filter_changes_bad_response(local_provider, session, monk
         await session.rpc.eth_get_filter_changes(block_filter)
 
 
-async def test_block_filter(session, root_signer, another_signer):
+async def test_block_filter(
+    session: ClientSession, root_signer: AccountSigner, another_signer: AccountSigner
+) -> None:
     to_transfer = Amount.ether(1)
 
     await session.transfer(root_signer, another_signer.address, to_transfer)
@@ -276,7 +340,9 @@ async def test_block_filter(session, root_signer, another_signer):
     await session.transfer(root_signer, another_signer.address, to_transfer)
 
     last_block = await session.rpc.eth_get_block_by_number(BlockLabel.LATEST)
+    assert last_block is not None
     prev_block = await session.rpc.eth_get_block_by_number(last_block.number - 1)
+    assert prev_block is not None
 
     block_hashes = await session.rpc.eth_get_filter_changes(block_filter)
     assert block_hashes == (prev_block.hash_, last_block.hash_)
@@ -285,13 +351,19 @@ async def test_block_filter(session, root_signer, another_signer):
 
     block_hashes = await session.rpc.eth_get_filter_changes(block_filter)
     last_block = await session.rpc.eth_get_block_by_number(BlockLabel.LATEST)
+    assert last_block is not None
     assert block_hashes == (last_block.hash_,)
 
     block_hashes = await session.rpc.eth_get_filter_changes(block_filter)
     assert len(block_hashes) == 0
 
 
-async def test_pending_transaction_filter(local_provider, session, root_signer, another_signer):
+async def test_pending_transaction_filter(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     transaction_filter = await session.rpc.eth_new_pending_transaction_filter()
 
     to_transfer = Amount.ether(1)
@@ -303,8 +375,13 @@ async def test_pending_transaction_filter(local_provider, session, root_signer, 
 
 
 async def test_eth_get_logs(
-    monkeypatch, local_provider, session, compiled_contracts, root_signer, another_signer
-):
+    monkeypatch: pytest.MonkeyPatch,
+    local_provider: LocalProvider,
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -337,7 +414,7 @@ async def test_eth_get_logs(
 
     # Test an invalid response
 
-    def mock_rpc(_method, *_args):
+    def mock_rpc(_method: str, *_args: Any) -> RPC_JSON:
         return {"foo": 1}
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
@@ -349,7 +426,12 @@ async def test_eth_get_logs(
         await session.rpc.eth_get_logs(source=contract2.address)
 
 
-async def test_eth_get_filter_logs(session, compiled_contracts, root_signer, another_signer):
+async def test_eth_get_filter_logs(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -361,6 +443,8 @@ async def test_eth_get_filter_logs(session, compiled_contracts, root_signer, ano
 
     entries = await session.rpc.eth_get_filter_logs(log_filter)
     assert len(entries) == 2
+    assert isinstance(entries[0], LogEntry)
+    assert isinstance(entries[1], LogEntry)
     assert entries[0].address == contract1.address
     assert entries[1].address == contract2.address
 
@@ -374,7 +458,12 @@ async def test_eth_get_filter_logs(session, compiled_contracts, root_signer, ano
     )
 
 
-async def test_log_filter_all(session, compiled_contracts, root_signer, another_signer):
+async def test_log_filter_all(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -386,6 +475,8 @@ async def test_log_filter_all(session, compiled_contracts, root_signer, another_
 
     entries = await session.rpc.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
+    assert isinstance(entries[0], LogEntry)
+    assert isinstance(entries[1], LogEntry)
     assert entries[0].address == contract1.address
     assert entries[1].address == contract2.address
 
@@ -399,7 +490,12 @@ async def test_log_filter_all(session, compiled_contracts, root_signer, another_
     )
 
 
-async def test_log_filter_by_address(session, compiled_contracts, root_signer, another_signer):
+async def test_log_filter_by_address(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -413,6 +509,7 @@ async def test_log_filter_by_address(session, compiled_contracts, root_signer, a
 
     entries = await session.rpc.eth_get_filter_changes(log_filter)
     assert len(entries) == 1
+    assert isinstance(entries[0], LogEntry)
     assert entries[0].address == contract2.address
     assert (
         normalize_topics(entries[0].topics)
@@ -430,6 +527,8 @@ async def test_log_filter_by_address(session, compiled_contracts, root_signer, a
 
     entries = await session.rpc.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
+    assert isinstance(entries[0], LogEntry)
+    assert isinstance(entries[1], LogEntry)
     assert entries[0].address == contract1.address
     assert (
         normalize_topics(entries[0].topics)
@@ -442,7 +541,12 @@ async def test_log_filter_by_address(session, compiled_contracts, root_signer, a
     )
 
 
-async def test_log_filter_by_topic(session, compiled_contracts, root_signer, another_signer):
+async def test_log_filter_by_topic(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -464,6 +568,8 @@ async def test_log_filter_by_topic(session, compiled_contracts, root_signer, ano
 
     entries = await session.rpc.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
+    assert isinstance(entries[0], LogEntry)
+    assert isinstance(entries[1], LogEntry)
     assert entries[0].address == contract1.address
     assert (
         normalize_topics(entries[0].topics)
@@ -486,6 +592,8 @@ async def test_log_filter_by_topic(session, compiled_contracts, root_signer, ano
 
     entries = await session.rpc.eth_get_filter_changes(log_filter)
     assert len(entries) == 2
+    assert isinstance(entries[0], LogEntry)
+    assert isinstance(entries[1], LogEntry)
     assert entries[0].address == contract1.address
     assert (
         normalize_topics(entries[0].topics)
@@ -498,7 +606,12 @@ async def test_log_filter_by_topic(session, compiled_contracts, root_signer, ano
     )
 
 
-async def test_log_filter_by_block_num(session, compiled_contracts, root_signer, another_signer):
+async def test_log_filter_by_block_num(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
     basic_contract = compiled_contracts["BasicContract"]
     await session.transfer(root_signer, another_signer.address, Amount.ether(1))
     contract1 = await session.deploy(root_signer, basic_contract.constructor(123))
@@ -515,19 +628,22 @@ async def test_log_filter_by_block_num(session, compiled_contracts, root_signer,
     entries = await session.rpc.eth_get_filter_changes(log_filter)
 
     # The range in the filter is inclusive
-    assert [entry.block_number for entry in entries] == list(range(block_num + 1, block_num + 4))
-    assert [normalize_topics(entry.topics) for entry in entries] == [
-        contract1.abi.event.Deposit(root_signer.address, b"2222").topics,
-        contract1.abi.event.Deposit(root_signer.address, b"3333").topics,
-        contract1.abi.event.Deposit(root_signer.address, b"4444").topics,
-    ]
+    for i, entry in enumerate(entries):
+        assert isinstance(entry, LogEntry)
+        assert entry.block_number == block_num + i + 1
+        assert (
+            normalize_topics(entry.topics)
+            == contract1.abi.event.Deposit(root_signer.address, (str(i + 2) * 4).encode()).topics
+        )
 
 
-async def test_unknown_rpc_status_code(local_provider, session, monkeypatch):
-    def mock_rpc(_method, *_args):
+async def test_unknown_rpc_status_code(
+    local_provider: LocalProvider, session: ClientSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def mock_rpc(_method: str, *_args: Any) -> RPC_JSON:
         # This is a known exception type, and it will be transferred through the network
         # keeping the status code.
-        raise RPCError(666, "this method is possessed")
+        raise RPCError(ErrorCode(666), "this method is possessed")
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
@@ -535,7 +651,12 @@ async def test_unknown_rpc_status_code(local_provider, session, monkeypatch):
         await session.net_version()
 
 
-async def check_rpc_error(awaitable, expected_code, expected_message, expected_data):
+async def check_rpc_error(
+    awaitable: Awaitable[Any],
+    expected_code: RPCErrorCode | None,
+    expected_message: str,
+    expected_data: bytes | None,
+) -> None:
     with pytest.raises(ProviderError) as exc:
         await awaitable
 
@@ -544,7 +665,11 @@ async def check_rpc_error(awaitable, expected_code, expected_message, expected_d
     assert exc.value.data == expected_data
 
 
-async def test_contract_exceptions(session, root_signer, compiled_contracts):
+async def test_contract_exceptions(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 
@@ -552,47 +677,51 @@ async def test_contract_exceptions(session, root_signer, compiled_contracts):
     custom_error_selector = keccak(b"CustomError(uint256)")[:4]
 
     # `require(condition)`
-    kwargs = dict(
+    await check_rpc_error(
+        session.rpc.eth_call(contract.method.viewError(0)),
         expected_code=RPCErrorCode.SERVER_ERROR,
         expected_message="execution reverted",
         expected_data=None,
     )
-    await check_rpc_error(session.rpc.eth_call(contract.method.viewError(0)), **kwargs)
 
     # `require(condition, message)`
-    kwargs = dict(
+    await check_rpc_error(
+        session.rpc.eth_call(contract.method.viewError(1)),
         expected_code=RPCErrorCode.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=error_selector + encode_args((abi.string, "require(string)")),
     )
-    await check_rpc_error(session.rpc.eth_call(contract.method.viewError(1)), **kwargs)
 
     # `revert()`
-    kwargs = dict(
+    await check_rpc_error(
+        session.rpc.eth_call(contract.method.viewError(2)),
         expected_code=RPCErrorCode.SERVER_ERROR,
         expected_message="execution reverted",
         expected_data=None,
     )
-    await check_rpc_error(session.rpc.eth_call(contract.method.viewError(2)), **kwargs)
 
     # `revert(message)`
-    kwargs = dict(
+    await check_rpc_error(
+        session.rpc.eth_call(contract.method.viewError(3)),
         expected_code=RPCErrorCode.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=error_selector + encode_args((abi.string, "revert(string)")),
     )
-    await check_rpc_error(session.rpc.eth_call(contract.method.viewError(3)), **kwargs)
 
     # `revert CustomError(...)`
-    kwargs = dict(
+    await check_rpc_error(
+        session.rpc.eth_call(contract.method.viewError(4)),
         expected_code=RPCErrorCode.EXECUTION_ERROR,
         expected_message="execution reverted",
         expected_data=custom_error_selector + encode_args((abi.uint(256), 4)),
     )
-    await check_rpc_error(session.rpc.eth_call(contract.method.viewError(4)), **kwargs)
 
 
-async def test_contract_panics(session, root_signer, compiled_contracts):
+async def test_contract_panics(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_contract = compiled_contracts["TestErrors"]
     contract = await session.deploy(root_signer, compiled_contract.constructor(999))
 

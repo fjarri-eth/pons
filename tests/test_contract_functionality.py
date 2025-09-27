@@ -4,6 +4,9 @@ import pytest
 from ethereum_rpc import Amount
 
 from pons import (
+    AccountSigner,
+    ClientSession,
+    CompiledContract,
     Constructor,
     ContractABI,
     DeployedContract,
@@ -16,12 +19,16 @@ from pons import (
 
 
 @pytest.fixture
-def compiled_contracts():
+def compiled_contracts() -> dict[str, CompiledContract]:
     path = Path(__file__).resolve().parent / "TestContractFunctionality.sol"
     return compile_contract_file(path, evm_version=EVMVersion.CANCUN)
 
 
-async def test_empty_constructor(session, root_signer, compiled_contracts):
+async def test_empty_constructor(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     """
     Checks that an empty constructor is created automatically if none is provided,
     and it can be used to deploy the contract.
@@ -34,7 +41,12 @@ async def test_empty_constructor(session, root_signer, compiled_contracts):
     assert result == (1 + 123,)
 
 
-async def test_basics(session, root_signer, another_signer, compiled_contracts):
+async def test_basics(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_contract = compiled_contracts["Test"]
 
     # Deploy the contract
@@ -61,7 +73,11 @@ async def test_basics(session, root_signer, another_signer, compiled_contracts):
     assert result == (inner, outer)
 
 
-async def test_overloaded_method(session, root_signer, compiled_contracts):
+async def test_overloaded_method(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_contract = compiled_contracts["Test"]
 
     # Deploy the contract
@@ -75,7 +91,11 @@ async def test_overloaded_method(session, root_signer, compiled_contracts):
     assert result == (456 + 123,)
 
 
-async def test_read_only_mode(session, root_signer, compiled_contracts):
+async def test_read_only_mode(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     # Test that a "nonpayable" (that is, mutating) method can still be invoked
     # via `eth_call`, and it will use the current state of the contract
     # in a "copy-on-write" mode, where it will be able to make changes,
@@ -106,7 +126,12 @@ async def test_read_only_mode(session, root_signer, compiled_contracts):
     assert result == (value + 1,)
 
 
-async def test_abi_declaration(session, root_signer, another_signer, compiled_contracts):
+async def test_abi_declaration(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     compiled_contract = compiled_contracts["Test"]
 
     # Deploy the contract
@@ -155,7 +180,11 @@ async def test_abi_declaration(session, root_signer, another_signer, compiled_co
     assert result == (inner, outer)
 
 
-async def test_complicated_event(session, root_signer, compiled_contracts):
+async def test_complicated_event(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    compiled_contracts: dict[str, CompiledContract],
+) -> None:
     # Smoke test for topic encoding, emitting an event with non-trivial topic structure.
     # The details of the encoding should be covered in ABI tests,
     # here we're just checking we got them right.
