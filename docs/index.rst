@@ -91,13 +91,13 @@ A quick usage example:
         signer = AccountSigner(acc)
 
         async with client.session() as session:
-            my_balance = await session.eth_get_balance(signer.address)
+            my_balance = await session.get_balance(signer.address)
             print("My balance:", my_balance.as_ether(), "ETH")
 
             another_address = Address.from_hex("0x<another_address>")
             await session.transfer(signer, another_address, Amount.ether(1.5))
 
-            another_balance = await session.eth_get_balance(another_address)
+            another_balance = await session.get_balance(another_address)
             print("Another balance:", another_balance.as_ether(), "ETH")
 
     trio.run(main)

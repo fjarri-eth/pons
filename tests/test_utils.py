@@ -18,17 +18,17 @@ async def test_create(session, root_signer, compiled_contracts):
 
     # Try deploying the contract with different nonces
 
-    nonce = await session.eth_get_transaction_count(root_signer.address)
+    nonce = await session.rpc.eth_get_transaction_count(root_signer.address)
     assert nonce == 0
     to_deploy = await session.deploy(root_signer, compiled_to_deploy.constructor(123))
     assert to_deploy.address == get_create_address(root_signer.address, nonce)
 
-    nonce = await session.eth_get_transaction_count(root_signer.address)
+    nonce = await session.rpc.eth_get_transaction_count(root_signer.address)
     assert nonce == 1
     to_deploy = await session.deploy(root_signer, compiled_to_deploy.constructor(123))
     assert to_deploy.address == get_create_address(root_signer.address, nonce)
 
-    nonce = await session.eth_get_transaction_count(root_signer.address)
+    nonce = await session.rpc.eth_get_transaction_count(root_signer.address)
     assert nonce == 2
     to_deploy = await session.deploy(root_signer, compiled_to_deploy.constructor(123))
     assert to_deploy.address == get_create_address(root_signer.address, nonce)

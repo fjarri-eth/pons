@@ -35,7 +35,7 @@ async def test_root_balance():
     provider = LocalProvider(root_balance=amount)
     client = Client(provider=provider)
     async with client.session() as session:
-        assert await session.eth_get_balance(provider.root.address) == amount
+        assert await session.get_balance(provider.root.address) == amount
 
 
 async def test_auto_mine(provider, session, root_signer, another_signer):
@@ -44,22 +44,22 @@ async def test_auto_mine(provider, session, root_signer, another_signer):
 
     # Auto-mininig is the default behavior
     tx_hash = await session.broadcast_transfer(root_signer, dest, amount)
-    receipt = await session.eth_get_transaction_receipt(tx_hash)
+    receipt = await session.rpc.eth_get_transaction_receipt(tx_hash)
     assert receipt.succeeded
-    assert await session.eth_get_balance(dest) == amount
+    assert await session.get_balance(dest) == amount
 
     # Disable auto-mining. Now broadcasting the transaction does not automatically finalize it.
     provider.disable_auto_mine_transactions()
     tx_hash = await session.broadcast_transfer(root_signer, dest, amount)
-    receipt = await session.eth_get_transaction_receipt(tx_hash)
+    receipt = await session.rpc.eth_get_transaction_receipt(tx_hash)
     assert receipt is None
-    assert await session.eth_get_balance(dest) == amount
+    assert await session.get_balance(dest) == amount
 
     # Enable auto-mining back. The pending transactions are added to the block.
     provider.enable_auto_mine_transactions()
-    receipt = await session.eth_get_transaction_receipt(tx_hash)
+    receipt = await session.rpc.eth_get_transaction_receipt(tx_hash)
     assert receipt.succeeded
-    assert await session.eth_get_balance(dest) == Amount.ether(2)
+    assert await session.get_balance(dest) == Amount.ether(2)
 
 
 async def test_snapshots(provider, session, root_signer, another_signer):
@@ -70,10 +70,10 @@ async def test_snapshots(provider, session, root_signer, another_signer):
     await session.transfer(root_signer, dest, amount)
     snapshot_id = provider.take_snapshot()
     await session.transfer(root_signer, dest, amount)
-    assert await session.eth_get_balance(dest) == double_amount
+    assert await session.get_balance(dest) == double_amount
 
     provider.revert_to_snapshot(snapshot_id)
-    assert await session.eth_get_balance(dest) == amount
+    assert await session.get_balance(dest) == amount
 
 
 async def test_net_version(session):

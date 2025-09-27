@@ -252,11 +252,11 @@ Compiled and deployed contracts
 Filter objects
 --------------
 
-.. autoclass:: pons._client.BlockFilter()
+.. autoclass:: pons._client_rpc.BlockFilter()
 
-.. autoclass:: pons._client.PendingTransactionFilter()
+.. autoclass:: pons._client_rpc.PendingTransactionFilter()
 
-.. autoclass:: pons._client.LogFilter()
+.. autoclass:: pons._client_rpc.LogFilter()
 
 
 Solidity types
