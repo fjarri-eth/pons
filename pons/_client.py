@@ -21,7 +21,7 @@ from ethereum_rpc import (
     unstructure,
 )
 
-from ._client_rpc import BadResponseFormat, ClientSessionRPC, ProviderError, RemoteError
+from ._client_rpc import BadResponseFormat, ClientSessionRPC, ProviderError
 from ._contract import (
     BaseBoundMethodCall,
     BoundConstructorCall,
@@ -61,10 +61,10 @@ class Client:
             # TODO (#58): incorporate cached values from the session back into the client
 
 
-class TransactionFailed(RemoteError):
+class TransactionFailed(Exception):
     """
-    Raised if the transaction was submitted successfully,
-    but the final receipt indicates a failure.
+    Raised for invalid transactions that are not contract executions
+    (e.g. transfers or contract deployments).
     """
 
 
@@ -121,7 +121,7 @@ class ContractPanicReason(Enum):
             return cls.UNKNOWN
 
 
-class ContractPanic(RemoteError):
+class ContractPanic(Exception):
     """A panic raised in a contract call."""
 
     Reason = ContractPanicReason
@@ -138,7 +138,7 @@ class ContractPanic(RemoteError):
         self.reason = reason
 
 
-class ContractLegacyError(RemoteError):
+class ContractLegacyError(Exception):
     """A raised Solidity legacy error (from ``require()`` or ``revert()``)."""
 
     message: str
@@ -149,7 +149,7 @@ class ContractLegacyError(RemoteError):
         self.message = message
 
 
-class ContractError(RemoteError):
+class ContractError(Exception):
     """A raised Solidity error (from ``revert SomeError(...)``)."""
 
     error: Error
@@ -186,7 +186,19 @@ def decode_contract_error(
 
 
 class ClientSession:
-    """An open session to the provider."""
+    """
+    An open session to the provider.
+
+    The methods of this class may raise the following exceptions:
+    :py:class:`ProviderError`,
+    :py:class:`ContractLegacyError`,
+    :py:class:`ContractError`,
+    :py:class:`ContractPanic`,
+    :py:class:`TransactionFailed`,
+    :py:class:`Unreachable`,
+    :py:class:`BadResponseFormat`,
+    a provider-specific derived class of :py:class:`ProtocolError`.
+    """
 
     def __init__(self, provider_session: ProviderSession):
         self._provider_session = provider_session

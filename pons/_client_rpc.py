@@ -47,20 +47,17 @@ class LogFilter:
     provider_path: tuple[int, ...]
 
 
-class RemoteError(Exception):
-    """
-    A base of all errors occurring on the provider's side.
-    Encompasses both errors returned via HTTP status codes
-    and the ones returned via the JSON response.
-    """
-
-
-class BadResponseFormat(RemoteError):
+class BadResponseFormat(Exception):
     """Raised if the RPC provider returned an unexpectedly formatted response."""
 
 
-class ProviderError(RemoteError):
-    """A general problem with fulfilling the request at the provider's side."""
+class ProviderError(Exception):
+    """
+    A general problem with fulfilling the request at the provider's side.
+
+    This means the provider sent a correct response with an error code
+    and possibly some associated data.
+    """
 
     raw_code: int
     """The error code returned by the server."""
@@ -144,6 +141,16 @@ async def rpc_call_at_pin(
 
 
 class ClientSessionRPC:
+    """
+    The hub for methods which directly correspond to Ethereum RPC calls.
+
+    The methods of this class may raise the following exceptions:
+    :py:class:`ProviderError`,
+    :py:class:`Unreachable`,
+    :py:class:`BadResponseFormat`,
+    a provider-specific derived class of :py:class:`ProtocolError`.
+    """
+
     def __init__(self, provider_session: ProviderSession):
         self._provider_session = provider_session
 

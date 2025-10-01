@@ -8,10 +8,9 @@ from ._client import (
     ContractError,
     ContractLegacyError,
     ContractPanic,
-    ProviderError,
-    RemoteError,
     TransactionFailed,
 )
+from ._client_rpc import BadResponseFormat, ClientSessionRPC, ProviderError
 from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
     BaseBoundMethodCall,
@@ -49,7 +48,7 @@ from ._fallback_provider import (
 from ._http_provider_server import HTTPProviderServer
 from ._local_provider import LocalProvider, SnapshotID
 from ._multicall import BoundMultiMethodCall, BoundMultiMethodValueCall, Multicall
-from ._provider import HTTPProvider, ProtocolError, Provider, Unreachable
+from ._provider import HTTPError, HTTPProvider, ProtocolError, Provider, Unreachable
 from ._signer import AccountSigner, Signer
 from ._utils import get_create2_address, get_create_address
 
@@ -57,6 +56,7 @@ __all__ = [
     "ABI_JSON",
     "ABIDecodingError",
     "AccountSigner",
+    "BadResponseFormat",
     "BaseBoundMethodCall",
     "BoundConstructor",
     "BoundConstructorCall",
@@ -68,6 +68,7 @@ __all__ = [
     "BoundMultiMethodValueCall",
     "Client",
     "ClientSession",
+    "ClientSessionRPC",
     "CompiledContract",
     "Constructor",
     "ConstructorCall",
@@ -86,6 +87,7 @@ __all__ = [
     "FallbackProvider",
     "FallbackStrategy",
     "FallbackStrategyFactory",
+    "HTTPError",
     "HTTPProvider",
     "HTTPProviderServer",
     "LocalProvider",
@@ -99,7 +101,6 @@ __all__ = [
     "Provider",
     "ProviderError",
     "Receive",
-    "RemoteError",
     "Signer",
     "SnapshotID",
     "TransactionFailed",
