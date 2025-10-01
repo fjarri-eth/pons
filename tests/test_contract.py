@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import NamedTuple
 
 import pytest
-from ethereum_rpc import Address, LogTopic, keccak
+from ethereum_rpc import Address, BlockHash, LogEntry, LogTopic, TxHash, keccak
 
 from pons import (
+    CompiledContract,
     Constructor,
     Event,
     Fallback,
@@ -18,12 +18,12 @@ from pons._contract import BoundMethod, DeployedContract
 
 
 @pytest.fixture
-def compiled_contracts():
+def compiled_contracts() -> dict[str, CompiledContract]:
     path = Path(__file__).resolve().parent / "TestContract.sol"
     return compile_contract_file(path)
 
 
-def test_abi_declaration(compiled_contracts):
+def test_abi_declaration(compiled_contracts: dict[str, CompiledContract]) -> None:
     """Checks that the compiler output is parsed correctly."""
     compiled_contract = compiled_contracts["JsonAbiTest"]
 
@@ -66,7 +66,7 @@ def test_abi_declaration(compiled_contracts):
     assert cabi.event.Foo.indexed == {"x", "y"}
 
 
-def test_api_binding(compiled_contracts):
+def test_api_binding(compiled_contracts: dict[str, CompiledContract]) -> None:
     """Checks that the methods are bound correctly on deploy."""
     compiled_contract = compiled_contracts["JsonAbiTest"]
 
@@ -89,12 +89,14 @@ def test_api_binding(compiled_contracts):
 
     read_call = deployed_contract.method.getState(3)
     assert read_call.contract_address == address
+    assert isinstance(compiled_contract.abi.method.getState, Method)
     assert read_call.data_bytes == (
         compiled_contract.abi.method.getState.selector + b"\x00" * 31 + b"\x03"
     )
     assert read_call.decode_output(b"\x00" * 31 + b"\x04") == (4,)
 
     write_call = deployed_contract.method.setState(5)
+    assert isinstance(compiled_contract.abi.method.setState, Method)
     assert write_call.contract_address == address
     assert write_call.payable
     assert write_call.data_bytes == (
@@ -108,22 +110,34 @@ def test_api_binding(compiled_contracts):
         (LogTopic(keccak(b"1234")),),
     )
 
-    # We only need a couple of fields
-    class FakeLogEntry(NamedTuple):
-        data: bytes
-        address: Address
-        topics: tuple[LogTopic, ...]
-
-    decoded = event_filter.decode_log_entry(
-        FakeLogEntry(
-            address=address,
-            topics=[LogTopic(abi.uint(256).encode(1)), LogTopic(keccak(b"1234"))],
-            data=encode_args((abi.bytes(4), b"4567"), (abi.bytes(), b"bytestring")),
-        )
+    log_entry = LogEntry(
+        address=address,
+        topics=(LogTopic(abi.uint(256).encode(1)), LogTopic(keccak(b"1234"))),
+        data=encode_args((abi.bytes(4), b"4567"), (abi.bytes(), b"bytestring")),
+        # These fields are not important
+        removed=False,
+        log_index=0,
+        transaction_index=0,
+        transaction_hash=TxHash(b"0" * 32),
+        block_hash=BlockHash(b"0" * 32),
+        block_number=0,
     )
+
+    decoded = event_filter.decode_log_entry(log_entry)
     assert decoded == dict(x=1, y=None, u=b"4567", v=b"bytestring")
 
+    log_entry = LogEntry(
+        address=Address(b"\xba" * 20),
+        topics=(),
+        data=b"",
+        # These fields are not important
+        removed=False,
+        log_index=0,
+        transaction_index=0,
+        transaction_hash=TxHash(b"0" * 32),
+        block_hash=BlockHash(b"0" * 32),
+        block_number=0,
+    )
+
     with pytest.raises(ValueError, match="Log entry originates from a different contract"):
-        decoded = event_filter.decode_log_entry(
-            FakeLogEntry(address=Address(b"\xba" * 20), topics=[], data=b"")
-        )
+        decoded = event_filter.decode_log_entry(log_entry)

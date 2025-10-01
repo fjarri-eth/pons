@@ -4,14 +4,14 @@ from contextlib import asynccontextmanager
 from enum import Enum
 
 import pytest
-from ethereum_rpc import RPCError
+from ethereum_rpc import ErrorCode, RPCError
 
 from pons import CycleFallback, FallbackProvider, PriorityFallback, Unreachable
 from pons._fallback_provider import PriorityFallbackStrategy
 from pons._provider import RPC_JSON, InvalidResponse, Provider, ProviderSession
 
 
-def random_request():
+def random_request() -> str:
     return os.urandom(2).hex()
 
 
@@ -23,11 +23,11 @@ class ProviderState(Enum):
 
 
 class MockProvider(Provider):
-    def __init__(self):
-        self.requests = []
+    def __init__(self) -> None:
+        self.requests: list[str] = []
         self.state = ProviderState.NORMAL
 
-    def set_state(self, state: ProviderState):
+    def set_state(self, state: ProviderState) -> None:
         self.state = state
 
     @asynccontextmanager
@@ -36,7 +36,7 @@ class MockProvider(Provider):
 
 
 class MockSession(ProviderSession):
-    def __init__(self, provider: Provider):
+    def __init__(self, provider: MockProvider):
         self.provider = provider
 
     async def rpc(self, method: str, *_args: RPC_JSON) -> RPC_JSON:
@@ -46,24 +46,24 @@ class MockSession(ProviderSession):
         if self.provider.state == ProviderState.BAD_RESPONSE:
             raise InvalidResponse("")
         if self.provider.state == ProviderState.RPC_ERROR:
-            raise RPCError(-1, "")
+            raise RPCError(ErrorCode(-1), "")
         return "success"
 
 
-async def test_default_fallback():
+async def test_default_fallback() -> None:
     providers = [MockProvider() for i in range(3)]
     provider = FallbackProvider(providers)
     assert isinstance(provider._strategy, PriorityFallbackStrategy)
 
 
-def test_inconsistent_weights_length():
+def test_inconsistent_weights_length() -> None:
     providers = [MockProvider() for i in range(3)]
     msg = r"Length of the weights \(2\) inconsistent with the number of providers \(3\)"
     with pytest.raises(ValueError, match=msg):
         FallbackProvider(providers, CycleFallback([1, 2]))
 
 
-async def test_cycle_fallback():
+async def test_cycle_fallback() -> None:
     strategy = CycleFallback()
     providers = [MockProvider() for i in range(3)]
     provider = FallbackProvider(providers, strategy)
@@ -78,7 +78,7 @@ async def test_cycle_fallback():
     assert providers[2].requests == ["2", "5", "8"]
 
 
-async def test_cycle_fallback_custom_weights():
+async def test_cycle_fallback_custom_weights() -> None:
     strategy = CycleFallback([3, 1, 2])
     providers = [MockProvider() for i in range(3)]
     provider = FallbackProvider(providers, strategy)
@@ -93,7 +93,7 @@ async def test_cycle_fallback_custom_weights():
     assert providers[2].requests == ["4", "5"]
 
 
-async def test_fallback_on_errors():
+async def test_fallback_on_errors() -> None:
     strategy = PriorityFallback()
     providers = [MockProvider() for i in range(3)]
     provider = FallbackProvider(providers, strategy)
@@ -121,7 +121,7 @@ async def test_fallback_on_errors():
         assert providers[2].requests[-1] == request
 
 
-async def test_raising_errors():
+async def test_raising_errors() -> None:
     strategy = PriorityFallback()
     providers = [MockProvider() for i in range(3)]
     provider = FallbackProvider(providers, strategy)
@@ -149,7 +149,7 @@ async def test_raising_errors():
             await session.rpc(random_request())
 
 
-async def test_nested_providers():
+async def test_nested_providers() -> None:
     providers = [MockProvider() for i in range(4)]
     subprovider1 = FallbackProvider([providers[0], providers[1]], PriorityFallback())
     subprovider2 = FallbackProvider(
@@ -197,7 +197,7 @@ async def test_nested_providers():
         assert providers[3].requests[-1] == request
 
 
-async def test_invalid_path():
+async def test_invalid_path() -> None:
     providers = [MockProvider() for i in range(4)]
     subprovider1 = FallbackProvider([providers[0], providers[1]], PriorityFallback())
     subprovider2 = FallbackProvider(

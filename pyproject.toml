@@ -137,6 +137,8 @@ ignore = [
     "ISC001",
     # Too many false positives, since Ruff cannot tell that the object is immutable.
     "RUF009",
+    # Way too restrictive. Sometimes it is useful to import types from pytest.
+    "PT013",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

@@ -51,6 +51,9 @@ Errors
 .. autoclass:: pons.ABIDecodingError
    :show-inheritance:
 
+.. autoclass:: pons.InvalidResponse
+   :show-inheritance:
+
 .. autoclass:: pons.Unreachable
    :show-inheritance:
 

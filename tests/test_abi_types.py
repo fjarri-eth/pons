@@ -1,11 +1,15 @@
 import os
+from typing import Any
 
 import pytest
 from ethereum_rpc import Address, keccak
 
 from pons import abi
 from pons._abi_types import (
+    ABI_JSON,
     ABIDecodingError,
+    ABIType,
+    Type,
     decode_args,
     dispatch_type,
     dispatch_types,
@@ -14,7 +18,7 @@ from pons._abi_types import (
 )
 
 
-def test_uint():
+def test_uint() -> None:
     for val in [0, 255, 10]:
         assert abi.uint(8)._normalize(val) == val
         assert abi.uint(8)._denormalize(val) == val
@@ -45,7 +49,7 @@ def test_uint():
         abi.uint(128)._normalize(2**128)
 
 
-def test_int():
+def test_int() -> None:
     for val in [0, 127, -128, 10]:
         assert abi.int(8)._normalize(val) == val
         assert abi.int(8)._denormalize(val) == val
@@ -78,7 +82,7 @@ def test_int():
         abi.int(128)._normalize(2**127)
 
 
-def test_bytes():
+def test_bytes() -> None:
     assert abi.bytes(3)._normalize(b"foo") == b"foo"
     assert abi.bytes(3)._denormalize(b"foo") == b"foo"
     assert abi.bytes()._normalize(b"foobar") == b"foobar"
@@ -102,7 +106,7 @@ def test_bytes():
         abi.bytes(4)._normalize(b"foo")
 
 
-def test_address():
+def test_address() -> None:
     addr_bytes = os.urandom(20)
     addr = Address(addr_bytes)
 
@@ -122,7 +126,7 @@ def test_address():
         abi.address._denormalize(addr_bytes)
 
 
-def test_string():
+def test_string() -> None:
     assert abi.string._normalize("foo") == "foo"
     assert abi.string._denormalize("foo") == "foo"
 
@@ -136,7 +140,7 @@ def test_string():
         abi.string._normalize(b"foo")
 
 
-def test_bool():
+def test_bool() -> None:
     assert abi.bool._normalize(True) is True
     assert abi.bool._denormalize(True) is True
 
@@ -148,7 +152,7 @@ def test_bool():
         abi.bool._normalize(1)
 
 
-def test_array():
+def test_array() -> None:
     assert abi.uint(8)[2]._normalize([1, 2]) == [1, 2]
     assert abi.uint(8)[2]._denormalize([1, 2]) == [1, 2]
     assert abi.uint(8)[...]._normalize([1, 2, 3]) == [1, 2, 3]
@@ -171,7 +175,7 @@ def test_array():
         abi.uint(8)[2]._normalize([1, 2, 3])
 
 
-def test_struct():
+def test_struct() -> None:
     u8 = abi.uint(8)
     s1 = abi.struct(a=u8, b=abi.bool)
 
@@ -198,7 +202,7 @@ def test_struct():
         s1._normalize(dict(a=1, c=True))
 
 
-def test_type_from_abi_string():
+def test_type_from_abi_string() -> None:
     assert type_from_abi_string("uint32") == abi.uint(32)
     assert type_from_abi_string("int64") == abi.int(64)
     assert type_from_abi_string("bytes11") == abi.bytes(11)
@@ -210,11 +214,11 @@ def test_type_from_abi_string():
         type_from_abi_string("uintx")
 
 
-def test_dispatch_type():
+def test_dispatch_type() -> None:
     assert dispatch_type(dict(type="uint8")) == abi.uint(8)
     assert dispatch_type(dict(type="uint8[2][]")) == abi.uint(8)[2][...]
 
-    struct_array = dict(
+    struct_array: ABI_JSON = dict(
         type="tuple[2]",
         components=[
             dict(name="field1", type="bool"),
@@ -229,7 +233,7 @@ def test_dispatch_type():
         dispatch_type(dict(type="uint8(2)[3]"))
 
 
-def test_dispatch_types():
+def test_dispatch_types() -> None:
     entries = [
         dict(name="param2", type="uint8"),
         dict(name="param1", type="uint16[2]"),
@@ -238,7 +242,9 @@ def test_dispatch_types():
     assert dispatch_types(entries) == dict(param2=abi.uint(8), param1=abi.uint(16)[2])
 
     # Check that the order is preserved, too
-    assert list(dispatch_types(entries).items()) == [
+    typed_entries = dispatch_types(entries)
+    assert isinstance(typed_entries, dict)
+    assert list(typed_entries.items()) == [
         ("param2", abi.uint(8)),
         ("param1", abi.uint(16)[2]),
     ]
@@ -259,15 +265,15 @@ def test_dispatch_types():
         dispatch_types([dict(name="foo", type="uint8"), dict(name="foo", type="uint16[2]")])
 
 
-def test_making_arrays():
+def test_making_arrays() -> None:
     assert abi.uint(8)[2].canonical_form == "uint8[2]"
     assert abi.uint(8)[...][3][...].canonical_form == "uint8[][3][]"
 
     with pytest.raises(TypeError, match="Invalid array size specifier type: float"):
-        abi.uint(8)[1.0]
+        abi.uint(8)[1.0]  # type: ignore[index]
 
 
-def test_normalization_roundtrip():
+def test_normalization_roundtrip() -> None:
     struct = abi.struct(
         field1=abi.uint(8),
         field2=abi.uint(16)[2],
@@ -279,7 +285,7 @@ def test_normalization_roundtrip():
 
     value = dict(field1=1, field2=[2, 3], field3=addr, field4=dict(inner2="abcd", inner1=True))
 
-    expected_normalized = [1, [2, 3], addr.checksum, [True, "abcd"]]
+    expected_normalized: ABIType = [1, [2, 3], addr.checksum, [True, "abcd"]]
 
     # normalize() loses info on struct field names
     assert struct._normalize(value) == expected_normalized
@@ -288,7 +294,9 @@ def test_normalization_roundtrip():
     assert struct._denormalize(expected_normalized) == value
 
 
-def check_topic_encode_decode(tp, val, encoded_val, *, can_be_decoded=True):
+def check_topic_encode_decode(
+    tp: Type, val: Any, encoded_val: bytes, *, can_be_decoded: bool = True
+) -> None:
     assert tp.encode_to_topic(val) == encoded_val
     if can_be_decoded:
         assert tp.decode_from_topic(encoded_val) == val
@@ -296,7 +304,7 @@ def check_topic_encode_decode(tp, val, encoded_val, *, can_be_decoded=True):
         assert tp.decode_from_topic(encoded_val) is None
 
 
-def test_encode_to_topic():
+def test_encode_to_topic() -> None:
     # Simple types
 
     check_topic_encode_decode(
@@ -331,14 +339,14 @@ def test_encode_to_topic():
     tp = abi.bytes()[2]
     small_bytes = os.urandom(5)
     big_bytes = os.urandom(33)
-    val = [small_bytes, big_bytes]
+    val: Any = [small_bytes, big_bytes]
     # Values in the array are padded to multiples of 32 bytes
     encoded_val = keccak(small_bytes + b"\x00" * 27 + big_bytes + b"\x00" * 31)
     check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=False)
 
     # Structs
 
-    tp = abi.struct(
+    struct_tp = abi.struct(
         field1=abi.bytes()[2],
         field2=abi.bool,
         field3=abi.struct(inner1=abi.bytes(5), inner2=abi.string),
@@ -355,10 +363,10 @@ def test_encode_to_topic():
         + (small_bytes + b"\x00" * 27)
         + (string.encode() + b"\x00" * 28)
     )
-    check_topic_encode_decode(tp, val, encoded_val, can_be_decoded=False)
+    check_topic_encode_decode(struct_tp, val, encoded_val, can_be_decoded=False)
 
 
-def test_encode_decode_args():
+def test_encode_decode_args() -> None:
     args = ("some string", b"bytestring", 1234)
     types = [abi.string, abi.bytes(), abi.uint(256)]
     encoded = encode_args(*zip(types, args, strict=True))
@@ -368,7 +376,7 @@ def test_encode_decode_args():
     assert encode_args() == b""
 
 
-def test_decoding_error():
+def test_decoding_error() -> None:
     types = [abi.uint(256), abi.uint(256)]
     encoded_bytes = b"\x00" * 31 + b"\x01"  # Only one uint256
 

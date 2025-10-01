@@ -1,11 +1,17 @@
 from eth_account import Account
+from eth_account.types import HexStr, TransactionDictType
 from ethereum_rpc import Address
 
 from pons import AccountSigner
 
 
-def check_signer(signer):
-    tx = dict(gas="0x3333", gasPrice="0x4444", nonce="0x5555", value="0x6666")
+def check_signer(signer: AccountSigner) -> None:
+    tx: TransactionDictType = dict(
+        gas=HexStr("0x3333"),
+        gasPrice=HexStr("0x4444"),
+        nonce=HexStr("0x5555"),
+        value=HexStr("0x6666"),
+    )
     sig = signer.sign_transaction(tx)
     assert isinstance(sig, bytes)
     # the length may vary depending on the integers in the signature (they're not padded)
@@ -28,7 +34,7 @@ def check_signer(signer):
     assert sig.startswith(bytes.fromhex(f"f8{payload_length:x}8255558244448233338082666680"))
 
 
-def test_signer():
+def test_signer() -> None:
     acc = Account.create()
     signer = AccountSigner(acc)
 
@@ -39,6 +45,6 @@ def test_signer():
     check_signer(signer)
 
 
-def test_random_signer():
+def test_random_signer() -> None:
     signer = AccountSigner.create()
     check_signer(signer)
