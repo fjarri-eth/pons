@@ -13,6 +13,9 @@ Clients
 .. autoclass:: ClientSession()
    :members:
 
+.. autoclass:: ClientSessionRPC()
+   :members:
+
 
 Providers
 ---------
@@ -46,14 +49,22 @@ Errors
 ------
 
 .. autoclass:: pons.ABIDecodingError
-
-.. autoclass:: pons.RemoteError
+   :show-inheritance:
 
 .. autoclass:: pons.Unreachable
+   :show-inheritance:
 
 .. autoclass:: pons.ProtocolError
+   :show-inheritance:
+
+.. autoclass:: pons.HTTPError
+   :show-inheritance:
 
 .. autoclass:: pons.TransactionFailed
+   :show-inheritance:
+
+.. autoclass:: pons.BadResponseFormat
+   :show-inheritance:
 
 .. autoclass:: pons.ProviderError()
    :show-inheritance:
@@ -252,11 +263,11 @@ Compiled and deployed contracts
 Filter objects
 --------------
 
-.. autoclass:: pons._client.BlockFilter()
+.. autoclass:: pons._client_rpc.BlockFilter()
 
-.. autoclass:: pons._client.PendingTransactionFilter()
+.. autoclass:: pons._client_rpc.PendingTransactionFilter()
 
-.. autoclass:: pons._client.LogFilter()
+.. autoclass:: pons._client_rpc.LogFilter()
 
 
 Solidity types

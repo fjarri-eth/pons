@@ -21,11 +21,27 @@ class Unreachable(Exception):
     """Raised when there is a problem connecting to the provider."""
 
 
-class ProtocolError(Exception):
-    """A protocol-specific error."""
+class ProtocolError(ABC, Exception):
+    """
+    A protocol-specific error, indicating that the provider returned an error status
+    with no additional information allowing to categorize the error further.
+
+    See the provider-specifc derived class for this exception for more details.
+    """
 
 
 class HTTPError(ProtocolError):
+    """
+    Raised when the provider returns a response with a status code other than 200,
+    and no ``"error"`` field in the associated JSON data.
+    """
+
+    status: HTTPStatus
+    """The HTTP status of the response."""
+
+    message: str
+    """The response body."""
+
     def __init__(self, status_code: int, message: str):
         try:
             status = HTTPStatus(status_code)
