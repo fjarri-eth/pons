@@ -12,6 +12,8 @@ Changed
 - Renamed ``id_`` fields of ``BlockFilter``, ``PendingTransactionFilter``, and ``LogFilter`` to just ``id``. (PR_82_)
 - Split out ``http-provider-server`` feature from ``local-provider``. (PR_82_)
 - ``RemoteError`` removed. (PR_82_)
+- The internal structure of ``BlockFilter``, ``LogFilter``, and ``PendingTransactionFilter`` is now undocumented. (PR_87_)
+- The path returned by ``Provider.rpc_and_pin()`` is now a ``ProviderPath`` object. (PR_87_)
 
 
 Added
@@ -23,12 +25,15 @@ Added
 - Exporting ``HTTPError`` and ``BadResponseFormat``. (PR_82_)
 - Exporting ``InvalidResponse``. (PR_86_)
 - ``LocalProvider.root`` is now of type ``AccountSigner`` instead of ``Signer``. (PR_86_)
+- ``FallbackProvider`` now records encountered errors, and they can be accessed via the ``errors()`` method. (PR_87_)
+- ``BlockFilter``, ``LogFilter``, and ``PendingTransactionFilter`` are exported from the top level. (PR_87_)
 
 
 .. _PR_81: https://github.com/fjarri-eth/pons/pull/81
 .. _PR_82: https://github.com/fjarri-eth/pons/pull/82
 .. _PR_84: https://github.com/fjarri-eth/pons/pull/84
 .. _PR_86: https://github.com/fjarri-eth/pons/pull/86
+.. _PR_87: https://github.com/fjarri-eth/pons/pull/87
 
 
 0.8.1 (2024-11-12)

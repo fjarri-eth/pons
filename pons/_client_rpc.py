@@ -26,25 +26,43 @@ from ethereum_rpc import (
 
 from ._contract import BaseBoundMethodCall
 from ._contract_abi import EventFilter
-from ._provider import InvalidResponse, ProviderSession
+from ._provider import InvalidResponse, ProviderPath, ProviderSession
 
 
 @dataclass
 class BlockFilter:
+    """
+    A block filter created on a remote provider.
+
+    Expires after some time subject to the provider's settings.
+    """
+
     id: int
-    provider_path: tuple[int, ...]
+    provider_path: ProviderPath
 
 
 @dataclass
 class PendingTransactionFilter:
+    """
+    A pending transaction filter created on a remote provider.
+
+    Expires after some time subject to the provider's settings.
+    """
+
     id: int
-    provider_path: tuple[int, ...]
+    provider_path: ProviderPath
 
 
 @dataclass
 class LogFilter:
+    """
+    A log filter created on a remote provider.
+
+    Expires after some time subject to the provider's settings.
+    """
+
     id: int
-    provider_path: tuple[int, ...]
+    provider_path: ProviderPath
 
 
 class BadResponseFormat(Exception):
@@ -116,7 +134,7 @@ async def rpc_call(
 
 async def rpc_call_pin(
     provider_session: ProviderSession, method_name: str, ret_type: type[RetType], *args: Any
-) -> tuple[RetType, tuple[int, ...]]:
+) -> tuple[RetType, ProviderPath]:
     """Catches various response formatting errors and returns them in a unified way."""
     with convert_errors(method_name):
         result, provider_path = await provider_session.rpc_and_pin(
@@ -127,7 +145,7 @@ async def rpc_call_pin(
 
 async def rpc_call_at_pin(
     provider_session: ProviderSession,
-    provider_path: tuple[int, ...],
+    provider_path: ProviderPath,
     method_name: str,
     ret_type: type[RetType],
     *args: Any,

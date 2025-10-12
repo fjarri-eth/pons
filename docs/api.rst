@@ -25,12 +25,15 @@ Providers
 .. autoclass:: HTTPProvider
    :show-inheritance:
 
+.. autoclass:: ProviderPath
+
 
 Fallback providers
 ------------------
 
 .. autoclass:: FallbackProvider
    :show-inheritance:
+   :members: errors
 
 .. autoclass:: CycleFallback
    :show-inheritance:
@@ -148,7 +151,7 @@ Testing utilities
    :show-inheritance:
    :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot
 
-.. autoclass:: SnapshotID
+.. autoclass:: SnapshotID()
 
 .. autoclass:: HTTPProviderServer
    :members:
@@ -266,11 +269,11 @@ Compiled and deployed contracts
 Filter objects
 --------------
 
-.. autoclass:: pons._client_rpc.BlockFilter()
+.. autoclass:: pons.BlockFilter()
 
-.. autoclass:: pons._client_rpc.PendingTransactionFilter()
+.. autoclass:: pons.PendingTransactionFilter()
 
-.. autoclass:: pons._client_rpc.LogFilter()
+.. autoclass:: pons.LogFilter()
 
 
 Solidity types
