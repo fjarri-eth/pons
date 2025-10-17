@@ -9,7 +9,7 @@ from pons import AccountSigner, Client, ClientSession, LocalProvider
 
 @pytest.fixture
 def local_provider() -> LocalProvider:
-    return LocalProvider(root_balance=Amount.ether(100), evm_version=EVMVersion.CANCUN)
+    return LocalProvider(root_balance=Amount.ether(100), evm_version=EVMVersion.PRAGUE)
 
 
 @pytest.fixture

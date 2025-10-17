@@ -28,6 +28,7 @@ Added
 - ``LocalProvider.root`` is now of type ``AccountSigner`` instead of ``Signer``. (PR_86_)
 - ``FallbackProvider`` now records encountered errors, and they can be accessed via the ``errors()`` method. (PR_87_)
 - ``BlockFilter``, ``LogFilter``, and ``PendingTransactionFilter`` are exported from the top level. (PR_87_)
+- ``EVMVersion.PRAGUE``. (PR_88_)
 
 
 .. _PR_81: https://github.com/fjarri-eth/pons/pull/81
