@@ -11,13 +11,16 @@ from pons import (
     CycleFallback,
     FallbackProvider,
     HTTPError,
+    InvalidResponse,
     PriorityFallback,
     ProtocolError,
+    Provider,
     ProviderError,
+    ProviderPath,
     Unreachable,
 )
 from pons._fallback_provider import PriorityFallbackStrategy
-from pons._provider import RPC_JSON, InvalidResponse, Provider, ProviderPath, ProviderSession
+from pons._provider import RPC_JSON, ProviderSession
 
 
 def random_request() -> str:

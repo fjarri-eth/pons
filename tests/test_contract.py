@@ -4,8 +4,10 @@ import pytest
 from ethereum_rpc import Address, BlockHash, LogEntry, LogTopic, TxHash, keccak
 
 from pons import (
+    BoundMethod,
     CompiledContract,
     Constructor,
+    DeployedContract,
     Event,
     Fallback,
     Method,
@@ -14,7 +16,6 @@ from pons import (
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._contract import BoundMethod, DeployedContract
 
 
 @pytest.fixture

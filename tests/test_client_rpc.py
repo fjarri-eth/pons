@@ -22,6 +22,7 @@ from ethereum_rpc import (
 
 from pons import (
     AccountSigner,
+    BadResponseFormat,
     ClientSession,
     CompiledContract,
     Either,
@@ -31,7 +32,6 @@ from pons import (
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._client_rpc import BadResponseFormat
 from pons._provider import RPC_JSON
 
 

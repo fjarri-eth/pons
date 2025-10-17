@@ -19,9 +19,10 @@ from pons import (
     LocalProvider,
     Provider,
     ProviderError,
+    ProviderPath,
     _http_provider_server,  # For monkeypatching purposes
 )
-from pons._provider import RPC_JSON, ProviderPath, ProviderSession
+from pons._provider import RPC_JSON, ProviderSession
 
 
 @pytest.fixture

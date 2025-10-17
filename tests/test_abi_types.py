@@ -4,10 +4,8 @@ from typing import Any
 import pytest
 from ethereum_rpc import Address, keccak
 
-from pons import abi
+from pons import ABI_JSON, ABIDecodingError, abi
 from pons._abi_types import (
-    ABI_JSON,
-    ABIDecodingError,
     ABIType,
     Type,
     decode_args,

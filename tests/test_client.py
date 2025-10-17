@@ -20,6 +20,7 @@ from trio.testing import MockClock
 from pons import (
     ABIDecodingError,
     AccountSigner,
+    BadResponseFormat,
     BoundEvent,
     Client,
     ClientSession,
@@ -33,12 +34,12 @@ from pons import (
     Method,
     Mutability,
     ProviderError,
+    TransactionFailed,
     Unreachable,
     abi,
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._client import BadResponseFormat, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
 from pons._provider import RPC_JSON
 
