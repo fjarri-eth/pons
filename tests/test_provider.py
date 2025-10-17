@@ -22,7 +22,7 @@ from pons import (
     Unreachable,
     _http_provider_server,  # For monkeypatching purposes
 )
-from pons._provider import RPC_JSON, ProviderSession
+from pons._provider import RPC_JSON, ProviderPath, ProviderSession
 
 
 @pytest.fixture
@@ -40,6 +40,23 @@ async def session(test_server: HTTPProviderServer) -> AsyncIterator[ClientSessio
     client = Client(test_server.http_provider)
     async with client.session() as session:
         yield session
+
+
+def test_provider_path() -> None:
+    assert ProviderPath.empty().is_empty()
+    assert not ProviderPath(["1"]).is_empty()
+
+    assert ProviderPath(["1", "2"]) == ProviderPath(["1", "2"])
+    assert ProviderPath(["1", "2"]) != ProviderPath(["1", "3"])
+
+    assert hash(ProviderPath(["1", "2"])) == hash(ProviderPath(["1", "2"]))
+    assert hash(ProviderPath(["1", "2"])) != hash(ProviderPath(["1", "3"]))
+
+    assert str(ProviderPath(["1", "2"])) == "1/2"
+    assert repr(ProviderPath(["1", "2"])) == "ProviderPath(('1', '2'))"
+
+    assert ProviderPath(["1"]).group("2") == ProviderPath(["2", "1"])
+    assert ProviderPath(["1", "2"]).ungroup() == ("1", ProviderPath(["2"]))
 
 
 async def test_single_value_request(session: ClientSession) -> None:
@@ -235,10 +252,10 @@ async def test_default_implementations() -> None:
     provider = MockProvider()
     async with provider.session() as session:
         result1 = await session.rpc_and_pin("1")
-        assert result1 == ("1", ())
+        assert result1 == ("1", ProviderPath.empty())
 
-        result2 = await session.rpc_at_pin((), "2")
+        result2 = await session.rpc_at_pin(ProviderPath.empty(), "2")
         assert result2 == "2"
 
-        with pytest.raises(ValueError, match=r"Unexpected provider path: \(1,\)"):
-            await session.rpc_at_pin((1,), "3")
+        with pytest.raises(ValueError, match=r"Expected an empty provider path, got: `1`"):
+            await session.rpc_at_pin(ProviderPath(["1"]), "3")

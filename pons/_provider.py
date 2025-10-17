@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from json import JSONDecodeError
@@ -57,6 +57,42 @@ class HTTPError(ProtocolError):
         return f"HTTP status {self.status}: {self.message}"
 
 
+class ProviderPath:
+    """Identifies a pinned provider."""
+
+    def __init__(self, path: Iterable[str]):
+        self._path = tuple(path)
+
+    def group(self, id_: str) -> "ProviderPath":
+        """Prepends ``id_`` to the path."""
+        return ProviderPath((id_, *self._path))
+
+    def ungroup(self) -> "tuple[str, ProviderPath]":
+        """Returns the top-level id and the subpath."""
+        return (self._path[0], ProviderPath(self._path[1:]))
+
+    @classmethod
+    def empty(cls) -> "ProviderPath":
+        """Returns an empty path."""
+        return cls(())
+
+    def is_empty(self) -> bool:
+        """Returns ``True`` if the path is empty."""
+        return not bool(self._path)
+
+    def __str__(self) -> str:
+        return "/".join(self._path)
+
+    def __repr__(self) -> str:
+        return f"ProviderPath({self._path!r})"
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, ProviderPath) and self._path == other._path
+
+    def __hash__(self) -> int:
+        return hash((ProviderPath, self._path))
+
+
 class Provider(ABC):
     """The base class for JSON RPC providers."""
 
@@ -88,21 +124,21 @@ class ProviderSession(ABC):
         """Calls the given RPC method with the already json-ified arguments."""
         ...
 
-    async def rpc_and_pin(self, method: str, *args: RPC_JSON) -> tuple[RPC_JSON, tuple[int, ...]]:
+    async def rpc_and_pin(self, method: str, *args: RPC_JSON) -> tuple[RPC_JSON, ProviderPath]:
         """
         Calls the given RPC method and returns the path to the provider it succeded on.
         This method will be typically overriden by multi-provider implementations.
         """
-        return await self.rpc(method, *args), ()
+        return await self.rpc(method, *args), ProviderPath.empty()
 
-    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: RPC_JSON) -> RPC_JSON:
+    async def rpc_at_pin(self, path: ProviderPath, method: str, *args: RPC_JSON) -> RPC_JSON:
         """
         Calls the given RPC method at the provider by the given path
         (obtained previously from ``rpc_and_pin()``).
         This method will be typically overriden by multi-provider implementations.
         """
-        if path != ():
-            raise ValueError(f"Unexpected provider path: {path}")
+        if not path.is_empty():
+            raise ValueError(f"Expected an empty provider path, got: `{path}`")
         return await self.rpc(method, *args)
 
 

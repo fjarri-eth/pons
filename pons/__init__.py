@@ -10,7 +10,14 @@ from ._client import (
     ContractPanic,
     TransactionFailed,
 )
-from ._client_rpc import BadResponseFormat, ClientSessionRPC, ProviderError
+from ._client_rpc import (
+    BadResponseFormat,
+    BlockFilter,
+    ClientSessionRPC,
+    LogFilter,
+    PendingTransactionFilter,
+    ProviderError,
+)
 from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
     BaseBoundMethodCall,
@@ -54,6 +61,7 @@ from ._provider import (
     InvalidResponse,
     ProtocolError,
     Provider,
+    ProviderPath,
     Unreachable,
 )
 from ._signer import AccountSigner, Signer
@@ -65,6 +73,7 @@ __all__ = [
     "AccountSigner",
     "BadResponseFormat",
     "BaseBoundMethodCall",
+    "BlockFilter",
     "BoundConstructor",
     "BoundConstructorCall",
     "BoundEvent",
@@ -99,15 +108,18 @@ __all__ = [
     "HTTPProviderServer",
     "InvalidResponse",
     "LocalProvider",
+    "LogFilter",
     "Method",
     "MethodCall",
     "MultiMethod",
     "Multicall",
     "Mutability",
+    "PendingTransactionFilter",
     "PriorityFallback",
     "ProtocolError",
     "Provider",
     "ProviderError",
+    "ProviderPath",
     "Receive",
     "Signer",
     "SnapshotID",

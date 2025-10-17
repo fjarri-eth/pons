@@ -1,17 +1,27 @@
+import threading
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import Set as AbstractSet
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from ethereum_rpc import RPCError
 
-from ._provider import RPC_JSON, InvalidResponse, Provider, ProviderSession
+from ._provider import (
+    RPC_JSON,
+    InvalidResponse,
+    ProtocolError,
+    Provider,
+    ProviderPath,
+    ProviderSession,
+    Unreachable,
+)
 
 
 class FallbackStrategy(ABC):
     """An abstract class defining a fallback strategy for multiple providers."""
 
     @abstractmethod
-    def get_provider_order(self) -> list[int]:
+    def get_provider_order(self) -> list[str]:
         """
         Returns the suggested order of providers to query, based on the accumulated data.
         This method is called once on every high-level request to the provider.
@@ -26,24 +36,23 @@ class FallbackStrategyFactory(ABC):
     """
 
     @abstractmethod
-    def make_strategy(self, num_providers: int) -> FallbackStrategy:
+    def make_strategy(self, provider_ids: AbstractSet[str]) -> FallbackStrategy:
         """Returns a strategy object."""
 
 
 class CycleFallbackStrategy(FallbackStrategy):
-    def __init__(self, weights: list[int]):
-        self._providers = list(range(len(weights)))
+    def __init__(self, weights: dict[str, int]):
         self._weights = weights
+        self._provider_ids = list(weights.keys())
         self._counter = 0
 
-    def get_provider_order(self) -> list[int]:
-        if self._counter == self._weights[0]:
+    def get_provider_order(self) -> list[str]:
+        if self._counter == self._weights[self._provider_ids[0]]:
             self._counter = 0
-            self._providers = [*self._providers[1:], self._providers[0]]
-            self._weights = [*self._weights[1:], self._weights[0]]
+            self._provider_ids = [*self._provider_ids[1:], self._provider_ids[0]]
 
         self._counter += 1
-        return list(self._providers)
+        return self._provider_ids
 
 
 class CycleFallback(FallbackStrategyFactory):
@@ -62,7 +71,8 @@ class CycleFallback(FallbackStrategyFactory):
         else:
             self._weights = None
 
-    def make_strategy(self, num_providers: int) -> CycleFallbackStrategy:
+    def make_strategy(self, provider_ids: AbstractSet[str]) -> CycleFallbackStrategy:
+        num_providers = len(provider_ids)
         weights = self._weights or [1] * num_providers
 
         if len(weights) != num_providers:
@@ -71,7 +81,7 @@ class CycleFallback(FallbackStrategyFactory):
                 f"inconsistent with the number of providers ({num_providers})"
             )
 
-        return CycleFallbackStrategy(weights)
+        return CycleFallbackStrategy(dict(zip(provider_ids, weights, strict=True)))
 
 
 class PriorityFallbackStrategy(FallbackStrategy):
@@ -80,16 +90,16 @@ class PriorityFallbackStrategy(FallbackStrategy):
     they were given to ``FallbackProvider``, until a successful response is received.
     """
 
-    def __init__(self, num_providers: int):
-        self._providers = list(range(num_providers))
+    def __init__(self, provider_ids: AbstractSet[str]):
+        self._provider_ids = list(provider_ids)
 
-    def get_provider_order(self) -> list[int]:
-        return self._providers
+    def get_provider_order(self) -> list[str]:
+        return self._provider_ids
 
 
 class PriorityFallback(FallbackStrategyFactory):
-    def make_strategy(self, num_providers: int) -> PriorityFallbackStrategy:
-        return PriorityFallbackStrategy(num_providers)
+    def make_strategy(self, provider_ids: AbstractSet[str]) -> PriorityFallbackStrategy:
+        return PriorityFallbackStrategy(provider_ids)
 
 
 class FallbackProvider(Provider):
@@ -102,80 +112,118 @@ class FallbackProvider(Provider):
     pointing to the same physical provider, for the purpose of stateful requests
     (e.g. filter creation).
 
-    If all requests finished with an error, the most informative error is raised.
+    If ``strategy`` is ``None``, an instance of :py:class:`PriorityFallback` is used.
+
+    If a request attempt results in an error for which ``use_fallback`` returns ``True``,
+    the next provider based on the chosen strategy will be selected.
+    Otherwise (or if it is the last provider), the error is raised normally.
     """
 
     def __init__(
         self,
-        providers: Iterable[Provider],
-        strategy: FallbackStrategyFactory = PriorityFallback(),
+        providers: Mapping[str, Provider],
+        strategy: FallbackStrategyFactory | None = None,
         *,
         same_provider: bool = False,
     ):
-        self._providers = list(providers)
-        self._strategy = strategy.make_strategy(len(self._providers))
+        self._providers = dict(providers)
+        strategy_ = strategy if strategy is not None else PriorityFallback()
+        self._strategy = strategy_.make_strategy(self._providers.keys())
         self._same_provider = same_provider
+        self._errors: dict[str, Exception] = {}
+        self._lock = threading.Lock()
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator["ProviderSession"]:
         async with AsyncExitStack() as stack:
-            sessions = [
-                await stack.enter_async_context(provider.session()) for provider in self._providers
-            ]
+            sessions = {
+                provider_id: await stack.enter_async_context(provider.session())
+                for provider_id, provider in self._providers.items()
+            }
             yield FallbackProviderSession(
-                sessions, self._strategy, same_provider=self._same_provider
+                self,
+                sessions,
+                self._strategy,
+                same_provider=self._same_provider,
             )
+
+    def errors(self) -> list[tuple[ProviderPath, Exception]]:
+        """
+        Returns the list of recorded errors for sub-providers.
+
+        Only the most recent error for every sub-provider is recorded.
+        Querying this method clears the recorded errors.
+        """
+        errors = []
+
+        with self._lock:
+            for provider_id, error in self._errors.items():
+                errors.append((ProviderPath([provider_id]), error))
+            self._errors = {}
+
+        for provider_id, provider in self._providers.items():
+            if isinstance(provider, FallbackProvider):
+                sub_errors = provider.errors()
+                for sub_path, error in sub_errors:
+                    errors.append((sub_path.group(provider_id), error))
+
+        return errors
+
+    def record_error(self, provider_id: str, exc: Exception) -> None:
+        with self._lock:
+            self._errors[provider_id] = exc
 
 
 class FallbackProviderSession(ProviderSession):
     def __init__(
-        self, sessions: list[ProviderSession], strategy: FallbackStrategy, *, same_provider: bool
+        self,
+        provider: FallbackProvider,
+        sessions: dict[str, ProviderSession],
+        strategy: FallbackStrategy,
+        *,
+        same_provider: bool,
     ):
+        self._provider = provider
         self._sessions = sessions
         self._strategy = strategy
         self._same_provider = same_provider
 
-    async def rpc_and_pin(self, method: str, *args: RPC_JSON) -> tuple[RPC_JSON, tuple[int, ...]]:
-        exceptions: list[Exception] = []
-        provider_idxs = self._strategy.get_provider_order()
-        for provider_idx in provider_idxs:
-            try:
-                result, sub_idx = await self._sessions[provider_idx].rpc_and_pin(method, *args)
-            # PERF203: There won't be a lot of providers, and we need to collect errors from each.
-            # BLE001: it's just a middleware, collecting all errors.
-            except Exception as exc:  # noqa: PERF203, BLE001
-                exceptions.append(exc)
-            else:
-                return result, (provider_idx, *sub_idx)
+    async def rpc_and_pin(self, method: str, *args: RPC_JSON) -> tuple[RPC_JSON, ProviderPath]:
+        provider_ids = self._strategy.get_provider_order()
 
-        # Here we may have a list with each element being
-        # `RPCError`, `ProtocolError`, `InvalidResponse`, or `Unreachable`.
-        # Since the users of `Provider` rely on the error being one of these types,
-        # we can only raise one. So we raise the one with the most information.
-        #
-        # RPC errors give the most information, since they usually signify our request was invalid,
-        # so all the providers would respond to it in the same manner.
-        #
-        # `InvalidResponse` means that the library is unable to parse the response for some reason,
-        # probably because of a bug. So it will be the same for all providers.
-        #
-        # The other two, `ProtocolError` and `Unreachable` is exactly why we have the fallback.
-        # It is pretty much expected to happen.
-        rpc_errors = [exc for exc in exceptions if isinstance(exc, RPCError)]
-        if len(rpc_errors) > 0:
-            raise rpc_errors[0]
-        invalid_responses = [exc for exc in exceptions if isinstance(exc, InvalidResponse)]
-        if len(invalid_responses) > 0:
-            raise invalid_responses[0]
-        raise exceptions[0]
+        for i, provider_id in enumerate(provider_ids):
+            session = self._sessions[provider_id]
+            try:
+                result, sub_path = await session.rpc_and_pin(method, *args)
+            # These are the exceptions `Provider` can raise for a remote problem
+            except (RPCError, Unreachable, InvalidResponse, ProtocolError) as exc:
+                if not isinstance(session, FallbackProviderSession):
+                    self._provider.record_error(provider_id, exc)
+
+                if i < len(provider_ids) - 1:
+                    continue
+
+                raise
+
+            break
+
+        else:  # pragma: no cover
+            # This branch will never be reached, because the loop will either return,
+            # or raise an exception.
+            raise NotImplementedError
+
+        return result, sub_path.group(provider_id)
 
     async def rpc(self, method: str, *args: RPC_JSON) -> RPC_JSON:
-        result, _provider = await self.rpc_and_pin(method, *args)
+        result, _path = await self.rpc_and_pin(method, *args)
         return result
 
-    async def rpc_at_pin(self, path: tuple[int, ...], method: str, *args: RPC_JSON) -> RPC_JSON:
+    async def rpc_at_pin(self, path: ProviderPath, method: str, *args: RPC_JSON) -> RPC_JSON:
         if self._same_provider:
             return await self.rpc(method, *args)
-        if not path or path[0] < 0 or path[0] >= len(self._sessions):
-            raise ValueError(f"Invalid provider path: {path}")
-        return await self._sessions[path[0]].rpc_at_pin(path[1:], method, *args)
+        if path.is_empty():
+            raise ValueError("Expected a non-empty provider path")
+        provider_id, sub_path = path.ungroup()
+        if provider_id not in self._sessions:
+            raise ValueError(f"Provider id `{provider_id}` not found")
+        return await self._sessions[provider_id].rpc_at_pin(sub_path, method, *args)
