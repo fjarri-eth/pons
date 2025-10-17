@@ -1,7 +1,7 @@
 API
 ===
 
-.. automodule:: pons
+.. module:: pons
 
 
 Clients
@@ -21,11 +21,12 @@ Providers
 ---------
 
 .. autoclass:: Provider
+   :show-inheritance:
 
 .. autoclass:: HTTPProvider
    :show-inheritance:
 
-.. autoclass:: ProviderPath
+.. autoclass:: ProviderPath()
 
 
 Fallback providers
@@ -42,52 +43,54 @@ Fallback providers
    :show-inheritance:
 
 .. autoclass:: FallbackStrategyFactory
+   :show-inheritance:
    :members:
 
 .. autoclass:: FallbackStrategy
+   :show-inheritance:
    :members:
 
 
 Errors
 ------
 
-.. autoclass:: pons.ABIDecodingError
+.. autoclass:: ABIDecodingError
    :show-inheritance:
 
-.. autoclass:: pons.InvalidResponse
+.. autoclass:: InvalidResponse
    :show-inheritance:
 
-.. autoclass:: pons.Unreachable
+.. autoclass:: Unreachable
    :show-inheritance:
 
-.. autoclass:: pons.ProtocolError
+.. autoclass:: ProtocolError
    :show-inheritance:
 
-.. autoclass:: pons.HTTPError
+.. autoclass:: HTTPError
    :show-inheritance:
 
-.. autoclass:: pons.TransactionFailed
+.. autoclass:: TransactionFailed
    :show-inheritance:
 
-.. autoclass:: pons.BadResponseFormat
+.. autoclass:: BadResponseFormat
    :show-inheritance:
 
-.. autoclass:: pons.ProviderError()
+.. autoclass:: ProviderError()
    :show-inheritance:
    :members:
 
 .. autoclass:: pons._client.ContractPanicReason
    :members:
 
-.. autoclass:: pons.ContractPanic()
+.. autoclass:: ContractPanic()
    :show-inheritance:
    :members:
 
-.. autoclass:: pons.ContractLegacyError()
+.. autoclass:: ContractLegacyError()
    :show-inheritance:
    :members:
 
-.. autoclass:: pons.ContractError()
+.. autoclass:: ContractError()
    :show-inheritance:
    :members:
 
@@ -96,11 +99,12 @@ Signers
 -------
 
 .. autoclass:: Signer
+   :show-inheritance:
    :members:
 
 .. autoclass:: AccountSigner
-   :members:
    :show-inheritance:
+   :members:
 
 
 Contract ABI
@@ -251,9 +255,9 @@ Utility classes
 Utility methods
 ---------------
 
-.. autofunction:: pons.get_create_address
+.. autofunction:: get_create_address
 
-.. autofunction:: pons.get_create2_address
+.. autofunction:: get_create2_address
 
 
 Compiled and deployed contracts
@@ -269,11 +273,11 @@ Compiled and deployed contracts
 Filter objects
 --------------
 
-.. autoclass:: pons.BlockFilter()
+.. autoclass:: BlockFilter()
 
-.. autoclass:: pons.PendingTransactionFilter()
+.. autoclass:: PendingTransactionFilter()
 
-.. autoclass:: pons.LogFilter()
+.. autoclass:: LogFilter()
 
 
 Solidity types
