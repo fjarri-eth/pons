@@ -14,6 +14,7 @@ Changed
 - ``RemoteError`` removed. (PR_82_)
 - The internal structure of ``BlockFilter``, ``LogFilter``, and ``PendingTransactionFilter`` is now undocumented. (PR_87_)
 - The path returned by ``Provider.rpc_and_pin()`` is now a ``ProviderPath`` object. (PR_87_)
+- ``ProviderError`` removed, ``ethereum_rpc.RPCError`` is used instead. (PR_88_)
 
 
 Added
@@ -34,6 +35,7 @@ Added
 .. _PR_84: https://github.com/fjarri-eth/pons/pull/84
 .. _PR_86: https://github.com/fjarri-eth/pons/pull/86
 .. _PR_87: https://github.com/fjarri-eth/pons/pull/87
+.. _PR_88: https://github.com/fjarri-eth/pons/pull/88
 
 
 0.8.1 (2024-11-12)

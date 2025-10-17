@@ -13,6 +13,7 @@ from ethereum_rpc import (
     BlockLabel,
     EstimateGasParams,
     LogEntry,
+    RPCError,
     RPCErrorCode,
     TxHash,
     TxInfo,
@@ -21,7 +22,7 @@ from ethereum_rpc import (
     unstructure,
 )
 
-from ._client_rpc import BadResponseFormat, ClientSessionRPC, ProviderError
+from ._client_rpc import BadResponseFormat, ClientSessionRPC
 from ._contract import (
     BaseBoundMethodCall,
     BoundConstructorCall,
@@ -165,13 +166,13 @@ class ContractError(Exception):
 
 
 def decode_contract_error(
-    abi: ContractABI, exc: ProviderError
-) -> ContractPanic | ContractLegacyError | ContractError | ProviderError:
+    abi: ContractABI, exc: RPCError
+) -> ContractPanic | ContractLegacyError | ContractError | RPCError:
     # A little wonky, but there's no better way to detect legacy errors without a message.
     # Hopefully these are used very rarely.
-    if exc.code == RPCErrorCode.SERVER_ERROR and exc.message == "execution reverted":
+    if exc.parsed_code == RPCErrorCode.SERVER_ERROR and exc.message == "execution reverted":
         return ContractLegacyError("")
-    if exc.code == RPCErrorCode.EXECUTION_ERROR:
+    if exc.parsed_code == RPCErrorCode.EXECUTION_ERROR:
         try:
             error, decoded_data = abi.resolve_error(exc.data or b"")
         except UnknownError:
@@ -190,7 +191,7 @@ class ClientSession:
     An open session to the provider.
 
     The methods of this class may raise the following exceptions:
-    :py:class:`ProviderError`,
+    :py:class:`ethereum_rpc.RPCError`,
     :py:class:`ContractLegacyError`,
     :py:class:`ContractError`,
     :py:class:`ContractPanic`,
@@ -265,7 +266,7 @@ class ClientSession:
         """
         try:
             return await self._rpc.eth_call(call, block=block, sender_address=sender_address)
-        except ProviderError as exc:
+        except RPCError as exc:
             raise decode_contract_error(call.contract_abi, exc) from exc
 
     async def estimate_deploy(
@@ -282,14 +283,14 @@ class ClientSession:
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
         or :py:class:`ContractError` if a known error was caught during the dry run.
-        If the error was unknown, falls back to :py:class:`ProviderError`.
+        If the error was unknown, falls back to :py:class:`ethereum_rpc.RPCError`.
         """
         params = EstimateGasParams(
             from_=sender_address, data=call.data_bytes, value=amount or Amount(0)
         )
         try:
             return await self._rpc.eth_estimate_gas(params, block)
-        except ProviderError as exc:
+        except RPCError as exc:
             raise decode_contract_error(call.contract_abi, exc) from exc
 
     async def estimate_transfer(
@@ -301,7 +302,8 @@ class ClientSession:
     ) -> int:
         """
         Estimates the amount of gas required to transfer ``amount``.
-        Raises a :py:class:`ProviderError` if there is not enough funds in ``source_address``.
+        Raises a :py:class:`ethereum_rpc.RPCError` if there is not enough funds
+        in ``source_address``.
         """
         # source_address and amount are optional,
         # but if they are specified, we will fail here instead of later.
@@ -323,7 +325,7 @@ class ClientSession:
 
         Raises :py:class:`ContractPanic`, :py:class:`ContractLegacyError`,
         or :py:class:`ContractError` if a known error was caught during the dry run.
-        If the error was unknown, falls back to :py:class:`ProviderError`.
+        If the error was unknown, falls back to :py:class:`ethereum_rpc.RPCError`.
         """
         params = EstimateGasParams(
             from_=sender_address,
@@ -333,7 +335,7 @@ class ClientSession:
         )
         try:
             return await self._rpc.eth_estimate_gas(params, block)
-        except ProviderError as exc:
+        except RPCError as exc:
             raise decode_contract_error(call.contract_abi, exc) from exc
 
     async def broadcast_transfer(

@@ -75,10 +75,6 @@ Errors
 .. autoclass:: BadResponseFormat
    :show-inheritance:
 
-.. autoclass:: ProviderError()
-   :show-inheritance:
-   :members:
-
 .. autoclass:: pons._client.ContractPanicReason
    :members:
 

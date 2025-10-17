@@ -36,7 +36,7 @@ from pons import (
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._client import BadResponseFormat, ProviderError, TransactionFailed
+from pons._client import BadResponseFormat, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
 from pons._provider import RPC_JSON
 
@@ -226,7 +226,7 @@ async def test_estimate_transfer(
     assert gas > 0
 
     with pytest.raises(
-        ProviderError,
+        RPCError,
         match="Sender does not have enough balance to cover transaction value and gas",
     ):
         await session.estimate_transfer(
@@ -277,7 +277,7 @@ async def test_transfer_custom_gas(
 
     # Not enough gas
     with pytest.raises(
-        ProviderError, match=re.escape("Invalid transaction: Message.gas cannot be negative")
+        RPCError, match=re.escape("Invalid transaction: Message.gas cannot be negative")
     ):
         await session.transfer(root_signer, another_signer.address, to_transfer, gas=20000)
 
@@ -668,8 +668,11 @@ async def test_unknown_error_reasons(
     with monkeypatch.context() as mp:
         mp.setattr(local_provider, "rpc", mock_rpc_unknown_error)
         with pytest.raises(
-            ProviderError,
-            match=r"Provider error \(RPCErrorCode\.EXECUTION_ERROR\): execution reverted",
+            RPCError,
+            match=re.escape(
+                "RPC error (RPCErrorCode.EXECUTION_ERROR): execution reverted "
+                "(data: 313233340000000000000000000000000000000000000000000000000000000000000001)"
+            ),
         ):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
 
@@ -684,5 +687,11 @@ async def test_unknown_error_reasons(
 
     with monkeypatch.context() as mp:
         mp.setattr(local_provider, "rpc", mock_rpc_unknown_code)
-        with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
+        with pytest.raises(
+            RPCError,
+            match=re.escape(
+                "RPC error (12345): execution reverted "
+                "(data: 4e487b710000000000000000000000000000000000000000000000000000000000000000)"
+            ),
+        ):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))

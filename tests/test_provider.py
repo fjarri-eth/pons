@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 import trio
-from ethereum_rpc import Amount
+from ethereum_rpc import Amount, RPCError
 from pytest import MonkeyPatch
 
 from pons import (
@@ -18,7 +18,6 @@ from pons import (
     HTTPProviderServer,
     LocalProvider,
     Provider,
-    ProviderError,
     Unreachable,
     _http_provider_server,  # For monkeypatching purposes
 )
@@ -77,7 +76,7 @@ async def test_dict_request_introspection(
     # so we trigger an intentionally bad transaction.
     # A little roundabout, is there a better way?
     with pytest.raises(
-        ProviderError,
+        RPCError,
         match="Sender does not have enough balance to cover transaction value and gas",
     ):
         await session.estimate_transfer(

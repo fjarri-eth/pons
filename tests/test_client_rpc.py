@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import Awaitable, Iterable
 from pathlib import Path
 from typing import Any
@@ -29,7 +30,7 @@ from pons import (
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._client_rpc import BadResponseFormat, ProviderError
+from pons._client_rpc import BadResponseFormat
 from pons._provider import RPC_JSON
 
 
@@ -647,7 +648,7 @@ async def test_unknown_rpc_status_code(
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
-    with pytest.raises(ProviderError, match=r"Provider error \(666\): this method is possessed"):
+    with pytest.raises(RPCError, match=re.escape("RPC error (666): this method is possessed")):
         await session.net_version()
 
 
@@ -657,10 +658,10 @@ async def check_rpc_error(
     expected_message: str,
     expected_data: bytes | None,
 ) -> None:
-    with pytest.raises(ProviderError) as exc:
+    with pytest.raises(RPCError) as exc:
         await awaitable
 
-    assert exc.value.code == expected_code
+    assert exc.value.parsed_code == expected_code
     assert exc.value.message == expected_message
     assert exc.value.data == expected_data
 

@@ -16,7 +16,6 @@ from ._client_rpc import (
     ClientSessionRPC,
     LogFilter,
     PendingTransactionFilter,
-    ProviderError,
 )
 from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
@@ -118,7 +117,6 @@ __all__ = [
     "PriorityFallback",
     "ProtocolError",
     "Provider",
-    "ProviderError",
     "ProviderPath",
     "Receive",
     "Signer",
