@@ -298,6 +298,12 @@ class Method:
        matches a Python keyword, ``_`` will be appended to it.
     """
 
+    name: str
+    """The name of this method."""
+
+    inputs: Signature
+    """The input signature of this method."""
+
     outputs: Signature
     """Method's output signature."""
 
@@ -339,8 +345,8 @@ class Method:
         inputs: Mapping[str, Type] | Sequence[Type],
         outputs: None | Mapping[str, Type] | Sequence[Type] | Type = None,
     ):
-        self._name = name
-        self._inputs = Signature(inputs)
+        self.name = name
+        self.inputs = Signature(inputs)
         self._mutability = mutability
         self.payable = mutability.payable
         self.mutating = mutability.mutating
@@ -356,18 +362,8 @@ class Method:
 
         self.outputs = Signature(outputs)
 
-    @property
-    def name(self) -> str:
-        """The name of this method."""
-        return self._name
-
-    @property
-    def inputs(self) -> Signature:
-        """The input signature of this method."""
-        return self._inputs
-
     def bind(self, *args: Any, **kwargs: Any) -> BoundArguments:
-        return self._inputs.bind(*args, **kwargs)
+        return self.inputs.bind(*args, **kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> "MethodCall":
         """Returns an encoded call with given arguments."""
