@@ -1,6 +1,6 @@
 [project]
 name = "pons"
-version = "0.8.1"
+version = "0.9.0"
 description = "Async RPC client for Ethereum"
 authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
