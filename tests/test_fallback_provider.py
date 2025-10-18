@@ -13,6 +13,7 @@ from pons import (
     HTTPError,
     PriorityFallback,
     ProtocolError,
+    ProviderError,
     Unreachable,
 )
 from pons._fallback_provider import PriorityFallbackStrategy
@@ -51,13 +52,13 @@ class MockSession(ProviderSession):
     async def rpc(self, method: str, *_args: RPC_JSON) -> RPC_JSON:
         self.provider.requests.append(method)
         if self.provider.state == ProviderState.UNREACHABLE:
-            raise Unreachable("")
+            raise ProviderError(Unreachable(""))
         if self.provider.state == ProviderState.BAD_RESPONSE:
-            raise InvalidResponse("")
+            raise ProviderError(InvalidResponse(""))
         if self.provider.state == ProviderState.RPC_ERROR:
-            raise RPCError(ErrorCode(-1), "")
+            raise ProviderError(RPCError(ErrorCode(-1), ""))
         if self.provider.state == ProviderState.PROTOCOL_ERROR:
-            raise HTTPError(HTTPStatus(500), "")
+            raise ProviderError(HTTPError(HTTPStatus(500), ""))
 
         return "success"
 
@@ -142,20 +143,23 @@ async def test_raising_errors() -> None:
         providers["0"].set_state(ProviderState.UNREACHABLE)
         providers["1"].set_state(ProviderState.UNREACHABLE)
         providers["2"].set_state(ProviderState.UNREACHABLE)
-        with pytest.raises(Unreachable):
+        with pytest.raises(ProviderError) as excinfo:
             await session.rpc(random_request())
+        assert isinstance(excinfo.value.error, Unreachable)
 
         providers["0"].set_state(ProviderState.UNREACHABLE)
         providers["1"].set_state(ProviderState.BAD_RESPONSE)
         providers["2"].set_state(ProviderState.UNREACHABLE)
-        with pytest.raises(Unreachable):
+        with pytest.raises(ProviderError) as excinfo:
             await session.rpc(random_request())
+        assert isinstance(excinfo.value.error, Unreachable)
 
         providers["0"].set_state(ProviderState.UNREACHABLE)
         providers["1"].set_state(ProviderState.RPC_ERROR)
         providers["2"].set_state(ProviderState.BAD_RESPONSE)
-        with pytest.raises(InvalidResponse):
+        with pytest.raises(ProviderError) as excinfo:
             await session.rpc(random_request())
+        assert isinstance(excinfo.value.error, InvalidResponse)
 
 
 async def test_nested_providers() -> None:
@@ -175,8 +179,9 @@ async def test_nested_providers() -> None:
 
         # Provider 0 offline, so trying to rpc it specifically results in an error
         providers["0"].set_state(ProviderState.UNREACHABLE)
-        with pytest.raises(Unreachable):
+        with pytest.raises(ProviderError) as excinfo:
             await session.rpc_at_pin(path, request)
+        assert isinstance(excinfo.value.error, Unreachable)
 
         # Provider 0 is still offline, pinning results in using provider 1
         request = random_request()
@@ -222,13 +227,13 @@ async def test_invalid_path() -> None:
 
 
 def assert_errors(
-    errors: list[tuple[ProviderPath, Exception]],
+    errors: list[tuple[ProviderPath, ProviderError]],
     reference: list[tuple[ProviderPath, type[Exception]]],
 ) -> None:
     # Since exceptions don't implement equality
     for (test_path, exc), (ref_path, exc_type) in zip(errors, reference, strict=True):
         assert test_path == ref_path
-        assert isinstance(exc, exc_type)
+        assert isinstance(exc.error, exc_type)
 
 
 async def test_error_collection() -> None:

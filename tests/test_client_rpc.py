@@ -26,6 +26,7 @@ from pons import (
     CompiledContract,
     Either,
     LocalProvider,
+    ProviderError,
     abi,
     compile_contract_file,
 )
@@ -658,12 +659,13 @@ async def check_rpc_error(
     expected_message: str,
     expected_data: bytes | None,
 ) -> None:
-    with pytest.raises(RPCError) as exc:
+    with pytest.raises(ProviderError) as exc:
         await awaitable
 
-    assert exc.value.parsed_code == expected_code
-    assert exc.value.message == expected_message
-    assert exc.value.data == expected_data
+    assert isinstance(exc.value.error, RPCError)
+    assert exc.value.error.parsed_code == expected_code
+    assert exc.value.error.message == expected_message
+    assert exc.value.error.data == expected_data
 
 
 async def test_contract_exceptions(

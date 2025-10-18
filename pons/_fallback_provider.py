@@ -4,16 +4,12 @@ from collections.abc import AsyncIterator, Iterable, Mapping
 from collections.abc import Set as AbstractSet
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from ethereum_rpc import RPCError
-
 from ._provider import (
     RPC_JSON,
-    InvalidResponse,
-    ProtocolError,
     Provider,
+    ProviderError,
     ProviderPath,
     ProviderSession,
-    Unreachable,
 )
 
 
@@ -130,7 +126,7 @@ class FallbackProvider(Provider):
         strategy_ = strategy if strategy is not None else PriorityFallback()
         self._strategy = strategy_.make_strategy(self._providers.keys())
         self._same_provider = same_provider
-        self._errors: dict[str, Exception] = {}
+        self._errors: dict[str, ProviderError] = {}
         self._lock = threading.Lock()
 
     @asynccontextmanager
@@ -147,7 +143,7 @@ class FallbackProvider(Provider):
                 same_provider=self._same_provider,
             )
 
-    def errors(self) -> list[tuple[ProviderPath, Exception]]:
+    def errors(self) -> list[tuple[ProviderPath, ProviderError]]:
         """
         Returns the list of recorded errors for sub-providers.
 
@@ -169,7 +165,7 @@ class FallbackProvider(Provider):
 
         return errors
 
-    def record_error(self, provider_id: str, exc: Exception) -> None:
+    def record_error(self, provider_id: str, exc: ProviderError) -> None:
         with self._lock:
             self._errors[provider_id] = exc
 
@@ -195,8 +191,7 @@ class FallbackProviderSession(ProviderSession):
             session = self._sessions[provider_id]
             try:
                 result, sub_path = await session.rpc_and_pin(method, *args)
-            # These are the exceptions `Provider` can raise for a remote problem
-            except (RPCError, Unreachable, InvalidResponse, ProtocolError) as exc:
+            except ProviderError as exc:
                 if not isinstance(session, FallbackProviderSession):
                     self._provider.record_error(provider_id, exc)
 

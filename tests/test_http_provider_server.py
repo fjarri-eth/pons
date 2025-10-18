@@ -5,7 +5,7 @@ import pytest
 import trio
 from ethereum_rpc import RPCError, RPCErrorCode
 
-from pons import HTTPProviderServer, InvalidResponse, LocalProvider
+from pons import HTTPProviderServer, LocalProvider, ProviderError
 from pons._provider import RPC_JSON, ProviderSession
 
 
@@ -31,9 +31,10 @@ async def test_happy_path(provider_session: ProviderSession) -> None:
 
 
 async def test_invalid_method(provider_session: ProviderSession) -> None:
-    with pytest.raises(RPCError) as excinfo:
+    with pytest.raises(ProviderError) as excinfo:
         await provider_session.rpc(["method1", "method2"], 1, 2, 3)  # type: ignore[arg-type]
-    assert excinfo.value.code == RPCErrorCode.INVALID_REQUEST.value
+    assert isinstance(excinfo.value.error, RPCError)
+    assert excinfo.value.error.parsed_code == RPCErrorCode.INVALID_REQUEST
 
 
 async def test_invalid_parameters(
@@ -47,9 +48,10 @@ async def test_invalid_parameters(
     )
 
     # Invalid parameters format (not a list)
-    with pytest.raises(RPCError) as excinfo:
+    with pytest.raises(ProviderError) as excinfo:
         await provider_session.rpc("method1", 1, 2, 3)
-    assert excinfo.value.code == RPCErrorCode.INVALID_REQUEST.value
+    assert isinstance(excinfo.value.error, RPCError)
+    assert excinfo.value.error.parsed_code == RPCErrorCode.INVALID_REQUEST
 
 
 async def test_internal_error(
@@ -61,5 +63,7 @@ async def test_internal_error(
         raise RuntimeError("foo")
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
-    with pytest.raises(InvalidResponse, match="Expected a JSON response, got HTTP status 500: foo"):
+    with pytest.raises(
+        ProviderError, match="Provider error: Expected a JSON response, got HTTP status 500: foo"
+    ):
         await provider_session.rpc("eth_chainId")

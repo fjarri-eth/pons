@@ -60,6 +60,7 @@ from ._provider import (
     InvalidResponse,
     ProtocolError,
     Provider,
+    ProviderError,
     ProviderPath,
     Unreachable,
 )
@@ -117,6 +118,7 @@ __all__ = [
     "PriorityFallback",
     "ProtocolError",
     "Provider",
+    "ProviderError",
     "ProviderPath",
     "Receive",
     "Signer",

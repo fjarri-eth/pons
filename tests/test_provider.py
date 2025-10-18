@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -5,7 +6,7 @@ from typing import Any
 
 import pytest
 import trio
-from ethereum_rpc import Amount, RPCError
+from ethereum_rpc import Amount
 from pytest import MonkeyPatch
 
 from pons import (
@@ -13,12 +14,11 @@ from pons import (
     BadResponseFormat,
     Client,
     ClientSession,
-    HTTPError,
     HTTPProvider,
     HTTPProviderServer,
     LocalProvider,
     Provider,
-    Unreachable,
+    ProviderError,
     _http_provider_server,  # For monkeypatching purposes
 )
 from pons._provider import RPC_JSON, ProviderPath, ProviderSession
@@ -76,8 +76,12 @@ async def test_dict_request_introspection(
     # so we trigger an intentionally bad transaction.
     # A little roundabout, is there a better way?
     with pytest.raises(
-        RPCError,
-        match="Sender does not have enough balance to cover transaction value and gas",
+        ProviderError,
+        match=re.escape(
+            "Provider error: RPC error (RPCErrorCode.INVALID_PARAMETER): "
+            "Invalid transaction: Sender does not have enough balance to cover transaction "
+            "value and gas  (has 100000000000000000000, needs 1000000000000000000000)"
+        ),
     ):
         await session.estimate_transfer(
             root_signer.address, another_signer.address, Amount.ether(1000)
@@ -156,8 +160,11 @@ async def test_non_json_response(
 
     monkeypatch.setattr(local_provider, "rpc", faulty_net_version)
 
-    message = "Expected a JSON response, got HTTP status 500: Something unexpected happened"
-    with pytest.raises(BadResponseFormat, match=message):
+    message = (
+        "Provider error: Expected a JSON response, got HTTP status 500: "
+        "Something unexpected happened"
+    )
+    with pytest.raises(ProviderError, match=message):
         await session.net_version()
 
 
@@ -174,7 +181,9 @@ async def test_no_result_field(session: ClientSession, monkeypatch: MonkeyPatch)
 
     monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
-    with pytest.raises(BadResponseFormat, match="`result` is not present in the response"):
+    with pytest.raises(
+        ProviderError, match="Provider error: `result` is not present in the response"
+    ):
         await session.net_version()
 
 
@@ -191,7 +200,9 @@ async def test_no_error_field(session: ClientSession, monkeypatch: MonkeyPatch) 
 
     monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
-    with pytest.raises(HTTPError, match=r"HTTP status 400: {\"jsonrpc\":\"2.0\",\"id\":0}"):
+    with pytest.raises(
+        ProviderError, match=r"Provider error: HTTP status 400: {\"jsonrpc\":\"2.0\",\"id\":0}"
+    ):
         await session.net_version()
 
 
@@ -210,7 +221,7 @@ async def test_malformed_error_field(session: ClientSession, monkeypatch: Monkey
 
     monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
-    with pytest.raises(BadResponseFormat, match=r"Failed to parse an error response"):
+    with pytest.raises(ProviderError, match=r"Provider error: Failed to parse an error response"):
         await session.net_version()
 
 
@@ -223,7 +234,9 @@ async def test_result_is_not_a_dict(session: ClientSession, monkeypatch: MonkeyP
 
     monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
 
-    with pytest.raises(BadResponseFormat, match="RPC response must be a dictionary, got: 1"):
+    with pytest.raises(
+        ProviderError, match="Provider error: RPC response must be a dictionary, got: 1"
+    ):
         await session.net_version()
 
 
@@ -233,7 +246,8 @@ async def test_unreachable_provider() -> None:
     async with client.session() as session:
         with trio.fail_after(1):  # Shouldn't be necessary, but just so that the test doesn't hang
             with pytest.raises(
-                Unreachable, match=r"all attempts to connect to 127\.0\.0\.1:8889 failed"
+                ProviderError,
+                match=r"Provider error: all attempts to connect to 127\.0\.0\.1:8889 failed",
             ):
                 await session.net_version()
 

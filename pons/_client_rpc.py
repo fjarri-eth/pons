@@ -24,7 +24,7 @@ from ethereum_rpc import (
 
 from ._contract import BaseBoundMethodCall
 from ._contract_abi import EventFilter
-from ._provider import InvalidResponse, ProviderPath, ProviderSession
+from ._provider import ProviderPath, ProviderSession
 
 
 @dataclass
@@ -71,7 +71,7 @@ class BadResponseFormat(Exception):
 def convert_errors(method_name: str) -> Iterator[None]:
     try:
         yield
-    except (StructuringError, InvalidResponse) as exc:
+    except StructuringError as exc:
         raise BadResponseFormat(f"{method_name}: {exc}") from exc
 
 
@@ -117,11 +117,9 @@ class ClientSessionRPC:
     """
     The hub for methods which directly correspond to Ethereum RPC calls.
 
-    The methods of this class may raise the following exceptions:
-    :py:class:`ethereum_rpc.RPCError`,
-    :py:class:`Unreachable`,
-    :py:class:`BadResponseFormat`,
-    a provider-specific derived class of :py:class:`ProtocolError`.
+    The methods of this class may raise
+    :py:class:`ProviderError` (coming from the lower level)
+    or :py:class:`BadResponseFormat` (failed to deserialize the response into the expected type).
     """
 
     def __init__(self, provider_session: ProviderSession):

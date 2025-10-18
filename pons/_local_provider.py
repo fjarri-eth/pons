@@ -8,9 +8,9 @@ from typing import Any
 
 from alysis import EVMVersion, Node, RPCNode
 from eth_account import Account
-from ethereum_rpc import Amount
+from ethereum_rpc import Amount, RPCError
 
-from ._provider import RPC_JSON, Provider, ProviderSession
+from ._provider import RPC_JSON, Provider, ProviderError, ProviderSession
 from ._signer import AccountSigner
 
 
@@ -66,7 +66,10 @@ class LocalProvider(Provider):
         self._rpc_node = RPCNode(self._local_node)
 
     def rpc(self, method: str, *args: Any) -> RPC_JSON:
-        return self._rpc_node.rpc(method, *args)
+        try:
+            return self._rpc_node.rpc(method, *args)
+        except RPCError as exc:
+            raise ProviderError(exc) from exc
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator["LocalProviderSession"]:

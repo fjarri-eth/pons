@@ -54,8 +54,12 @@ Fallback providers
 Errors
 ------
 
-.. autoclass:: ABIDecodingError
+Provider level
+^^^^^^^^^^^^^^
+
+.. autoclass:: ProviderError
    :show-inheritance:
+   :members:
 
 .. autoclass:: InvalidResponse
    :show-inheritance:
@@ -69,10 +73,16 @@ Errors
 .. autoclass:: HTTPError
    :show-inheritance:
 
-.. autoclass:: TransactionFailed
-   :show-inheritance:
+Client level
+^^^^^^^^^^^^
 
 .. autoclass:: BadResponseFormat
+   :show-inheritance:
+
+.. autoclass:: ABIDecodingError
+   :show-inheritance:
+
+.. autoclass:: TransactionFailed
    :show-inheritance:
 
 .. autoclass:: pons._client.ContractPanicReason
