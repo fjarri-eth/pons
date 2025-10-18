@@ -10,8 +10,8 @@ from pons import (
     EVMVersion,
     compile_contract_file,
     get_create2_address,
+    get_create_address,
 )
-from pons._utils import get_create_address
 
 
 @pytest.fixture

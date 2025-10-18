@@ -16,7 +16,6 @@ from ._client_rpc import (
     ClientSessionRPC,
     LogFilter,
     PendingTransactionFilter,
-    ProviderError,
 )
 from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
@@ -61,6 +60,7 @@ from ._provider import (
     InvalidResponse,
     ProtocolError,
     Provider,
+    ProviderError,
     ProviderPath,
     Unreachable,
 )

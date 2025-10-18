@@ -1,7 +1,7 @@
 API
 ===
 
-.. automodule:: pons
+.. module:: pons
 
 
 Clients
@@ -21,11 +21,12 @@ Providers
 ---------
 
 .. autoclass:: Provider
+   :show-inheritance:
 
 .. autoclass:: HTTPProvider
    :show-inheritance:
 
-.. autoclass:: ProviderPath
+.. autoclass:: ProviderPath()
 
 
 Fallback providers
@@ -42,52 +43,60 @@ Fallback providers
    :show-inheritance:
 
 .. autoclass:: FallbackStrategyFactory
+   :show-inheritance:
    :members:
 
 .. autoclass:: FallbackStrategy
+   :show-inheritance:
    :members:
 
 
 Errors
 ------
 
-.. autoclass:: pons.ABIDecodingError
-   :show-inheritance:
+Provider level
+^^^^^^^^^^^^^^
 
-.. autoclass:: pons.InvalidResponse
-   :show-inheritance:
-
-.. autoclass:: pons.Unreachable
-   :show-inheritance:
-
-.. autoclass:: pons.ProtocolError
-   :show-inheritance:
-
-.. autoclass:: pons.HTTPError
-   :show-inheritance:
-
-.. autoclass:: pons.TransactionFailed
-   :show-inheritance:
-
-.. autoclass:: pons.BadResponseFormat
-   :show-inheritance:
-
-.. autoclass:: pons.ProviderError()
+.. autoclass:: ProviderError
    :show-inheritance:
    :members:
+
+.. autoclass:: InvalidResponse
+   :show-inheritance:
+
+.. autoclass:: Unreachable
+   :show-inheritance:
+
+.. autoclass:: ProtocolError
+   :show-inheritance:
+
+.. autoclass:: HTTPError
+   :show-inheritance:
+
+Client level
+^^^^^^^^^^^^
+
+.. autoclass:: BadResponseFormat
+   :show-inheritance:
+
+.. autoclass:: ABIDecodingError
+   :show-inheritance:
+
+.. autoclass:: TransactionFailed
+   :show-inheritance:
 
 .. autoclass:: pons._client.ContractPanicReason
    :members:
 
-.. autoclass:: pons.ContractPanic()
+.. autoclass:: ContractPanic()
    :show-inheritance:
    :members:
 
-.. autoclass:: pons.ContractLegacyError()
+.. autoclass:: ContractLegacyError()
    :show-inheritance:
    :members:
 
-.. autoclass:: pons.ContractError()
+.. autoclass:: ContractError()
    :show-inheritance:
    :members:
 
@@ -96,11 +105,12 @@ Signers
 -------
 
 .. autoclass:: Signer
+   :show-inheritance:
    :members:
 
 .. autoclass:: AccountSigner
-   :members:
    :show-inheritance:
+   :members:
 
 
 Contract ABI
@@ -251,9 +261,9 @@ Utility classes
 Utility methods
 ---------------
 
-.. autofunction:: pons.get_create_address
+.. autofunction:: get_create_address
 
-.. autofunction:: pons.get_create2_address
+.. autofunction:: get_create2_address
 
 
 Compiled and deployed contracts
@@ -269,11 +279,11 @@ Compiled and deployed contracts
 Filter objects
 --------------
 
-.. autoclass:: pons.BlockFilter()
+.. autoclass:: BlockFilter()
 
-.. autoclass:: pons.PendingTransactionFilter()
+.. autoclass:: PendingTransactionFilter()
 
-.. autoclass:: pons.LogFilter()
+.. autoclass:: LogFilter()
 
 
 Solidity types

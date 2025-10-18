@@ -1,9 +1,10 @@
+import re
 from collections.abc import AsyncIterator
 
 import pytest
-from ethereum_rpc import Amount, RPCError
+from ethereum_rpc import Amount
 
-from pons import AccountSigner, Client, ClientSession, LocalProvider
+from pons import AccountSigner, Client, ClientSession, LocalProvider, ProviderError
 
 
 # Masking the global fixtures to make this test self-contained
@@ -93,7 +94,13 @@ async def test_net_version(session: ClientSession) -> None:
 
 
 def test_rpc_error(provider: LocalProvider) -> None:
-    with pytest.raises(RPCError, match="Unknown method: eth_nonexistentMethod"):
+    with pytest.raises(
+        ProviderError,
+        match=re.escape(
+            "Provider error: RPC error (RPCErrorCode.METHOD_NOT_FOUND): "
+            "Unknown method: eth_nonexistentMethod"
+        ),
+    ):
         provider.rpc("eth_nonexistentMethod")
 
 

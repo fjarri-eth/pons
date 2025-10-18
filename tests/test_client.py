@@ -20,6 +20,7 @@ from trio.testing import MockClock
 from pons import (
     ABIDecodingError,
     AccountSigner,
+    BadResponseFormat,
     BoundEvent,
     Client,
     ClientSession,
@@ -32,11 +33,13 @@ from pons import (
     LocalProvider,
     Method,
     Mutability,
+    ProviderError,
+    TransactionFailed,
+    Unreachable,
     abi,
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._client import BadResponseFormat, ProviderError, TransactionFailed
 from pons._contract_abi import PANIC_ERROR
 from pons._provider import RPC_JSON
 
@@ -227,7 +230,10 @@ async def test_estimate_transfer(
 
     with pytest.raises(
         ProviderError,
-        match="Sender does not have enough balance to cover transaction value and gas",
+        match=re.escape(
+            "Provider error: RPC error (RPCErrorCode.INVALID_PARAMETER): Invalid transaction: "
+            "Sender does not have enough balance to cover transaction value and gas"
+        ),
     ):
         await session.estimate_transfer(
             root_signer.address, another_signer.address, Amount.ether(1000)
@@ -277,7 +283,11 @@ async def test_transfer_custom_gas(
 
     # Not enough gas
     with pytest.raises(
-        ProviderError, match=re.escape("Invalid transaction: Message.gas cannot be negative")
+        ProviderError,
+        match=re.escape(
+            "Provider error: RPC error (RPCErrorCode.INVALID_PARAMETER): "
+            "Invalid transaction: Message.gas cannot be negative"
+        ),
     ):
         await session.transfer(root_signer, another_signer.address, to_transfer, gas=20000)
 
@@ -648,7 +658,9 @@ async def test_unknown_error_reasons(
         if method == "eth_estimateGas":
             # Invalid selector
             data = PANIC_ERROR.selector + encode_args((abi.uint(256), 888))
-            raise RPCError.with_code(RPCErrorCode.EXECUTION_ERROR, "execution reverted", data)
+            raise ProviderError(
+                RPCError.with_code(RPCErrorCode.EXECUTION_ERROR, "execution reverted", data)
+            )
         return orig_rpc(method, *args)
 
     with monkeypatch.context() as mp:
@@ -662,14 +674,19 @@ async def test_unknown_error_reasons(
         if method == "eth_estimateGas":
             # Invalid selector
             data = b"1234" + encode_args((abi.uint(256), 1))
-            raise RPCError.with_code(RPCErrorCode.EXECUTION_ERROR, "execution reverted", data)
+            raise ProviderError(
+                RPCError.with_code(RPCErrorCode.EXECUTION_ERROR, "execution reverted", data)
+            )
         return orig_rpc(method, *args)
 
     with monkeypatch.context() as mp:
         mp.setattr(local_provider, "rpc", mock_rpc_unknown_error)
         with pytest.raises(
             ProviderError,
-            match=r"Provider error \(RPCErrorCode\.EXECUTION_ERROR\): execution reverted",
+            match=re.escape(
+                "Provider error: RPC error (RPCErrorCode.EXECUTION_ERROR): execution reverted "
+                "(data: 313233340000000000000000000000000000000000000000000000000000000000000001)"
+            ),
         ):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
 
@@ -679,10 +696,43 @@ async def test_unknown_error_reasons(
         if method == "eth_estimateGas":
             # Invalid selector
             data = PANIC_ERROR.selector + encode_args((abi.uint(256), 0))
-            raise RPCError(ErrorCode(12345), "execution reverted", data)
+            raise ProviderError(RPCError(ErrorCode(12345), "execution reverted", data))
         return orig_rpc(method, *args)
 
     with monkeypatch.context() as mp:
         mp.setattr(local_provider, "rpc", mock_rpc_unknown_code)
-        with pytest.raises(ProviderError, match=r"Provider error \(12345\): execution reverted"):
+        with pytest.raises(
+            ProviderError,
+            match=re.escape(
+                "Provider error: RPC error (12345): execution reverted "
+                "(data: 4e487b710000000000000000000000000000000000000000000000000000000000000000)"
+            ),
+        ):
             await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
+
+
+async def test_provider_error_passthrough(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    compiled_contract = compiled_contracts["TestErrors"]
+    contract = await session.deploy(root_signer, compiled_contract.constructor(999))
+
+    orig_rpc = local_provider.rpc
+
+    # Provider raises a ProviderError with something other than RPC error -
+    # it is passed through without changes.
+
+    def mock_rpc(method: str, *args: Any) -> RPC_JSON:
+        if method == "eth_estimateGas":
+            raise ProviderError(Unreachable("foo"))
+        return orig_rpc(method, *args)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(local_provider, "rpc", mock_rpc)
+        with pytest.raises(ProviderError, match=r"Provider error: foo") as excinfo:
+            await session.estimate_transact(root_signer.address, contract.method.transactPanic(999))
+        assert isinstance(excinfo.value.error, Unreachable)

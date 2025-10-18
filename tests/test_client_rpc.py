@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import Awaitable, Iterable
 from pathlib import Path
 from typing import Any
@@ -21,15 +22,16 @@ from ethereum_rpc import (
 
 from pons import (
     AccountSigner,
+    BadResponseFormat,
     ClientSession,
     CompiledContract,
     Either,
     LocalProvider,
+    ProviderError,
     abi,
     compile_contract_file,
 )
 from pons._abi_types import encode_args
-from pons._client_rpc import BadResponseFormat, ProviderError
 from pons._provider import RPC_JSON
 
 
@@ -647,7 +649,7 @@ async def test_unknown_rpc_status_code(
 
     monkeypatch.setattr(local_provider, "rpc", mock_rpc)
 
-    with pytest.raises(ProviderError, match=r"Provider error \(666\): this method is possessed"):
+    with pytest.raises(RPCError, match=re.escape("RPC error (666): this method is possessed")):
         await session.net_version()
 
 
@@ -660,9 +662,10 @@ async def check_rpc_error(
     with pytest.raises(ProviderError) as exc:
         await awaitable
 
-    assert exc.value.code == expected_code
-    assert exc.value.message == expected_message
-    assert exc.value.data == expected_data
+    assert isinstance(exc.value.error, RPCError)
+    assert exc.value.error.parsed_code == expected_code
+    assert exc.value.error.message == expected_message
+    assert exc.value.error.data == expected_data
 
 
 async def test_contract_exceptions(

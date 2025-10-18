@@ -15,8 +15,6 @@ from ethereum_rpc import (
     EthCallParams,
     FilterParams,
     LogEntry,
-    RPCError,
-    RPCErrorCode,
     TxHash,
     TxInfo,
     TxReceipt,
@@ -26,7 +24,7 @@ from ethereum_rpc import (
 
 from ._contract import BaseBoundMethodCall
 from ._contract_abi import EventFilter
-from ._provider import InvalidResponse, ProviderPath, ProviderSession
+from ._provider import ProviderPath, ProviderSession
 
 
 @dataclass
@@ -69,55 +67,12 @@ class BadResponseFormat(Exception):
     """Raised if the RPC provider returned an unexpectedly formatted response."""
 
 
-class ProviderError(Exception):
-    """
-    A general problem with fulfilling the request at the provider's side.
-
-    This means the provider sent a correct response with an error code
-    and possibly some associated data.
-    """
-
-    raw_code: int
-    """The error code returned by the server."""
-
-    code: None | RPCErrorCode
-    """The parsed error code (if known)."""
-
-    message: str
-    """The error message."""
-
-    data: None | bytes
-    """The associated data (if any)."""
-
-    @classmethod
-    def from_rpc_error(cls, exc: RPCError) -> "ProviderError":
-        return cls(exc.code, exc.parsed_code, exc.message, exc.data)
-
-    def __init__(
-        self, raw_code: int, code: None | RPCErrorCode, message: str, data: None | bytes = None
-    ):
-        super().__init__(raw_code, code, message, data)
-        self.raw_code = raw_code
-        self.code = code
-        self.message = message
-        self.data = data
-
-    def __str__(self) -> str:
-        # Substitute the known code if any, or report the raw integer value otherwise
-        code = self.code or self.raw_code
-        return f"Provider error ({code}): {self.message}" + (
-            f" (data: {self.data.hex()})" if self.data else ""
-        )
-
-
 @contextmanager
 def convert_errors(method_name: str) -> Iterator[None]:
     try:
         yield
-    except (StructuringError, InvalidResponse) as exc:
+    except StructuringError as exc:
         raise BadResponseFormat(f"{method_name}: {exc}") from exc
-    except RPCError as exc:
-        raise ProviderError.from_rpc_error(exc) from exc
 
 
 RetType = TypeVar("RetType")
@@ -162,11 +117,9 @@ class ClientSessionRPC:
     """
     The hub for methods which directly correspond to Ethereum RPC calls.
 
-    The methods of this class may raise the following exceptions:
-    :py:class:`ProviderError`,
-    :py:class:`Unreachable`,
-    :py:class:`BadResponseFormat`,
-    a provider-specific derived class of :py:class:`ProtocolError`.
+    The methods of this class may raise
+    :py:class:`ProviderError` (coming from the lower level)
+    or :py:class:`BadResponseFormat` (failed to deserialize the response into the expected type).
     """
 
     def __init__(self, provider_session: ProviderSession):

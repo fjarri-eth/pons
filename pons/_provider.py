@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from http import HTTPStatus
 from json import JSONDecodeError
 from typing import cast
@@ -55,6 +56,17 @@ class HTTPError(ProtocolError):
 
     def __str__(self) -> str:
         return f"HTTP status {self.status}: {self.message}"
+
+
+@dataclass
+class ProviderError(Exception):
+    """Describes an error on the provider's side."""
+
+    error: RPCError | Unreachable | InvalidResponse | ProtocolError
+    """The specific error."""
+
+    def __str__(self) -> str:
+        return f"Provider error: {self.error}"
 
 
 class ProviderPath:
@@ -112,11 +124,8 @@ class ProviderSession(ABC):
     """
     The base class for provider sessions.
 
-    The methods of this class may raise the following exceptions:
-    :py:class:`RPCError`,
-    :py:class:`Unreachable`,
-    :py:class:`InvalidResponse`,
-    a provider-specific derived class of :py:class:`ProtocolError`.
+    The methods of this class may raise :py:class:`ProviderError`
+    indicating a problem on the provider's side.
     """
 
     @abstractmethod
@@ -167,7 +176,7 @@ class HTTPSession(ProviderSession):
         try:
             response = await self._client.post(self._url, json=json)
         except httpx.ConnectError as exc:
-            raise Unreachable(str(exc)) from exc
+            raise ProviderError(Unreachable(str(exc))) from exc
 
         status = response.status_code
 
@@ -175,12 +184,14 @@ class HTTPSession(ProviderSession):
             response_json = response.json()
         except JSONDecodeError as exc:
             content = response.content.decode()
-            raise InvalidResponse(
-                f"Expected a JSON response, got HTTP status {status}: {content}"
+            raise ProviderError(
+                InvalidResponse(f"Expected a JSON response, got HTTP status {status}: {content}")
             ) from exc
 
         if not isinstance(response_json, Mapping):
-            raise InvalidResponse(f"RPC response must be a dictionary, got: {response_json}")
+            raise ProviderError(
+                InvalidResponse(f"RPC response must be a dictionary, got: {response_json}")
+            )
         response_json = cast("Mapping[str, RPC_JSON]", response_json)
 
         # Note that the Eth-side errors (e.g. transaction having been reverted)
@@ -189,15 +200,17 @@ class HTTPSession(ProviderSession):
             try:
                 error = structure(RPCError, response_json["error"])
             except StructuringError as exc:
-                raise InvalidResponse(
-                    f"Failed to parse an error response: {response_json}"
+                raise ProviderError(
+                    InvalidResponse(f"Failed to parse an error response: {response_json}")
                 ) from exc
 
-            raise error
+            raise ProviderError(error)
 
         if status == HTTPStatus.OK:
             if "result" in response_json:
                 return response_json["result"]
-            raise InvalidResponse(f"`result` is not present in the response: {response_json}")
+            raise ProviderError(
+                InvalidResponse(f"`result` is not present in the response: {response_json}")
+            )
 
-        raise HTTPError(status, response.content.decode())
+        raise ProviderError(HTTPError(status, response.content.decode()))
