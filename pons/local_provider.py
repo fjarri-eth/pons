@@ -1,4 +1,7 @@
-"""PyEVM-based provider for tests."""
+"""
+PyEVM-based provider for tests.
+Requires the dependencies from the ``local-provider`` feature.
+"""
 
 import itertools
 from collections.abc import AsyncIterator
@@ -12,6 +15,8 @@ from ethereum_rpc import Amount, RPCError
 
 from ._provider import RPC_JSON, Provider, ProviderError, ProviderSession
 from ._signer import AccountSigner
+
+__all__ = ["LocalProvider", "SnapshotID"]
 
 
 class SnapshotID:
@@ -32,7 +37,7 @@ class LocalProvider(Provider):
         *,
         root_balance: Amount,
         chain_id: int = 1,
-        evm_version: EVMVersion = EVMVersion.CANCUN,
+        evm_version: EVMVersion = EVMVersion.PRAGUE,
     ):
         self._local_node = Node(
             root_balance_wei=root_balance.as_wei(), chain_id=chain_id, evm_version=evm_version
@@ -65,14 +70,14 @@ class LocalProvider(Provider):
         self._local_node = self._snapshots[snapshot_id.id_]
         self._rpc_node = RPCNode(self._local_node)
 
-    def rpc(self, method: str, *args: Any) -> RPC_JSON:
+    def rpc(self, method: str, *args: Any) -> RPC_JSON:  # noqa: D102
         try:
             return self._rpc_node.rpc(method, *args)
         except RPCError as exc:
             raise ProviderError(exc) from exc
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator["LocalProviderSession"]:
+    async def session(self) -> AsyncIterator["LocalProviderSession"]:  # noqa: D102
         yield LocalProviderSession(self)
 
 

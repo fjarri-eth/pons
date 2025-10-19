@@ -1,3 +1,8 @@
+"""
+Solidity compiler support.
+Requires the dependencies from the ``compiler`` feature.
+"""
+
 from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
@@ -5,6 +10,8 @@ from pathlib import Path
 import solcx
 
 from ._contract import CompiledContract
+
+__all__ = ["EVMVersion", "compile_contract_file"]
 
 
 class EVMVersion(Enum):

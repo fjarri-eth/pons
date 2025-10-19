@@ -5,8 +5,10 @@ import pytest
 import trio
 from ethereum_rpc import RPCError, RPCErrorCode
 
-from pons import HTTPProviderServer, LocalProvider, ProviderError
+from pons import ProviderError
 from pons._provider import RPC_JSON, ProviderSession
+from pons.http_provider_server import HTTPProviderServer
+from pons.local_provider import LocalProvider
 
 
 @pytest.fixture

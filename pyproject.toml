@@ -1,6 +1,6 @@
 [project]
 name = "pons"
-version = "0.9.0"
+version = "0.10.0-dev"
 description = "Async RPC client for Ethereum"
 authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
@@ -139,6 +139,8 @@ ignore = [
     "RUF009",
     # Way too restrictive. Sometimes it is useful to import types from pytest.
     "PT013",
+    # Sphinx does not need a separate docstring for ``__init__``.
+    "D107",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

@@ -7,17 +7,16 @@ from pons import (
     AccountSigner,
     ClientSession,
     CompiledContract,
-    EVMVersion,
-    compile_contract_file,
     get_create2_address,
     get_create_address,
 )
+from pons.compiler import compile_contract_file
 
 
 @pytest.fixture
 def compiled_contracts() -> dict[str, CompiledContract]:
     path = Path(__file__).resolve().parent / "TestUtils.sol"
-    return compile_contract_file(path, evm_version=EVMVersion.CANCUN)
+    return compile_contract_file(path)
 
 
 async def test_create(

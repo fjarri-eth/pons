@@ -17,7 +17,6 @@ from ._client_rpc import (
     LogFilter,
     PendingTransactionFilter,
 )
-from ._compiler import EVMVersion, compile_contract_file
 from ._contract import (
     BaseBoundMethodCall,
     BoundConstructor,
@@ -51,8 +50,6 @@ from ._fallback_provider import (
     FallbackStrategyFactory,
     PriorityFallback,
 )
-from ._http_provider_server import HTTPProviderServer
-from ._local_provider import LocalProvider, SnapshotID
 from ._multicall import BoundMultiMethodCall, BoundMultiMethodValueCall, Multicall
 from ._provider import (
     HTTPError,
@@ -94,7 +91,6 @@ __all__ = [
     "ContractPanic",
     "CycleFallback",
     "DeployedContract",
-    "EVMVersion",
     "Either",
     "Error",
     "Event",
@@ -105,9 +101,7 @@ __all__ = [
     "FallbackStrategyFactory",
     "HTTPError",
     "HTTPProvider",
-    "HTTPProviderServer",
     "InvalidResponse",
-    "LocalProvider",
     "LogFilter",
     "Method",
     "MethodCall",
@@ -122,11 +116,9 @@ __all__ = [
     "ProviderPath",
     "Receive",
     "Signer",
-    "SnapshotID",
     "TransactionFailed",
     "Unreachable",
     "abi",
-    "compile_contract_file",
     "get_create2_address",
     "get_create_address",
 ]

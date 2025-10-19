@@ -4,7 +4,8 @@ from collections.abc import AsyncIterator
 import pytest
 from ethereum_rpc import Amount
 
-from pons import AccountSigner, Client, ClientSession, LocalProvider, ProviderError
+from pons import AccountSigner, Client, ClientSession, ProviderError
+from pons.local_provider import LocalProvider
 
 
 # Masking the global fixtures to make this test self-contained

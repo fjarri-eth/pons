@@ -1,3 +1,8 @@
+"""
+HTTP provider server for tests.
+Requires the dependencies from the ``http-provider-server`` feature.
+"""
+
 from http import HTTPStatus
 from typing import cast
 
@@ -12,6 +17,8 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from ._provider import RPC_JSON, HTTPProvider, Provider
+
+__all__ = ["HTTPProviderServer"]
 
 
 def parse_request(request: RPC_JSON) -> tuple[RPC_JSON, str, list[RPC_JSON]]:
@@ -98,7 +105,7 @@ class HTTPProviderServer:
         Starts the server in an external event loop.
         Useful for the cases when it needs to run in parallel with other servers or clients.
 
-        Supports start-up reporting when invoked via `nursery.start()`.
+        Supports start-up reporting when invoked via ``nursery.start()``.
         """
         config = Config()
         config.bind = [f"{self._host}:{self._port}"]

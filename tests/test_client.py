@@ -30,18 +30,18 @@ from pons import (
     ContractLegacyError,
     ContractPanic,
     DeployedContract,
-    LocalProvider,
     Method,
     Mutability,
     ProviderError,
     TransactionFailed,
     Unreachable,
     abi,
-    compile_contract_file,
 )
 from pons._abi_types import encode_args
 from pons._contract_abi import PANIC_ERROR
 from pons._provider import RPC_JSON
+from pons.compiler import compile_contract_file
+from pons.local_provider import LocalProvider
 
 
 @pytest.fixture

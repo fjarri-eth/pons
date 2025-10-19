@@ -15,14 +15,14 @@ from pons import (
     Client,
     ClientSession,
     HTTPProvider,
-    HTTPProviderServer,
-    LocalProvider,
     Provider,
     ProviderError,
     ProviderPath,
-    _http_provider_server,  # For monkeypatching purposes
+    http_provider_server,  # For monkeypatching purposes
 )
 from pons._provider import RPC_JSON, ProviderSession
+from pons.http_provider_server import HTTPProviderServer
+from pons.local_provider import LocalProvider
 
 
 @pytest.fixture
@@ -172,7 +172,7 @@ async def test_non_json_response(
 async def test_no_result_field(session: ClientSession, monkeypatch: MonkeyPatch) -> None:
     # Tests the handling of a badly formed success response without the "result" field.
 
-    orig_process_request = _http_provider_server.process_request
+    orig_process_request = http_provider_server.process_request
 
     async def faulty_process_request(*args: Any, **kwargs: Any) -> tuple[HTTPStatus, RPC_JSON]:
         status, response = await orig_process_request(*args, **kwargs)
@@ -180,7 +180,7 @@ async def test_no_result_field(session: ClientSession, monkeypatch: MonkeyPatch)
         del response["result"]
         return (status, response)
 
-    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
+    monkeypatch.setattr(http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(
         ProviderError, match="Provider error: `result` is not present in the response"
@@ -191,7 +191,7 @@ async def test_no_result_field(session: ClientSession, monkeypatch: MonkeyPatch)
 async def test_no_error_field(session: ClientSession, monkeypatch: MonkeyPatch) -> None:
     # Tests the handling of a badly formed error response without the "error" field.
 
-    orig_process_request = _http_provider_server.process_request
+    orig_process_request = http_provider_server.process_request
 
     async def faulty_process_request(*args: Any, **kwargs: Any) -> tuple[HTTPStatus, RPC_JSON]:
         _status, response = await orig_process_request(*args, **kwargs)
@@ -199,7 +199,7 @@ async def test_no_error_field(session: ClientSession, monkeypatch: MonkeyPatch) 
         del response["result"]
         return (HTTPStatus.BAD_REQUEST, response)
 
-    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
+    monkeypatch.setattr(http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(
         ProviderError, match=r"Provider error: HTTP status 400: {\"jsonrpc\":\"2.0\",\"id\":0}"
@@ -211,7 +211,7 @@ async def test_malformed_error_field(session: ClientSession, monkeypatch: Monkey
     # Tests the handling of a badly formed error response
     # where the "error" field cannot be parsed as an RPCError.
 
-    orig_process_request = _http_provider_server.process_request
+    orig_process_request = http_provider_server.process_request
 
     async def faulty_process_request(*args: Any, **kwargs: Any) -> RPC_JSON:
         _status, response = await orig_process_request(*args, **kwargs)
@@ -220,7 +220,7 @@ async def test_malformed_error_field(session: ClientSession, monkeypatch: Monkey
         response["error"] = {"something_weird": 1}
         return (HTTPStatus.BAD_REQUEST, response)
 
-    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
+    monkeypatch.setattr(http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(ProviderError, match=r"Provider error: Failed to parse an error response"):
         await session.net_version()
@@ -233,7 +233,7 @@ async def test_result_is_not_a_dict(session: ClientSession, monkeypatch: MonkeyP
     async def faulty_process_request(*_args: Any, **_kwargs: Any) -> tuple[HTTPStatus, RPC_JSON]:
         return (HTTPStatus.OK, 1)
 
-    monkeypatch.setattr(_http_provider_server, "process_request", faulty_process_request)
+    monkeypatch.setattr(http_provider_server, "process_request", faulty_process_request)
 
     with pytest.raises(
         ProviderError, match="Provider error: RPC response must be a dictionary, got: 1"
