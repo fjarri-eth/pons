@@ -10,18 +10,17 @@ from pons import (
     Constructor,
     ContractABI,
     DeployedContract,
-    EVMVersion,
     Method,
     Mutability,
     abi,
-    compile_contract_file,
 )
+from pons.compiler import compile_contract_file
 
 
 @pytest.fixture
 def compiled_contracts() -> dict[str, CompiledContract]:
     path = Path(__file__).resolve().parent / "TestContractFunctionality.sol"
-    return compile_contract_file(path, evm_version=EVMVersion.CANCUN)
+    return compile_contract_file(path)
 
 
 async def test_empty_constructor(

@@ -157,13 +157,17 @@ Testing utilities
 
 ``pons`` exposes several types useful for testing applications that connect to Ethereum RPC servers. Not intended for the production environment.
 
-.. autoclass:: LocalProvider
+Install the feature ``local-provider`` for the ``local_provider`` module to be available.
+
+.. autoclass:: pons.local_provider.LocalProvider
    :show-inheritance:
-   :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot
+   :members: disable_auto_mine_transactions, enable_auto_mine_transactions, take_snapshot, revert_to_snapshot, root
 
-.. autoclass:: SnapshotID()
+.. autoclass:: pons.local_provider.SnapshotID()
 
-.. autoclass:: HTTPProviderServer
+Install the feature ``http-provider-server`` for the ``http_provider_server`` module to be available.
+
+.. autoclass:: pons.http_provider_server.HTTPProviderServer
    :members:
    :special-members: __call__
 
@@ -174,9 +178,9 @@ Compiler
 Install with the feature ``compiler`` for it to be available.
 
 
-.. autofunction:: compile_contract_file
+.. autofunction:: pons.compiler.compile_contract_file
 
-.. autoclass:: EVMVersion
+.. autoclass:: pons.compiler.EVMVersion
    :members:
 
 

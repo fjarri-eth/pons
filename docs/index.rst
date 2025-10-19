@@ -14,7 +14,8 @@ A quick usage example:
     import ethereum_rpc
 
     from ethereum_rpc import Amount
-    from pons import LocalProvider, HTTPProviderServer
+    from pons.local_provider import LocalProvider
+    from pons.http_provider_server import HTTPProviderServer
 
     # Run examples with our test server in the background
 

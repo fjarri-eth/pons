@@ -4,7 +4,8 @@ import pytest
 from alysis import EVMVersion
 from ethereum_rpc import Amount
 
-from pons import AccountSigner, Client, ClientSession, LocalProvider
+from pons import AccountSigner, Client, ClientSession
+from pons.local_provider import LocalProvider
 
 
 @pytest.fixture

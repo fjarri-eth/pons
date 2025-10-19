@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pons import EVMVersion, compile_contract_file
+from pons.compiler import EVMVersion, compile_contract_file
 
 
 def test_multiple_contracts() -> None:

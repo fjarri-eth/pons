@@ -13,9 +13,9 @@ from pons import (
     Method,
     Receive,
     abi,
-    compile_contract_file,
 )
 from pons._abi_types import encode_args
+from pons.compiler import compile_contract_file
 
 
 @pytest.fixture

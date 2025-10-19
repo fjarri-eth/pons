@@ -26,13 +26,13 @@ from pons import (
     ClientSession,
     CompiledContract,
     Either,
-    LocalProvider,
     ProviderError,
     abi,
-    compile_contract_file,
 )
 from pons._abi_types import encode_args
 from pons._provider import RPC_JSON
+from pons.compiler import compile_contract_file
+from pons.local_provider import LocalProvider
 
 
 @pytest.fixture

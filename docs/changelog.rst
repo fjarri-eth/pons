@@ -2,6 +2,18 @@ Changelog
 ---------
 
 
+0.10.0 (in development)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Changed
+^^^^^^^
+
+- ``compile_contract_file`` and ``EVMVersion`` moved to ``compiler`` submodule; ``LocalProvider`` moved to ``local_provider`` submodule; ``HTTPProviderServer`` moved to ``http_provider_server`` submodule. (PR_89_)
+
+
+.. _PR_89: https://github.com/fjarri-eth/pons/pull/89
+
+
 0.9.0 (2025-10-18)
 ~~~~~~~~~~~~~~~~~~
 

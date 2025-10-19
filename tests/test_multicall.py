@@ -10,8 +10,8 @@ from pons import (
     ContractLegacyError,
     DeployedContract,
     Multicall,
-    compile_contract_file,
 )
+from pons.compiler import compile_contract_file
 
 
 @pytest.fixture
