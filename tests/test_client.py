@@ -208,6 +208,20 @@ async def test_call_decoding_error(
         await session.call(wrong_contract.method.getState(456))
 
 
+async def test_error_with_anonymous_fields(
+    session: ClientSession,
+    compiled_contracts: dict[str, CompiledContract],
+    root_signer: AccountSigner,
+) -> None:
+    compiled_contract = compiled_contracts["TestErrors"]
+    deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
+
+    with pytest.raises(ContractError) as exc:
+        await session.call(deployed_contract.method.raiseAnonymousFieldError(4))
+    assert exc.value.error == deployed_contract.error.AnonymousFieldError
+    assert exc.value.data == (4,)
+
+
 async def test_estimate_deploy(
     session: ClientSession,
     compiled_contracts: dict[str, CompiledContract],

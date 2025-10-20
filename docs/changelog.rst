@@ -2,6 +2,18 @@ Changelog
 ---------
 
 
+0.10.1 (in development)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+- Support for contract errors with anonymous fields. (PR_90_)
+
+
+.. _PR_90: https://github.com/fjarri-eth/pons/pull/90
+
+
 0.10.0 (2025-10-19)
 ~~~~~~~~~~~~~~~~~~~
 

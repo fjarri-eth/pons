@@ -104,6 +104,8 @@ contract PayableConstructor {
 contract TestErrors {
     error CustomError(uint256 x);
 
+    error AnonymousFieldError(uint256);
+
     uint256 state;
 
     constructor(uint256 x) {
@@ -151,5 +153,9 @@ contract TestErrors {
 
     function transactPanic(uint256 x) public {
         state = raisePanic(x);
+    }
+
+    function raiseAnonymousFieldError(uint256 x) public view returns (uint256) {
+        revert AnonymousFieldError(x);
     }
 }

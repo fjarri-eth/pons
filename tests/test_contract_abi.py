@@ -762,18 +762,6 @@ def test_error_from_json() -> None:
     ):
         Error.from_json(dict(type="constructor"))
 
-    with pytest.raises(TypeError, match="Error fields must be named"):
-        Error.from_json(
-            dict(
-                inputs=[
-                    dict(internalType="address", name="", type="address"),
-                    dict(internalType="bytes", name="", type="bytes"),
-                ],
-                name="Foo",
-                type="error",
-            )
-        )
-
 
 def test_error_init() -> None:
     error = Error(
@@ -785,6 +773,8 @@ def test_error_init() -> None:
 
 
 def test_error_decode() -> None:
+    # Named fields
+
     error = Error(
         "Foo",
         dict(foo=abi.bytes(), bar=abi.uint(8)),
@@ -793,6 +783,17 @@ def test_error_decode() -> None:
     encoded_bytes = encode_args((abi.bytes(), b"12345"), (abi.uint(8), 9))
     decoded = error.decode_fields(encoded_bytes)
     assert decoded == dict(foo=b"12345", bar=9)
+
+    # Anonymous fields
+
+    error = Error(
+        "Foo",
+        [abi.bytes(), abi.uint(8)],
+    )
+
+    encoded_bytes = encode_args((abi.bytes(), b"12345"), (abi.uint(8), 9))
+    decoded = error.decode_fields(encoded_bytes)
+    assert decoded == (b"12345", 9)
 
 
 def test_resolve_error() -> None:
