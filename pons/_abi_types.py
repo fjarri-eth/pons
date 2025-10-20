@@ -512,12 +512,12 @@ def dispatch_types(abi_entry: ABI_JSON) -> list[Type] | dict[str, Type]:
 
     names = [entry["name"] for entry in abi_entry_typed]
 
-    # Unnamed arguments; treat as positional arguments
-    if names and all(not name for name in names):
+    # In Solidity, it is possible to have have an argument list like `(address x, uint256)`
+    # (that is, only some of the arguments are unnamed).
+    # This cannot be mapped to Python function signatures,
+    # so we have to treat this as if all the arguments were unnamed.
+    if names and any(not name for name in names):
         return [dispatch_type(entry) for entry in abi_entry_typed]
-
-    if any(not name for name in names):
-        raise ValueError("Arguments must be either all named or all unnamed")
 
     # Since we are returning a dictionary, need to be sure we don't silently merge entries
     if len(names) != len(set(names)):
