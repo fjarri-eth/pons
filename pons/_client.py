@@ -156,10 +156,10 @@ class ContractError(Exception):
     error: Error
     """The recognized ABI Error object."""
 
-    data: dict[str, Any]
+    data: dict[str, Any] | tuple[Any, ...]
     """The unpacked error data, corresponding to the ABI."""
 
-    def __init__(self, error: Error, decoded_data: dict[str, Any]):
+    def __init__(self, error: Error, decoded_data: dict[str, Any] | tuple[Any, ...]):
         super().__init__(error, decoded_data)
         self.error = error
         self.data = decoded_data
@@ -189,10 +189,15 @@ def decode_contract_error(
         except UnknownError:
             return ProviderError(exc)
 
+        # These errors have named fields, so `decoded_data` is expected to be a dictionary.
+        # The assertions are there for `mypy`'s sake.
         if error == PANIC_ERROR:
+            assert isinstance(decoded_data, dict)  # noqa: S101
             return ContractPanic.from_code(decoded_data["code"])
         if error == LEGACY_ERROR:
+            assert isinstance(decoded_data, dict)  # noqa: S101
             return ContractLegacyError(decoded_data["message"])
+
         return ContractError(error, decoded_data)
     return ProviderError(exc)
 

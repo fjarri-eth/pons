@@ -583,17 +583,16 @@ class Error:
 
         name = error_entry_typed["name"]
         fields = dispatch_types(error_entry_typed["inputs"])
-        if isinstance(fields, list):
-            raise TypeError("Error fields must be named")
 
         return cls(name=name, fields=fields)
 
     def __init__(
         self,
         name: str,
-        fields: Mapping[str, Type],
+        fields: Mapping[str, Type] | Sequence[Type],
     ):
         self.name = name
+        self._named_fields = isinstance(fields, Mapping)
         self.fields = Signature(fields)
 
     @cached_property
@@ -601,9 +600,11 @@ class Error:
         """Error's selector."""
         return keccak(self.name.encode() + self.fields.canonical_form.encode())[:SELECTOR_LENGTH]
 
-    def decode_fields(self, data_bytes: bytes) -> dict[str, Any]:
+    def decode_fields(self, data_bytes: bytes) -> dict[str, Any] | tuple[Any, ...]:
         """Decodes the error fields from the given packed data."""
-        return self.fields.decode_into_dict(data_bytes)
+        if self._named_fields:
+            return self.fields.decode_into_dict(data_bytes)
+        return self.fields.decode_into_tuple(data_bytes)
 
     def __str__(self) -> str:
         return f"error {self.name}{self.fields}"
@@ -843,7 +844,7 @@ class ContractABI:
             error.selector: error for error in chain([PANIC_ERROR, LEGACY_ERROR], self.error)
         }
 
-    def resolve_error(self, error_data: bytes) -> tuple[Error, dict[str, Any]]:
+    def resolve_error(self, error_data: bytes) -> tuple[Error, dict[str, Any] | tuple[Any, ...]]:
         """
         Given the packed error data, attempts to find the error in the ABI
         and decode the data into its fields.
