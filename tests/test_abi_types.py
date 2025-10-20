@@ -256,8 +256,11 @@ def test_dispatch_types() -> None:
     # For an empty argument list we choose to resolve it as an empty dictionary, for certainty.
     assert dispatch_types([]) == {}
 
-    with pytest.raises(ValueError, match="Arguments must be either all named or all unnamed"):
-        dispatch_types([dict(name="foo", type="uint8"), dict(name="", type="uint16[2]")])
+    # Partially named arguments
+    assert dispatch_types([dict(name="x", type="uint8"), dict(name="", type="uint16[2]")]) == [
+        abi.uint(8),
+        abi.uint(16)[2],
+    ]
 
     with pytest.raises(ValueError, match="All ABI entries must have distinct names"):
         dispatch_types([dict(name="foo", type="uint8"), dict(name="foo", type="uint16[2]")])

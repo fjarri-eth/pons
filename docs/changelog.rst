@@ -9,9 +9,11 @@ Added
 ^^^^^
 
 - Support for contract errors with anonymous fields. (PR_90_)
+- Support for partially named method arguments. (PR_91_)
 
 
 .. _PR_90: https://github.com/fjarri-eth/pons/pull/90
+.. _PR_91: https://github.com/fjarri-eth/pons/pull/91
 
 
 0.10.0 (2025-10-19)
