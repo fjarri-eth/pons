@@ -64,7 +64,6 @@ def test_abi_declaration(compiled_contracts: dict[str, CompiledContract]) -> Non
     assert isinstance(cabi.event.Foo, Event)
     assert str(cabi.event.Foo.fields) == "(uint256 indexed x, bytes indexed y, bytes4 u, bytes v)"
     assert cabi.event.Foo.anonymous
-    assert cabi.event.Foo.indexed == {"x", "y"}
 
 
 def test_api_binding(compiled_contracts: dict[str, CompiledContract]) -> None:
@@ -94,7 +93,7 @@ def test_api_binding(compiled_contracts: dict[str, CompiledContract]) -> None:
     assert read_call.data_bytes == (
         compiled_contract.abi.method.getState.selector + b"\x00" * 31 + b"\x03"
     )
-    assert read_call.decode_output(b"\x00" * 31 + b"\x04") == (4,)
+    assert read_call.decode_output(b"\x00" * 31 + b"\x04") == 4
 
     write_call = deployed_contract.method.setState(5)
     assert isinstance(compiled_contract.abi.method.setState, Method)
@@ -125,7 +124,7 @@ def test_api_binding(compiled_contracts: dict[str, CompiledContract]) -> None:
     )
 
     decoded = event_filter.decode_log_entry(log_entry)
-    assert decoded == dict(x=1, y=None, u=b"4567", v=b"bytestring")
+    assert decoded.as_dict == dict(x=1, y=None, u=b"4567", v=b"bytestring")
 
     log_entry = LogEntry(
         address=Address(b"\xba" * 20),

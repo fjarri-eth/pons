@@ -506,23 +506,13 @@ def dispatch_type(abi_entry: ABI_JSON) -> Type:
     return type_from_abi_string(element_type_name)
 
 
-def dispatch_types(abi_entry: ABI_JSON) -> list[Type] | dict[str, Type]:
+def dispatch_parameter_types(abi_entry: ABI_JSON) -> list[tuple[str | None, Type]]:
     # TODO (#83): use proper validation
     abi_entry_typed = cast("Iterable[dict[str, Any]]", abi_entry)
-
-    names = [entry["name"] for entry in abi_entry_typed]
-
-    # In Solidity, it is possible to have have an argument list like `(address x, uint256)`
-    # (that is, only some of the arguments are unnamed).
-    # This cannot be mapped to Python function signatures,
-    # so we have to treat this as if all the arguments were unnamed.
-    if names and any(not name for name in names):
-        return [dispatch_type(entry) for entry in abi_entry_typed]
-
-    # Since we are returning a dictionary, need to be sure we don't silently merge entries
-    if len(names) != len(set(names)):
-        raise ValueError("All ABI entries must have distinct names")
-    return {entry["name"]: dispatch_type(entry) for entry in abi_entry_typed}
+    return [
+        (entry["name"] if entry["name"] != "" else None, dispatch_type(entry))
+        for entry in abi_entry_typed
+    ]
 
 
 def encode_args(*types_and_args: tuple[Type, Any]) -> bytes:

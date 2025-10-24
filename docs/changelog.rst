@@ -2,8 +2,14 @@ Changelog
 ---------
 
 
-0.10.1 (in development)
+0.11.0 (in development)
 ~~~~~~~~~~~~~~~~~~~~~~~
+
+Changed
+^^^^^^^
+
+- ``ContractABI`` interface modified to allow for methods, errors, and events with arbitrary anonymous parameters and fields. Instead of returning ``dict[str, Any]`` as a parsed struct we now return a ``FieldValues`` object. Signatures of methods and fields of errors are exposed as ``Fields``, fields of events are exposed as ``EventFields`` objects. (PR_92_)
+
 
 Added
 ^^^^^
@@ -12,8 +18,15 @@ Added
 - Support for partially named method arguments. (PR_91_)
 
 
+Fixed
+^^^^^
+
+- Name disambiguation for method parameters and struct fields. (PR_92_)
+
+
 .. _PR_90: https://github.com/fjarri-eth/pons/pull/90
 .. _PR_91: https://github.com/fjarri-eth/pons/pull/91
+.. _PR_92: https://github.com/fjarri-eth/pons/pull/92
 
 
 0.10.0 (2025-10-19)

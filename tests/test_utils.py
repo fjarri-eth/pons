@@ -62,7 +62,7 @@ async def test_create2(
         return_events=[deployer.event.Deployed],
     )
     assert len(events[deployer.event.Deployed]) == 1
-    assert events[deployer.event.Deployed][0] == dict(
+    assert events[deployer.event.Deployed][0].as_dict == dict(
         deployedAddress=get_create2_address(deployer.address, to_deploy.data_bytes, salt)
     )
 

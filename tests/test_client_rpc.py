@@ -275,11 +275,11 @@ async def test_eth_call(
     compiled_contract = compiled_contracts["BasicContract"]
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor(123))
     result = await session.call(deployed_contract.method.getState(456))
-    assert result == (123 + 456,)
+    assert result == 123 + 456
 
     # With a real provider, if `sender_address` is not given, it will default to the zero address.
     result = await session.call(deployed_contract.method.getSender())
-    assert result == (Address(b"\x00" * 20),)
+    assert result == Address(b"\x00" * 20)
 
     # Seems to be another tester chain limitation: even though `eth_call` does not spend gas,
     # the `sender_address` still needs to be funded.
@@ -288,7 +288,7 @@ async def test_eth_call(
     result = await session.call(
         deployed_contract.method.getSender(), sender_address=another_signer.address
     )
-    assert result == (another_signer.address,)
+    assert result == another_signer.address
 
 
 async def test_eth_call_pending(
@@ -305,11 +305,11 @@ async def test_eth_call_pending(
 
     # This uses the state of the last finalized block
     result = await session.call(deployed_contract.method.getState(0))
-    assert result == (123,)
+    assert result == 123
 
     # This also uses the state change introduced by the pending transaction
     result = await session.call(deployed_contract.method.getState(0), block=BlockLabel.PENDING)
-    assert result == (456,)
+    assert result == 456
 
 
 async def test_eth_get_filter_changes_bad_response(

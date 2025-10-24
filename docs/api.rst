@@ -151,6 +151,17 @@ Contract ABI
 .. autoclass:: Receive
    :members:
 
+.. autoclass:: Fields
+   :members:
+
+.. autoclass:: EventFields
+   :members:
+   :show-inheritance:
+
+.. autoclass:: FieldValues
+   :members:
+   :special-members: __getitem__, __getattr__
+
 
 Testing utilities
 -----------------
@@ -254,12 +265,6 @@ Utility classes
 .. class:: pons._contract_abi.MethodType
 
    Generic method type parameter.
-
-.. autoclass:: pons._contract_abi.Signature()
-   :members: canonical_form
-
-.. autoclass:: pons._contract_abi.Method
-   :members:
 
 
 Utility methods

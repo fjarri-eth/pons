@@ -30,6 +30,7 @@ from pons import (
     ContractLegacyError,
     ContractPanic,
     DeployedContract,
+    FieldValues,
     Method,
     Mutability,
     ProviderError,
@@ -171,7 +172,7 @@ async def test_call_contract_error(
     with pytest.raises(ContractError) as exc:
         await session.call(deployed_contract.method.viewError(4))
     assert exc.value.error == deployed_contract.error.CustomError
-    assert exc.value.data == {"x": 4}
+    assert exc.value.data.as_dict == dict(x=4)
 
 
 async def test_call_decoding_error(
@@ -191,9 +192,9 @@ async def test_call_decoding_error(
             Method(
                 name="getState",
                 mutability=Mutability.VIEW,
-                inputs=[abi.uint(256)],
+                inputs=[(None, abi.uint(256))],
                 # the actual method in in BasicContract returns only one uint256
-                outputs=[abi.uint(256), abi.uint(256)],
+                outputs=[(None, abi.uint(256)), (None, abi.uint(256))],
             )
         ]
     )
@@ -219,7 +220,7 @@ async def test_error_with_anonymous_fields(
     with pytest.raises(ContractError) as exc:
         await session.call(deployed_contract.method.raiseAnonymousFieldError(4))
     assert exc.value.error == deployed_contract.error.AnonymousFieldError
-    assert exc.value.data == (4,)
+    assert exc.value.data.as_tuple == (4,)
 
 
 async def test_estimate_deploy(
@@ -344,7 +345,7 @@ async def test_deploy(
     # Normal deploy
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
     result = await session.call(deployed_contract.method.getState(456))
-    assert result == (123 + 456,)
+    assert result == 123 + 456
 
     with pytest.raises(ValueError, match="This constructor does not accept an associated payment"):
         await session.deploy(root_signer, basic_contract.constructor(1), Amount.ether(1))
@@ -395,7 +396,7 @@ async def test_transact(
     deployed_contract = await session.deploy(root_signer, basic_contract.constructor(123))
     await session.transact(root_signer, deployed_contract.method.setState(456))
     result = await session.call(deployed_contract.method.getState(789))
-    assert result == (456 + 789,)
+    assert result == 456 + 789
 
     with pytest.raises(
         ValueError, match="This method is non-mutating, use `eth_call` to invoke it"
@@ -457,11 +458,16 @@ async def test_transact_and_return_events(
     event1 = deployed_contract.event.Event1
     event2 = deployed_contract.event.Event2
 
-    def results_for(x: int) -> dict[BoundEvent, list[dict[str, Any]]]:
-        return {
+    def check_results(results: dict[BoundEvent, list[FieldValues]], x: int) -> None:
+        expected = {
             event1: [{"value": x}, {"value": x + 1}],
             event2: [{"value": x + 2}, {"value": x + 3}],
         }
+        decoded = {
+            event: [values.as_dict for values in values_list]
+            for event, values_list in results.items()
+        }
+        assert decoded == expected
 
     # Normal operation: one relevant transaction in the block
 
@@ -471,7 +477,7 @@ async def test_transact_and_return_events(
         deployed_contract.method.emitMultipleEvents(x),
         return_events=[event1, event2],
     )
-    assert result == results_for(x)
+    check_results(result, x)
 
     # Two transactions for the same method in the same block -
     # we need to be able to only pick up the results from the relevant transaction receipt
@@ -498,8 +504,8 @@ async def test_transact_and_return_events(
         nursery.start_soon(transact, another_signer, x2)
         nursery.start_soon(delayed_enable_mining)
 
-    assert results[x1] == results_for(x1)
-    assert results[x2] == results_for(x2)
+    check_results(results[x1], x1)
+    check_results(results[x2], x2)
 
 
 async def test_block_filter_high_level(
@@ -616,9 +622,24 @@ async def test_event_filter_high_level(
             another_signer, contract2.method.deposit2(b"1111"), amount=Amount.wei(3)
         )
 
-    assert events[0] == {"from_": root_signer.address, "id": b"1111", "value": 1, "value2": 2}
-    assert events[1] == {"from_": another_signer.address, "id": b"1111", "value": 2, "value2": 3}
-    assert events[2] == {"from_": another_signer.address, "id": b"1111", "value": 3, "value2": 4}
+    assert events[0].as_dict == {
+        "from": root_signer.address,
+        "id": b"1111",
+        "value": 1,
+        "value2": 2,
+    }
+    assert events[1].as_dict == {
+        "from": another_signer.address,
+        "id": b"1111",
+        "value": 2,
+        "value2": 3,
+    }
+    assert events[2].as_dict == {
+        "from": another_signer.address,
+        "id": b"1111",
+        "value": 3,
+        "value2": 4,
+    }
 
 
 async def test_contract_exceptions_high_level(
@@ -644,14 +665,14 @@ async def test_contract_exceptions_high_level(
     with pytest.raises(ContractError) as error_exc:
         await session.estimate_transact(root_signer.address, contract.method.transactError(4))
     assert error_exc.value.error == contract.error.CustomError
-    assert error_exc.value.data == {"x": 4}
+    assert error_exc.value.data.as_dict == {"x": 4}
 
     # Check that the same works for deployment
 
     with pytest.raises(ContractError) as error_exc:
         await session.estimate_deploy(root_signer.address, compiled_contract.constructor(4))
     assert error_exc.value.error == contract.error.CustomError
-    assert error_exc.value.data == {"x": 4}
+    assert error_exc.value.data.as_dict == {"x": 4}
 
 
 async def test_unknown_error_reasons(
