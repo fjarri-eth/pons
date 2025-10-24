@@ -16,6 +16,7 @@ Added
 
 - Support for contract errors with anonymous fields. (PR_90_)
 - Support for partially named method arguments. (PR_91_)
+- ``to_json()`` methods in contract ABI objects. (PR_93_)
 
 
 Fixed
@@ -27,6 +28,7 @@ Fixed
 .. _PR_90: https://github.com/fjarri-eth/pons/pull/90
 .. _PR_91: https://github.com/fjarri-eth/pons/pull/91
 .. _PR_92: https://github.com/fjarri-eth/pons/pull/92
+.. _PR_93: https://github.com/fjarri-eth/pons/pull/93
 
 
 0.10.0 (2025-10-19)
