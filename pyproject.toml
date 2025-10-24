@@ -1,12 +1,11 @@
 [project]
 name = "pons"
-version = "0.10.1-dev"
+version = "0.11.0-dev"
 description = "Async RPC client for Ethereum"
 authors = [
     {name = "Bogdan Opanchuk", email = "bogdan@opanchuk.net"},
 ]
 dependencies = [
-    "httpx>=0.22",
     "eth-account>=0.13",
     "eth-utils>=2",
     "eth-abi>=5.0.1",
@@ -29,6 +28,9 @@ compiler = [
 local-provider = [
     "alysis>=0.6.1",
 ]
+http-provider = [
+    "httpx>=0.22",
+]
 http-provider-server = [
     "starlette>=0.48",
     "hypercorn>=0.17",
@@ -44,8 +46,11 @@ tests = [
     "py-solc-x>=2",
     # from `local-provider` feature
     "alysis>=0.3.0",
-    "starlette",
-    "hypercorn",
+    # from `http-provider` feature
+    "httpx>=0.22",
+    # from `http-provider-server` feature
+    "starlette>=0.48",
+    "hypercorn>=0.17",
 ]
 docs = [
     "sphinx>=4",
