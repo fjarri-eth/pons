@@ -9,8 +9,8 @@ from pons._abi_types import (
     ABIType,
     Type,
     decode_args,
+    dispatch_parameter_types,
     dispatch_type,
-    dispatch_types,
     encode_args,
     type_from_abi_string,
 )
@@ -231,39 +231,24 @@ def test_dispatch_type() -> None:
         dispatch_type(dict(type="uint8(2)[3]"))
 
 
-def test_dispatch_types() -> None:
+def test_dispatch_parameter_types() -> None:
     entries = [
         dict(name="param2", type="uint8"),
         dict(name="param1", type="uint16[2]"),
     ]
 
-    assert dispatch_types(entries) == dict(param2=abi.uint(8), param1=abi.uint(16)[2])
-
-    # Check that the order is preserved, too
-    typed_entries = dispatch_types(entries)
-    assert isinstance(typed_entries, dict)
-    assert list(typed_entries.items()) == [
+    assert dispatch_parameter_types(entries) == [
         ("param2", abi.uint(8)),
         ("param1", abi.uint(16)[2]),
     ]
 
-    # Note that if all the names are empty, it is treated as a list of positional arguments
-    assert dispatch_types([dict(name="", type="uint8"), dict(name="", type="uint16[2]")]) == [
-        abi.uint(8),
-        abi.uint(16)[2],
+    # Empty names are converted into Nones
+    assert dispatch_parameter_types(
+        [dict(name="param1", type="uint8"), dict(name="", type="uint16[2]")]
+    ) == [
+        ("param1", abi.uint(8)),
+        (None, abi.uint(16)[2]),
     ]
-
-    # For an empty argument list we choose to resolve it as an empty dictionary, for certainty.
-    assert dispatch_types([]) == {}
-
-    # Partially named arguments
-    assert dispatch_types([dict(name="x", type="uint8"), dict(name="", type="uint16[2]")]) == [
-        abi.uint(8),
-        abi.uint(16)[2],
-    ]
-
-    with pytest.raises(ValueError, match="All ABI entries must have distinct names"):
-        dispatch_types([dict(name="foo", type="uint8"), dict(name="foo", type="uint16[2]")])
 
 
 def test_making_arrays() -> None:

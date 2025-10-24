@@ -11,7 +11,7 @@ from typing import Any, Generic, TypeVar, cast
 from ethereum_rpc import LogEntry, LogTopic, keccak
 
 from . import abi
-from ._abi_types import ABI_JSON, Type, decode_args, dispatch_type, dispatch_types, encode_args
+from ._abi_types import ABI_JSON, Type, decode_args, dispatch_parameter_types, encode_args
 
 # Anonymous events can have at most 4 indexed fields
 ANONYMOUS_EVENT_INDEXED_FIELDS = 4
@@ -23,80 +23,162 @@ EVENT_INDEXED_FIELDS = 3
 SELECTOR_LENGTH = 4
 
 
-# We are using the `inspect` machinery to bind arguments to parameters.
-# From Py3.11 on it does not allow parameter names to coincide with keywords,
-# so we have to escape them.
-# This can be avoided if we write our own `inspect.Signature` implementation.
-def make_name_safe(name: str) -> str:
-    if iskeyword(name):
-        return name + "_"
-    return name
+class FieldValues:
+    """
+    A container for field values of an event, error, or a method return.
 
+    Since Solidity allows fields at arbitrary positions to be anonymous,
+    a dictionary cannot handle all the possibilities.
+    """
 
-class Signature:
-    """Generalized signature of either inputs or outputs of a method."""
+    def __init__(self, values: Sequence[tuple[str | None, Any]]):
+        names = [name for name, _value in values if name is not None]
+        if len(names) != len(set(names)):
+            raise ValueError("The values cannot have repeating names")
 
-    def __init__(self, parameters: Mapping[str, Type] | Sequence[Type]):
-        if isinstance(parameters, Mapping):
-            self._signature = inspect.Signature(
-                parameters=[
-                    inspect.Parameter(make_name_safe(name), inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                    for name, tp in parameters.items()
-                ]
-            )
-            self._types = list(parameters.values())
-            self._named_parameters = True
-        else:
-            self._signature = inspect.Signature(
-                parameters=[
-                    inspect.Parameter(f"_{i}", inspect.Parameter.POSITIONAL_ONLY)
-                    for i in range(len(parameters))
-                ]
-            )
-            self._types = list(parameters)
-            self._named_parameters = False
+        self._values_seq = values
+        self._values_dict = {name: value for name, value in values if name is not None}
+        self._representable_as_dict = len(names) == len(self._values_seq)
 
     @property
-    def empty(self) -> bool:
-        return not bool(self._types)
+    def as_dict(self) -> dict[str, Any]:
+        """
+        Returns the equivalent dictionary representation.
+
+        Raises ``ValueError`` if there are anonymous fields present.
+        """
+        if not self._representable_as_dict:
+            raise ValueError(
+                "This structure has some anonymous fields "
+                "and therefore is not representable as a `dict`"
+            )
+        return self._values_dict
+
+    @cached_property
+    def as_tuple(self) -> tuple[Any, ...]:
+        """
+        Returns the equivalent tuple representation
+        (a tuple of the values with the field names omitted).
+        """
+        return tuple(item for _name, item in self._values_seq)
+
+    def __getitem__(self, name: str) -> Any:
+        """Returns the value with the given name."""
+        return self._values_dict[name]
+
+    def __getattr__(self, name: str) -> Any:
+        """Returns the value with the given name."""
+        return self._values_dict[name]
+
+    def __repr__(self) -> str:
+        return f"FieldValues({self._values_seq!r})"
+
+
+class Fields:
+    """
+    Describes a sequence of optionally named typed values.
+    These can be method parameters, method outputs, error fields,
+    or event fields.
+    """
+
+    names: tuple[str | None, ...]
+    """Field names."""
+
+    types: tuple[Type, ...]
+    """Field types."""
+
+    def __init__(
+        self, fields: Mapping[str, Type] | Sequence[Type] | Sequence[tuple[str | None, Type]]
+    ):
+        names: tuple[str | None, ...]
+        if isinstance(fields, Mapping):
+            names = tuple(fields)
+            types = tuple(fields.values())
+        elif all(isinstance(elem, Type) for elem in fields):
+            fields = cast("Sequence[Type]", fields)
+            names = tuple(None for tp in fields)
+            types = tuple(fields)
+        else:
+            fields = cast("Sequence[tuple[str | None, Type]]", fields)
+            names = tuple(name for name, _tp in fields)
+            types = tuple(tp for _name, tp in fields)
+
+        self.names = names
+        self.types = types
+
+    @cached_property
+    def named_fields(self) -> set[str]:
+        return {name for name in self.names if name is not None}
+
+    @cached_property
+    def as_signature(self) -> inspect.Signature:
+        """
+        Returns the fields represented as a signature.
+
+        .. note::
+
+            In Solidity, it is possible to have named and anonymous method parameters
+            or event/error fields in arbitrary order.
+            This cannot be mapped to Python function signatures.
+            Also it is possible that some parameter names are Python keywords,
+            so they will be rejected by the Signature constructor.
+
+            So the keyword names will be postfixed with a `_`,
+            and anonymous fields will be given auto-generated names.
+        """
+        # Keep as many original names as possible
+        existing_names = {name for name in self.names if name is not None and not iskeyword(name)}
+
+        safe_names = []
+        disambiguation_counter = 1
+        for arg_num, name in enumerate(self.names):
+            if name is None:
+                base_name = "_" + str(arg_num + 1)
+            elif iskeyword(name):
+                base_name = name + "_"
+            else:
+                safe_names.append(name)
+                continue
+
+            # Since we renamed an existing name, there can potentially be
+            # an existing one equal to it.
+
+            safe_name = base_name
+            while safe_name in existing_names:
+                safe_name = base_name + "_" + str(disambiguation_counter)
+                disambiguation_counter += 1
+
+            safe_names.append(safe_name)
+
+        return inspect.Signature(
+            parameters=[
+                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                for name in safe_names
+            ]
+        )
 
     @cached_property
     def canonical_form(self) -> str:
-        """Returns the signature serialized in the canonical form as a string."""
-        return "(" + ",".join(tp.canonical_form for tp in self._types) + ")"
+        """Returns the field types serialized in the canonical form as a string."""
+        return "(" + ",".join(tp.canonical_form for tp in self.types) + ")"
 
-    def bind(self, *args: Any, **kwargs: Any) -> BoundArguments:
-        return self._signature.bind(*args, **kwargs)
+    def encode(self, values: Iterable[Any]) -> bytes:
+        """Encodes the given position values into bytes according to field types."""
+        return encode_args(*zip(self.types, values, strict=True))
 
-    def encode_bound(self, bound_args: BoundArguments) -> bytes:
-        return encode_args(*zip(self._types, bound_args.args, strict=True))
-
-    def encode(self, *args: Any, **kwargs: Any) -> bytes:
+    def decode(self, value_bytes: bytes) -> FieldValues:
         """
-        Encodes assorted positional/keyword arguments into the bytestring
-        according to the ABI format.
+        Decodes the packed bytestring into a list of pairs
+        of the original parameter/field name and the value.
         """
-        bound_args = self.bind(*args, **kwargs)
-        return self.encode_bound(bound_args)
-
-    def decode_into_tuple(self, value_bytes: bytes) -> tuple[Any, ...]:
-        """Decodes the packed bytestring into a list of values."""
-        return decode_args(self._types, value_bytes)
-
-    def decode_into_dict(self, value_bytes: bytes) -> dict[str, Any]:
-        """Decodes the packed bytestring into a dict of values."""
-        decoded = self.decode_into_tuple(value_bytes)
-        return dict(zip(self._signature.parameters, decoded, strict=True))
+        return FieldValues(list(zip(self.names, decode_args(self.types, value_bytes), strict=True)))
 
     def __str__(self) -> str:
-        if self._named_parameters:
-            params = ", ".join(
-                f"{tp.canonical_form} {name}"
-                for name, tp in zip(self._signature.parameters, self._types, strict=True)
-            )
-        else:
-            params = ", ".join(f"{tp.canonical_form}" for tp in self._types)
-        return f"({params})"
+        fields = ", ".join(
+            tp.canonical_form + ((" " + name) if name is not None else "")
+            for name, tp in zip(self.names, self.types, strict=True)
+        )
+        return f"({fields})"
 
 
 class Either:
@@ -106,40 +188,72 @@ class Either:
         self.items = items
 
 
-class EventSignature:
-    """A signature representing the constructor of an event (that is, its fields)."""
+class EventFields(Fields):
+    """Fields of an event structure."""
 
-    def __init__(self, parameters: Mapping[str, Type], indexed: AbstractSet[str]):
-        parameters = {make_name_safe(name): val for name, val in parameters.items()}
-        indexed = {make_name_safe(name) for name in indexed}
-        self._signature = inspect.Signature(
-            parameters=[
-                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                for name, tp in parameters.items()
-                if name in indexed
-            ]
-        )
-        self._types = parameters
-        self._types_nonindexed = {
-            name: self._types[name] for name in parameters if name not in indexed
-        }
-        self._indexed = indexed
+    indexed: tuple[bool, ...]
+    """A sequence indicating whether the field at the given position is indexed."""
+
+    def __init__(
+        self,
+        fields: Mapping[str, Type] | Sequence[Type] | Sequence[tuple[str | None, Type]],
+        indexed: AbstractSet[str] | Sequence[bool],
+    ):
+        super().__init__(fields)
+
+        self._signature = self.as_signature
+
+        # Unique names for each field, will be used for internal field identification.
+        self._safe_names = tuple(self._signature.parameters)
+
+        if isinstance(indexed, AbstractSet):
+            if not set(indexed).issubset(self.named_fields):
+                raise ValueError("All the names in `indexed` must be present in the fields list")
+            indexed_seq = tuple(name in indexed for name in self._signature.parameters)
+        else:
+            indexed_seq = tuple(indexed)
+            if len(indexed_seq) != len(self.names):
+                raise ValueError(
+                    "If `indexed` is a sequence of booleans, "
+                    "its length must match the number of fields"
+                )
+
+        self.indexed = indexed_seq
+
+        # Need to preserve the order of the names that was declared when creating the signature.
+        self._indexed_names = [
+            name for name, indexed in zip(self._safe_names, indexed_seq, strict=True) if indexed
+        ]
+        self._indexed_types = [
+            tp for tp, indexed in zip(self.types, indexed_seq, strict=True) if indexed
+        ]
+
+        self._nonindexed_names = [
+            name for name, indexed in zip(self._safe_names, indexed_seq, strict=True) if not indexed
+        ]
+        self._nonindexed_types = [
+            tp for tp, indexed in zip(self.types, indexed_seq, strict=True) if not indexed
+        ]
 
     def encode_to_topics(self, *args: Any, **kwargs: Any) -> tuple[None | tuple[bytes, ...], ...]:
         """
         Binds given arguments to event's indexed parameters
         and encodes them as log topics.
+
+        .. note::
+
+            If keyword arguments are used, any field names that matched Python keywords
+            need to be postfixed by a `_`.
         """
         bound_args = self._signature.bind_partial(*args, **kwargs)
 
         encoded_topics: list[None | tuple[bytes, ...]] = []
-        for param_name in self._signature.parameters:
-            if param_name not in bound_args.arguments:
+        for safe_name, tp in zip(self._safe_names, self.types, strict=True):
+            if safe_name not in bound_args.arguments:
                 encoded_topics.append(None)
                 continue
 
-            bound_val = bound_args.arguments[param_name]
-            tp = self._types[param_name]
+            bound_val = bound_args.arguments[safe_name]
 
             if isinstance(bound_val, Either):
                 encoded_val = tuple(tp.encode_to_topic(elem) for elem in bound_val.items)
@@ -155,46 +269,40 @@ class EventSignature:
 
         return tuple(encoded_topics)
 
-    def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> dict[str, Any]:
+    def decode_log_entry(self, topics: Sequence[bytes], data: bytes) -> FieldValues:
         """Decodes the event fields from the given log entry data."""
-        if len(topics) != len(self._indexed):
+        if len(topics) != len(self._indexed_names):
             raise ValueError(
                 f"The number of topics in the log entry ({len(topics)}) does not match "
-                f"the number of indexed fields in the event ({len(self._indexed)})"
+                f"the number of indexed fields in the event ({len(self._indexed_names)})"
             )
 
-        decoded_topics = {
-            name: self._types[name].decode_from_topic(topic)
-            for name, topic in zip(self._signature.parameters, topics, strict=True)
+        decoded_topics: dict[str, Any] = {
+            name: tp.decode_from_topic(topic)
+            for name, tp, topic in zip(
+                self._indexed_names, self._indexed_types, topics, strict=True
+            )
         }
 
-        decoded_data_tuple = decode_args(self._types_nonindexed.values(), data)
-        decoded_data = dict(zip(self._types_nonindexed, decoded_data_tuple, strict=True))
+        decoded_data_tuple = decode_args(self._nonindexed_types, data)
+        decoded_nonindexed = dict(zip(self._nonindexed_names, decoded_data_tuple, strict=True))
 
-        result = {}
-        for name in self._types:
-            if name in decoded_topics:
-                result[name] = decoded_topics[name]
+        # Assemble preserving the field order
+        decoded_data = []
+        for safe_name, name in zip(self._safe_names, self.names, strict=True):
+            if safe_name in decoded_topics:
+                decoded_data.append((name, decoded_topics[safe_name]))
             else:
-                result[name] = decoded_data[name]
+                decoded_data.append((name, decoded_nonindexed[safe_name]))
 
-        return result
-
-    @cached_property
-    def canonical_form(self) -> str:
-        """Returns the signature serialized in the canonical form as a string."""
-        return "(" + ",".join(tp.canonical_form for tp in self._types.values()) + ")"
-
-    @cached_property
-    def canonical_form_nonindexed(self) -> str:
-        """Returns the signature serialized in the canonical form as a string."""
-        return "(" + ",".join(tp.canonical_form for tp in self._types_nonindexed.values()) + ")"
+        return FieldValues(decoded_data)
 
     def __str__(self) -> str:
         params = []
-        for name, tp in self._types.items():
-            indexed = "indexed " if name in self._indexed else ""
-            params.append(f"{tp.canonical_form} {indexed}{name}")
+        for name, tp, indexed in zip(self.names, self.types, self.indexed, strict=True):
+            indexed_str = " indexed" if indexed else ""
+            name_str = (" " + name) if name is not None else ""
+            params.append(f"{tp.canonical_form}{indexed_str}{name_str}")
         return "(" + ", ".join(params) + ")"
 
 
@@ -208,7 +316,7 @@ class Constructor:
        ``_`` will be appended to it.
     """
 
-    inputs: Signature
+    inputs: Fields
     """Input signature."""
 
     payable: bool
@@ -232,17 +340,23 @@ class Constructor:
             raise ValueError(
                 "Constructor's JSON entry state mutability must be `nonpayable` or `payable`"
             )
-        inputs = dispatch_types(method_entry_typed.get("inputs", []))
+        inputs = dispatch_parameter_types(method_entry_typed.get("inputs", []))
         payable = method_entry_typed["stateMutability"] == "payable"
         return cls(inputs, payable=payable)
 
-    def __init__(self, inputs: Mapping[str, Type] | Sequence[Type], *, payable: bool = False):
-        self.inputs = Signature(inputs)
+    def __init__(
+        self,
+        inputs: Mapping[str, Type] | Sequence[tuple[str | None, Type]],
+        *,
+        payable: bool = False,
+    ):
+        self.inputs = Fields(inputs)
+        self._inputs_signature = self.inputs.as_signature
         self.payable = payable
 
     def __call__(self, *args: Any, **kwargs: Any) -> "ConstructorCall":
         """Returns an encoded call with given arguments."""
-        input_bytes = self.inputs.encode(*args, **kwargs)
+        input_bytes = self.inputs.encode(self._inputs_signature.bind(*args, **kwargs).args)
         return ConstructorCall(input_bytes)
 
     def __str__(self) -> str:
@@ -301,11 +415,11 @@ class Method:
     name: str
     """The name of this method."""
 
-    inputs: Signature
+    inputs: Fields
     """The input signature of this method."""
 
-    outputs: Signature
-    """Method's output signature."""
+    outputs: Fields
+    """The output signature of this method."""
 
     payable: bool
     """Whether this method is marked as payable."""
@@ -323,18 +437,15 @@ class Method:
             raise ValueError("Method object must be created from a JSON entry with type='function'")
 
         name = method_entry_typed["name"]
-        inputs = dispatch_types(method_entry_typed["inputs"])
+        inputs = dispatch_parameter_types(method_entry_typed["inputs"])
 
         mutability = Mutability.from_json(method_entry_typed["stateMutability"])
 
-        # Outputs can be anonymous
-        outputs: dict[str, Type] | list[Type]
+        outputs: None | dict[str, Type] | list[tuple[str | None, Type]]
         if "outputs" not in method_entry_typed:
-            outputs = []
-        elif all(entry["name"] == "" for entry in method_entry_typed["outputs"]):
-            outputs = [dispatch_type(entry) for entry in method_entry_typed["outputs"]]
+            outputs = None
         else:
-            outputs = dispatch_types(method_entry_typed["outputs"])
+            outputs = dispatch_parameter_types(method_entry_typed["outputs"])
 
         return cls(name=name, inputs=inputs, outputs=outputs, mutability=mutability)
 
@@ -342,28 +453,30 @@ class Method:
         self,
         name: str,
         mutability: Mutability,
-        inputs: Mapping[str, Type] | Sequence[Type],
-        outputs: None | Mapping[str, Type] | Sequence[Type] | Type = None,
+        inputs: Mapping[str, Type] | Sequence[Type] | Sequence[tuple[str | None, Type]],
+        outputs: None
+        | Mapping[str, Type]
+        | Sequence[Type]
+        | Sequence[tuple[str | None, Type]]
+        | Type = None,
     ):
         self.name = name
-        self.inputs = Signature(inputs)
+        self.inputs = Fields(inputs)
+        self._inputs_signature = self.inputs.as_signature
         self._mutability = mutability
         self.payable = mutability.payable
         self.mutating = mutability.mutating
 
         if outputs is None:
             outputs = []
-
         if isinstance(outputs, Type):
-            outputs = [outputs]
-            self._single_output = True
-        else:
-            self._single_output = False
+            outputs = [(None, outputs)]
 
-        self.outputs = Signature(outputs)
+        self.outputs = Fields(outputs)
 
     def bind(self, *args: Any, **kwargs: Any) -> BoundArguments:
-        return self.inputs.bind(*args, **kwargs)
+        """Binds the given arguments to the method's signature."""
+        return self._inputs_signature.bind(*args, **kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> "MethodCall":
         """Returns an encoded call with given arguments."""
@@ -371,7 +484,8 @@ class Method:
         return self.call_bound(bound_args)
 
     def call_bound(self, bound_args: BoundArguments) -> "MethodCall":
-        input_bytes = self.inputs.encode_bound(bound_args)
+        """Creates a method call object using previouosly bound arguments."""
+        input_bytes = self.inputs.encode(bound_args.args)
         encoded = self.selector + input_bytes
         return MethodCall(self, encoded)
 
@@ -381,17 +495,28 @@ class Method:
         return keccak(self.name.encode() + self.inputs.canonical_form.encode())[:SELECTOR_LENGTH]
 
     def decode_output(self, output_bytes: bytes) -> Any:
-        """Decodes the output from ABI-packed bytes."""
-        results = self.outputs.decode_into_tuple(output_bytes)
-        if self._single_output:
-            results = results[0]
+        """
+        Decodes the output from ABI-packed bytes.
+
+        If there is only a single output, its value is returned.
+        If all the fields in the output are unnamed, it is returned as a tuple of values.
+        Otherwise it is returned as a :py:class:`FieldValues` object.
+        """
+        results = self.outputs.decode(output_bytes)
+
+        if len(self.outputs.names) == 1:
+            return results.as_tuple[0]
+        if all(name is None for name in self.outputs.names):
+            return results.as_tuple
+
         return results
 
     def with_method(self, method: "Method") -> "MultiMethod":
+        """Returns a multimethod resulting from joining this method with `method`."""
         return MultiMethod(self, method)
 
     def __str__(self) -> str:
-        returns = "" if self.outputs.empty else f" returns {self.outputs}"
+        returns = "" if not self.outputs.names else f" returns {self.outputs}"
         return f"function {self.name}{self.inputs} {self._mutability.value}{returns}"
 
 
@@ -404,6 +529,7 @@ class MultiMethod:
     def __init__(self, *methods: Method):
         if len(methods) == 0:
             raise ValueError("`methods` cannot be empty")
+
         first_method = methods[0]
         self._methods = {first_method.inputs.canonical_form: first_method}
         self._name = first_method.name
@@ -414,7 +540,7 @@ class MultiMethod:
     def __getitem__(self, args: str) -> Method:
         """
         Returns the :py:class:`Method` with the given canonical form of an input signature
-        (corresponding to :py:attr:`Signature.canonical_form`).
+        (corresponding to :py:attr:`Fields.canonical_form`).
         """
         return self._methods[args]
 
@@ -474,6 +600,15 @@ class Event:
        ``_`` will be appended to it.
     """
 
+    name: str
+    """The name of this event."""
+
+    fields: EventFields
+    """The event fields."""
+
+    anonymous: bool
+    """Whether the event is anonymous."""
+
     @classmethod
     def from_json(cls, event_entry: ABI_JSON) -> "Event":
         """Creates this object from a JSON ABI method entry."""
@@ -484,11 +619,8 @@ class Event:
             raise ValueError("Event object must be created from a JSON entry with type='event'")
 
         name = event_entry_typed["name"]
-        fields = dispatch_types(event_entry_typed["inputs"])
-        if isinstance(fields, list):
-            raise TypeError("Event fields must be named")
-
-        indexed = {input_["name"] for input_ in event_entry_typed["inputs"] if input_["indexed"]}
+        fields = dispatch_parameter_types(event_entry_typed["inputs"])
+        indexed = [input_["indexed"] for input_ in event_entry_typed["inputs"]]
 
         return cls(
             name=name, fields=fields, indexed=indexed, anonymous=event_entry_typed["anonymous"]
@@ -497,24 +629,25 @@ class Event:
     def __init__(
         self,
         name: str,
-        fields: Mapping[str, Type],
-        indexed: AbstractSet[str],
+        fields: Mapping[str, Type] | Sequence[tuple[str | None, Type]],
+        indexed: AbstractSet[str] | Sequence[bool],
         *,
         anonymous: bool = False,
     ):
-        if anonymous and len(indexed) > ANONYMOUS_EVENT_INDEXED_FIELDS:
+        self.name = name
+        self.fields = EventFields(fields, indexed)
+        self.anonymous = anonymous
+
+        indexed_num = sum(self.fields.indexed)
+
+        if anonymous and indexed_num > ANONYMOUS_EVENT_INDEXED_FIELDS:
             raise ValueError(
                 f"Anonymous events can have at most {ANONYMOUS_EVENT_INDEXED_FIELDS} indexed fields"
             )
-        if not anonymous and len(indexed) > EVENT_INDEXED_FIELDS:
+        if not anonymous and indexed_num > EVENT_INDEXED_FIELDS:
             raise ValueError(
                 f"Non-anonymous events can have at most {EVENT_INDEXED_FIELDS} indexed fields"
             )
-
-        self.name = name
-        self.indexed = indexed
-        self.fields = EventSignature(fields, indexed)
-        self.anonymous = anonymous
 
     @cached_property
     def _topic(self) -> LogTopic:
@@ -542,7 +675,7 @@ class Event:
 
         return EventFilter(tuple(log_topics))
 
-    def decode_log_entry(self, log_entry: LogEntry) -> dict[str, Any]:
+    def decode_log_entry(self, log_entry: LogEntry) -> FieldValues:
         """
         Decodes the event fields from the given log entry.
         Fields that cannot be decoded (indexed reference types,
@@ -572,6 +705,12 @@ class EventFilter:
 class Error:
     """A custom contract error."""
 
+    name: str
+    """The name of the error structure."""
+
+    fields: Fields
+    """The fields of the structure."""
+
     @classmethod
     def from_json(cls, error_entry: ABI_JSON) -> "Error":
         """Creates this object from a JSON ABI method entry."""
@@ -582,29 +721,27 @@ class Error:
             raise ValueError("Error object must be created from a JSON entry with type='error'")
 
         name = error_entry_typed["name"]
-        fields = dispatch_types(error_entry_typed["inputs"])
+        fields = dispatch_parameter_types(error_entry_typed["inputs"])
 
         return cls(name=name, fields=fields)
 
     def __init__(
         self,
         name: str,
-        fields: Mapping[str, Type] | Sequence[Type],
+        fields: Mapping[str, Type] | Sequence[Type] | Sequence[tuple[str | None, Type]],
     ):
         self.name = name
         self._named_fields = isinstance(fields, Mapping)
-        self.fields = Signature(fields)
+        self.fields = Fields(fields)
 
     @cached_property
     def selector(self) -> bytes:
         """Error's selector."""
         return keccak(self.name.encode() + self.fields.canonical_form.encode())[:SELECTOR_LENGTH]
 
-    def decode_fields(self, data_bytes: bytes) -> dict[str, Any] | tuple[Any, ...]:
+    def decode_fields(self, data_bytes: bytes) -> FieldValues:
         """Decodes the error fields from the given packed data."""
-        if self._named_fields:
-            return self.fields.decode_into_dict(data_bytes)
-        return self.fields.decode_into_tuple(data_bytes)
+        return self.fields.decode(data_bytes)
 
     def __str__(self) -> str:
         return f"error {self.name}{self.fields}"
@@ -653,9 +790,7 @@ class Receive:
         method_entry_typed = cast("Mapping[str, ABI_JSON]", method_entry)
 
         if method_entry_typed["type"] != "receive":
-            raise ValueError(
-                "Receive object must be created from a JSON entry with type='fallback'"
-            )
+            raise ValueError("Receive object must be created from a JSON entry with type='receive'")
         if method_entry_typed["stateMutability"] not in ("nonpayable", "payable"):
             raise ValueError(
                 "Receive method's JSON entry state mutability must be `nonpayable` or `payable`"
@@ -844,7 +979,7 @@ class ContractABI:
             error.selector: error for error in chain([PANIC_ERROR, LEGACY_ERROR], self.error)
         }
 
-    def resolve_error(self, error_data: bytes) -> tuple[Error, dict[str, Any] | tuple[Any, ...]]:
+    def resolve_error(self, error_data: bytes) -> tuple[Error, FieldValues]:
         """
         Given the packed error data, attempts to find the error in the ABI
         and decode the data into its fields.
@@ -862,7 +997,7 @@ class ContractABI:
         raise UnknownError(f"Could not find an error with selector {selector.hex()} in the ABI")
 
     def __str__(self) -> str:
-        all_methods: Iterable[
+        all_items: Iterable[
             Constructor | Fallback | Receive | Method | MultiMethod | Event | Error
         ] = chain(
             [self.constructor] if self.constructor else [],
@@ -880,5 +1015,5 @@ class ContractABI:
                 return ("\n" + indent).join(str(method) for method in item.methods.values())
             return str(item)
 
-        method_list = [indent + to_str(method) for method in all_methods]
+        method_list = [indent + to_str(method) for method in all_items]
         return "{\n" + "\n".join(method_list) + "\n}"

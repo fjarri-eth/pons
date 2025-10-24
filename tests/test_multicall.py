@@ -47,8 +47,8 @@ async def test_multicall_read(
     session: ClientSession, multicall: Multicall, target: DeployedContract
 ) -> None:
     results = await session.call(multicall.aggregate([target.method.x1(), target.method.x2()]))
-    assert results[0] == (True, (1,))
-    assert results[1] == (True, (2,))
+    assert results[0] == (True, 1)
+    assert results[1] == (True, 2)
 
 
 async def test_multicall_write(
@@ -60,8 +60,8 @@ async def test_multicall_write(
     await session.transact(
         root_signer, multicall.aggregate([target.method.write1(3), target.method.write2(4)])
     )
-    assert await session.call(target.method.x1()) == (3,)
-    assert await session.call(target.method.x2()) == (4,)
+    assert await session.call(target.method.x1()) == 3
+    assert await session.call(target.method.x2()) == 4
 
 
 async def test_multicall_read_error(
@@ -76,7 +76,7 @@ async def test_multicall_read_error(
     results = await session.call(
         multicall.aggregate([target.method.x1(), target.method.read_error()], allow_failure=True),
     )
-    assert results[0] == (True, (1,))  # successful call
+    assert results[0] == (True, 1)  # successful call
     assert results[1] == (False, ())  # errored call
 
 
@@ -93,8 +93,8 @@ async def test_multicall_write_error(
         )
 
     # The values remained unchanged
-    assert await session.call(target.method.x1()) == (1,)
-    assert await session.call(target.method.x2()) == (2,)
+    assert await session.call(target.method.x1()) == 1
+    assert await session.call(target.method.x2()) == 2
 
     await session.transact(
         root_signer,
@@ -104,10 +104,10 @@ async def test_multicall_write_error(
     )
 
     # The successful call updated the value
-    assert await session.call(target.method.x1()) == (3,)
+    assert await session.call(target.method.x1()) == 3
 
     # The reverted call did not update the value
-    assert await session.call(target.method.x2()) == (2,)
+    assert await session.call(target.method.x2()) == 2
 
 
 async def test_multicall_read_value(
@@ -118,8 +118,8 @@ async def test_multicall_read_value(
             [(target.method.x1(), Amount.wei(0)), (target.method.x2(), Amount.wei(0))]
         )
     )
-    assert results[0] == (True, (1,))
-    assert results[1] == (True, (2,))
+    assert results[0] == (True, 1)
+    assert results[1] == (True, 2)
 
 
 async def test_multicall_write_value(
@@ -138,8 +138,8 @@ async def test_multicall_write_value(
         ),
         amount=Amount.wei(300),
     )
-    assert await session.call(target.method.x1()) == (100,)
-    assert await session.call(target.method.x2()) == (200,)
+    assert await session.call(target.method.x1()) == 100
+    assert await session.call(target.method.x2()) == 200
 
 
 async def test_multicall_write_value_insufficient_funds(

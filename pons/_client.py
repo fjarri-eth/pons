@@ -36,6 +36,7 @@ from ._contract_abi import (
     ContractABI,
     Error,
     EventFilter,
+    FieldValues,
     UnknownError,
 )
 from ._provider import Provider, ProviderError, ProviderSession
@@ -156,10 +157,10 @@ class ContractError(Exception):
     error: Error
     """The recognized ABI Error object."""
 
-    data: dict[str, Any] | tuple[Any, ...]
+    data: FieldValues
     """The unpacked error data, corresponding to the ABI."""
 
-    def __init__(self, error: Error, decoded_data: dict[str, Any] | tuple[Any, ...]):
+    def __init__(self, error: Error, decoded_data: FieldValues):
         super().__init__(error, decoded_data)
         self.error = error
         self.data = decoded_data
@@ -189,14 +190,16 @@ def decode_contract_error(
         except UnknownError:
             return ProviderError(exc)
 
-        # These errors have named fields, so `decoded_data` is expected to be a dictionary.
-        # The assertions are there for `mypy`'s sake.
         if error == PANIC_ERROR:
-            assert isinstance(decoded_data, dict)  # noqa: S101
-            return ContractPanic.from_code(decoded_data["code"])
+            # If `resolve_error()` finished successfully,
+            # `code` will be present in `decoded_data`
+            # since it is declared as a field in the PANIC_ERROR
+            return ContractPanic.from_code(decoded_data.as_dict["code"])
         if error == LEGACY_ERROR:
-            assert isinstance(decoded_data, dict)  # noqa: S101
-            return ContractLegacyError(decoded_data["message"])
+            # If `resolve_error()` finished successfully,
+            # `message` will be present in `decoded_data`
+            # since it is declared as a field in the PANIC_ERROR
+            return ContractLegacyError(decoded_data.as_dict["message"])
 
         return ContractError(error, decoded_data)
     return ProviderError(exc)
@@ -519,7 +522,7 @@ class ClientSession:
         amount: None | Amount = None,
         gas: None | int = None,
         return_events: None | Sequence[BoundEvent] = None,
-    ) -> dict[BoundEvent, list[dict[str, Any]]]:
+    ) -> dict[BoundEvent, list[FieldValues]]:
         """
         Transacts with the contract using a prepared method call.
         If ``gas`` is ``None``, the required amount of gas is estimated first,
@@ -594,7 +597,7 @@ class ClientSession:
         poll_interval: int = 1,
         from_block: Block = BlockLabel.LATEST,
         to_block: Block = BlockLabel.LATEST,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[FieldValues]:
         """
         Yields decoded log entries produced by the filter.
         The fields that were hashed when converted to topics (that is, fields of reference types)

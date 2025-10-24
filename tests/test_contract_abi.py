@@ -10,7 +10,10 @@ from pons import (
     Either,
     Error,
     Event,
+    EventFields,
     Fallback,
+    Fields,
+    FieldValues,
     Method,
     MultiMethod,
     Mutability,
@@ -18,77 +21,131 @@ from pons import (
     abi,
 )
 from pons._abi_types import encode_args
-from pons._contract_abi import (
-    LEGACY_ERROR,
-    PANIC_ERROR,
-    EventSignature,
-    Signature,
-    UnknownError,
-)
+from pons._contract_abi import LEGACY_ERROR, PANIC_ERROR, UnknownError
 
 
-def test_signature_from_dict() -> None:
-    sig = Signature(dict(a=abi.uint(8), b=abi.bool))
-    assert sig.canonical_form == "(uint8,bool)"
-    assert str(sig) == "(uint8 a, bool b)"
-    assert sig.decode_into_tuple(sig.encode(1, True)) == (1, True)
-    assert sig.decode_into_tuple(sig.encode(b=True, a=1)) == (1, True)
-    assert sig.decode_into_dict(sig.encode(b=True, a=1)) == dict(b=True, a=1)
+def test_field_values() -> None:
+    vals = FieldValues([("a", 1), ("b", 2)])
+    assert vals.as_dict == dict(a=1, b=2)
+    assert vals.as_tuple == (1, 2)
+    assert vals["b"] == 2
+    assert vals.b == 2
+    assert repr(vals) == "FieldValues([('a', 1), ('b', 2)])"
+
+    with pytest.raises(ValueError, match="The values cannot have repeating names"):
+        FieldValues([("a", 1), ("a", 2)])
 
 
-def test_signature_from_list() -> None:
-    sig = Signature([abi.uint(8), abi.bool])
-    assert str(sig) == "(uint8, bool)"
-    assert sig.canonical_form == "(uint8,bool)"
-    assert sig.decode_into_tuple(sig.encode(1, True)) == (1, True)
-    assert sig.decode_into_dict(sig.encode(1, True)) == {"_0": 1, "_1": True}
+def test_field_values_partially_named() -> None:
+    vals = FieldValues([("a", 1), (None, 2)])
+    with pytest.raises(
+        ValueError,
+        match="This structure has some anonymous fields "
+        "and therefore is not representable as a `dict`",
+    ):
+        _ = vals.as_dict
+
+    assert vals.as_tuple == (1, 2)
+    assert vals.a == 1
+    assert vals["a"] == 1
 
 
-def test_event_signature() -> None:
-    sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
-    assert str(sig) == "(uint8 indexed a, bool indexed b, bytes4 c)"
-    assert sig.canonical_form == "(uint8,bool,bytes4)"
-    assert sig.canonical_form_nonindexed == "(bytes4)"
+def test_fields_from_dict() -> None:
+    fields = Fields(dict(a=abi.uint(8), b=abi.bool))
+    assert fields.canonical_form == "(uint8,bool)"
+    assert str(fields) == "(uint8 a, bool b)"
+    assert fields.decode(fields.encode([1, True])).as_dict == dict(b=True, a=1)
+    assert fields.decode(fields.encode([1, True])).as_tuple == (1, True)
 
 
-def test_event_signature_encode() -> None:
-    sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
+def test_fields_from_list() -> None:
+    fields = Fields([("a", abi.uint(8)), (None, abi.bool)])
+    assert str(fields) == "(uint8 a, bool)"
+    assert fields.canonical_form == "(uint8,bool)"
+    assert fields.decode(fields.encode([1, True])).as_tuple == (1, True)
+
+
+def test_fields_from_list_simplified() -> None:
+    fields = Fields([abi.uint(8), abi.bool])
+    assert str(fields) == "(uint8, bool)"
+    assert fields.canonical_form == "(uint8,bool)"
+    assert fields.decode(fields.encode([1, True])).as_tuple == (1, True)
+
+
+def test_fields_signature() -> None:
+    fields = Fields(
+        [
+            ("assert", abi.bool),
+            # can't be just replaced with `from_`, since it's already the name of another argument
+            (
+                "from",
+                abi.bool,
+            ),
+            ("_4", abi.bool),  # the next argument can't be also named `_4`
+            (None, abi.bool),
+            ("from_", abi.bool),
+            (None, abi.bool),
+        ]
+    )
+    sig = fields.as_signature
+    assert list(sig.parameters) == ["assert_", "from__1", "_4", "_4_2", "from_", "_6"]
+
+
+def test_event_fields() -> None:
+    fields = EventFields(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
+    assert str(fields) == "(uint8 indexed a, bool indexed b, bytes4 c)"
+    assert fields.canonical_form == "(uint8,bool,bytes4)"
+
+    with pytest.raises(
+        ValueError, match="All the names in `indexed` must be present in the fields list"
+    ):
+        EventFields(dict(a=abi.uint(8), b=abi.bool), {"a", "c"})
+
+    with pytest.raises(
+        ValueError,
+        match="If `indexed` is a sequence of booleans, its length must match the number of fields",
+    ):
+        EventFields(dict(a=abi.uint(8), b=abi.bool), [True])
+
+
+def test_event_fields_encode() -> None:
+    fields = EventFields(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4)), {"a", "b"})
 
     # All indexed parameters provided
-    encoded = sig.encode_to_topics(1, True)
+    encoded = fields.encode_to_topics(1, True)
     assert encoded == ((abi.uint(8).encode(1),), (abi.bool.encode(True),))
 
     # One indexed parameter not provided
-    encoded = sig.encode_to_topics(b=True)
+    encoded = fields.encode_to_topics(b=True)
     assert encoded == (None, (abi.bool.encode(True),))
 
     # An indexed parameter at the end not provided - the trailing Nones are trimmed
-    encoded = sig.encode_to_topics(a=1)
+    encoded = fields.encode_to_topics(a=1)
     assert encoded == ((abi.uint(8).encode(1),),)
 
     # Using Either to encode several possible values for a parameter
-    encoded = sig.encode_to_topics(a=Either(1, 2), b=True)
+    encoded = fields.encode_to_topics(a=Either(1, 2), b=True)
     assert encoded == (
         (abi.uint(8).encode(1), abi.uint(8).encode(2)),
         (abi.bool.encode(True),),
     )
 
 
-def test_event_signature_decode() -> None:
-    sig = EventSignature(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
+def test_event_fields_decode() -> None:
+    fields = EventFields(dict(a=abi.uint(8), b=abi.bool, c=abi.bytes(4), d=abi.bytes()), {"a", "b"})
 
-    decoded = sig.decode_log_entry(
+    decoded = fields.decode_log_entry(
         [abi.uint(8).encode(1), abi.bool.encode(True)],
         encode_args((abi.bytes(4), b"1234"), (abi.bytes(), b"bytestring")),
     )
-    assert decoded == dict(a=1, b=True, c=b"1234", d=b"bytestring")
+    assert decoded.as_dict == dict(a=1, b=True, c=b"1234", d=b"bytestring")
 
     message = re.escape(
         "The number of topics in the log entry (3) does not match "
         "the number of indexed fields in the event (2)"
     )
     with pytest.raises(ValueError, match=message):
-        sig.decode_log_entry([b"1", b"2", b"3"], b"zzz")
+        fields.decode_log_entry([b"1", b"2", b"3"], b"zzz")
 
 
 def test_constructor_from_json() -> None:
@@ -158,8 +215,8 @@ def _check_method(method: Method) -> None:
     call = method(1, True)
     assert call.data_bytes == method.selector + encoded_bytes
 
-    vals = method.decode_output(encoded_bytes)
-    assert vals == (1, True)
+    vals = method.outputs.decode(encoded_bytes)
+    assert vals.as_tuple == (1, True)
 
     # A regression for a typo in argument passing.
     # Check that keyword arguments are processed correctly.
@@ -233,7 +290,43 @@ def test_method_single_output() -> None:
     assert str(method.outputs) == "(uint8)"
 
     encoded_bytes = b"\x00" * 31 + b"\x01"
+
+    # Single output is returned as a single value
     assert method.decode_output(encoded_bytes) == 1
+
+
+def test_method_tuple_output() -> None:
+    method = Method(
+        name="someMethod",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8), b=abi.bool),
+        outputs=[abi.uint(8), abi.uint(8)],
+    )
+
+    assert method.outputs.canonical_form == "(uint8,uint8)"
+    assert str(method.outputs) == "(uint8, uint8)"
+
+    encoded_bytes = b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x02"
+
+    # Since all the outputs are unnamed, the output is returned as a tuple
+    assert method.decode_output(encoded_bytes) == (1, 2)
+
+
+def test_method_full_output() -> None:
+    method = Method(
+        name="someMethod",
+        mutability=Mutability.VIEW,
+        inputs=dict(a=abi.uint(8), b=abi.bool),
+        outputs=[("a", abi.uint(8)), (None, abi.uint(8))],
+    )
+
+    assert method.outputs.canonical_form == "(uint8,uint8)"
+    assert str(method.outputs) == "(uint8 a, uint8)"
+
+    encoded_bytes = b"\x00" * 31 + b"\x01" + b"\x00" * 31 + b"\x02"
+
+    # Since some of the outputs are named, the return value is `FieldValues`.
+    assert method.decode_output(encoded_bytes).as_tuple == (1, 2)
 
 
 def test_method_errors() -> None:
@@ -353,7 +446,7 @@ def test_receive() -> None:
 
 def test_receive_errors() -> None:
     with pytest.raises(
-        ValueError, match="Receive object must be created from a JSON entry with type='fallback'"
+        ValueError, match="Receive object must be created from a JSON entry with type='receive'"
     ):
         Receive.from_json(dict(type="function", stateMutability="payable"))
     with pytest.raises(
@@ -421,9 +514,17 @@ def test_contract_abi_json() -> None:
     fallback_abi: ABI_JSON = dict(type="fallback", stateMutability="payable")
     receive_abi: ABI_JSON = dict(type="receive", stateMutability="payable")
 
-    cabi = ContractABI.from_json(
-        [constructor_abi, read_abi, write_abi, fallback_abi, receive_abi, event_abi, error_abi]
-    )
+    abi_json = [
+        constructor_abi,
+        read_abi,
+        write_abi,
+        fallback_abi,
+        receive_abi,
+        event_abi,
+        error_abi,
+    ]
+
+    cabi = ContractABI.from_json(abi_json)
     assert str(cabi) == (
         "{\n"
         "    constructor(uint8 a, bool b) payable\n"
@@ -431,8 +532,8 @@ def test_contract_abi_json() -> None:
         "    receive() payable\n"
         "    function readMethod(uint8 a, bool b) view returns (uint8, bool)\n"
         "    function writeMethod(uint8 a, bool b) payable\n"
-        "    event Deposit(address indexed from_, bytes indexed foo, uint8 bar) anonymous\n"
-        "    error CustomError(address from_, bytes foo, uint8 bar)\n"
+        "    event Deposit(address indexed from, bytes indexed foo, uint8 bar) anonymous\n"
+        "    error CustomError(address from, bytes foo, uint8 bar)\n"
         "}"
     )
 
@@ -587,8 +688,7 @@ def test_event_from_json() -> None:
     )
     assert event.anonymous
     assert event.name == "Foo"
-    assert event.indexed == {"from", "foo"}
-    assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
+    assert str(event.fields) == "(address indexed from, bytes indexed foo, uint8 bar)"
 
 
 def test_event_init() -> None:
@@ -600,7 +700,6 @@ def test_event_init() -> None:
     )
     assert event.anonymous
     assert event.name == "Foo"
-    assert event.indexed == {"from_", "foo"}
     assert str(event.fields) == "(address indexed from_, bytes indexed foo, uint8 bar)"
 
 
@@ -644,7 +743,7 @@ def test_event_decode() -> None:
     )
 
     decoded = event.decode_log_entry(entry)
-    assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
+    assert decoded.as_dict == dict(a=True, b=2, c=b"1234", d=b"bytestring")
 
 
 def test_event_decode_wrong_selector() -> None:
@@ -691,7 +790,7 @@ def test_event_decode_anonymous() -> None:
     )
 
     decoded = event.decode_log_entry(entry)
-    assert decoded == dict(a=True, b=2, c=b"1234", d=b"bytestring")
+    assert decoded.as_dict == dict(a=True, b=2, c=b"1234", d=b"bytestring")
 
 
 def test_event_errors() -> None:
@@ -727,19 +826,6 @@ def test_event_errors() -> None:
     # This works
     Event("Foo", dict(a=uint8, b=uint8, c=uint8, d=uint8, e=uint8), indexed={"a", "b", "c"})
 
-    with pytest.raises(TypeError, match="Event fields must be named"):
-        Event.from_json(
-            dict(
-                anonymous=True,
-                inputs=[
-                    dict(indexed=True, internalType="address", name="", type="address"),
-                    dict(indexed=False, internalType="uint8", name="", type="uint8"),
-                ],
-                name="Foo",
-                type="event",
-            )
-        )
-
 
 def test_error_from_json() -> None:
     error = Error.from_json(
@@ -754,7 +840,7 @@ def test_error_from_json() -> None:
         )
     )
     assert error.name == "Foo"
-    assert str(error.fields) == "(address from_, bytes foo, uint8 bar)"
+    assert str(error.fields) == "(address from, bytes foo, uint8 bar)"
 
     with pytest.raises(
         ValueError,
@@ -782,7 +868,7 @@ def test_error_decode() -> None:
 
     encoded_bytes = encode_args((abi.bytes(), b"12345"), (abi.uint(8), 9))
     decoded = error.decode_fields(encoded_bytes)
-    assert decoded == dict(foo=b"12345", bar=9)
+    assert decoded.as_dict == dict(foo=b"12345", bar=9)
 
     # Anonymous fields
 
@@ -793,7 +879,7 @@ def test_error_decode() -> None:
 
     encoded_bytes = encode_args((abi.bytes(), b"12345"), (abi.uint(8), 9))
     decoded = error.decode_fields(encoded_bytes)
-    assert decoded == (b"12345", 9)
+    assert decoded.as_tuple == (b"12345", 9)
 
 
 def test_resolve_error() -> None:
@@ -802,22 +888,22 @@ def test_resolve_error() -> None:
     contract_abi = ContractABI(errors=[error1, error2])
 
     # Decode custom error
-    error_data = error1.selector + error1.fields.encode(b"12345", 9)
+    error_data = error1.selector + error1.fields.encode([b"12345", 9])
     error, decoded = contract_abi.resolve_error(error_data)
     assert error is error1
-    assert decoded == dict(foo=b"12345", bar=9)
+    assert decoded.as_dict == dict(foo=b"12345", bar=9)
 
     # Decode a panic (the description is added automatically to the ABI)
-    error_data = PANIC_ERROR.selector + PANIC_ERROR.fields.encode(9)
+    error_data = PANIC_ERROR.selector + PANIC_ERROR.fields.encode([9])
     error, decoded = contract_abi.resolve_error(error_data)
     assert error is PANIC_ERROR
-    assert decoded == dict(code=9)
+    assert decoded.as_dict == dict(code=9)
 
     # Decode a legacy error (the description is added automatically to the ABI)
-    error_data = LEGACY_ERROR.selector + LEGACY_ERROR.fields.encode("error message")
+    error_data = LEGACY_ERROR.selector + LEGACY_ERROR.fields.encode(["error message"])
     error, decoded = contract_abi.resolve_error(error_data)
     assert error is LEGACY_ERROR
-    assert decoded == dict(message="error message")
+    assert decoded.as_dict == dict(message="error message")
 
     with pytest.raises(ValueError, match="Error data too short to contain a selector"):
         contract_abi.resolve_error(b"123")
@@ -826,4 +912,4 @@ def test_resolve_error() -> None:
     with pytest.raises(
         UnknownError, match=f"Could not find an error with selector {bad_selector.hex()} in the ABI"
     ):
-        contract_abi.resolve_error(bad_selector + error1.fields.encode(b"12345", 9))
+        contract_abi.resolve_error(bad_selector + error1.fields.encode([b"12345", 9]))

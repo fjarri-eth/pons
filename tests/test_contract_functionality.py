@@ -37,7 +37,7 @@ async def test_empty_constructor(
     deployed_contract = await session.deploy(root_signer, compiled_contract.constructor())
     call = deployed_contract.method.getState(123)
     result = await session.call(call)
-    assert result == (1 + 123,)
+    assert result == 1 + 123
 
 
 async def test_basics(
@@ -54,22 +54,22 @@ async def test_basics(
     deployed_contract = await session.deploy(another_signer, call)
 
     # Check the state
-    assert await session.call(deployed_contract.method.v1()) == (12345,)
-    assert await session.call(deployed_contract.method.v2()) == (56789,)
+    assert await session.call(deployed_contract.method.v1()) == 12345
+    assert await session.call(deployed_contract.method.v2()) == 56789
 
     # Transact with the contract
     await session.transact(another_signer, deployed_contract.method.setState(111))
-    assert await session.call(deployed_contract.method.v1()) == (111,)
+    assert await session.call(deployed_contract.method.v1()) == 111
 
     # Call the contract
 
     result = await session.call(deployed_contract.method.getState(123))
-    assert result == (111 + 123,)
+    assert result == 111 + 123
 
     inner = dict(inner1=1, inner2=2)
     outer = dict(inner=inner, outer1=3)
     result = await session.call(deployed_contract.method.testStructs(inner, outer))
-    assert result == (inner, outer)
+    assert result.as_tuple == (inner, outer)
 
 
 async def test_overloaded_method(
@@ -84,10 +84,10 @@ async def test_overloaded_method(
     deployed_contract = await session.deploy(root_signer, call)
 
     result = await session.call(deployed_contract.method.overloaded(123))
-    assert result == (12345 + 123,)
+    assert result == 12345 + 123
 
     result = await session.call(deployed_contract.method.overloaded(123, 456))
-    assert result == (456 + 123,)
+    assert result == 456 + 123
 
 
 async def test_read_only_mode(
@@ -107,22 +107,22 @@ async def test_read_only_mode(
 
     # check the state
     result = await session.call(deployed_contract.method.getState(0))
-    assert result == (value,)
+    assert result == value
 
     # this method will not modify the state since it's invoked via `eth_call`,
     # but it will return a value that reflects the ethereal "modified" state.
     result = await session.call(deployed_contract.method.setStateAndReturn(1))
-    assert result == (value + 1,)
+    assert result == value + 1
 
     result = await session.call(deployed_contract.method.getState(0))
-    assert result == (value,)
+    assert result == value
 
     # Now invoke it as a transaction, allowing it to modify the state
     await session.transact(root_signer, deployed_contract.method.setStateAndReturn(1))
 
     # The state is now modified
     result = await session.call(deployed_contract.method.getState(0))
-    assert result == (value + 1,)
+    assert result == value + 1
 
 
 async def test_abi_declaration(
@@ -171,12 +171,12 @@ async def test_abi_declaration(
     # Call the contract
 
     result = await session.call(deployed_contract.method.getState(123))
-    assert result == 111 + 123  # Note the lack of `[]` - we declared outputs as a single value
+    assert result == 111 + 123
 
     inner = dict(inner1=1, inner2=2)
     outer = dict(inner=inner, outer1=3)
     result = await session.call(deployed_contract.method.testStructs(inner, outer))
-    assert result == (inner, outer)
+    assert result.as_tuple == (inner, outer)
 
 
 async def test_complicated_event(

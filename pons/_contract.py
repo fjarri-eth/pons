@@ -9,6 +9,7 @@ from ._contract_abi import (
     Error,
     Event,
     EventFilter,
+    FieldValues,
     Method,
     Methods,
     MultiMethod,
@@ -169,7 +170,7 @@ class BoundEventFilter:
         self.topics = event_filter.topics
         self._event = event
 
-    def decode_log_entry(self, log_entry: LogEntry) -> dict[str, Any]:
+    def decode_log_entry(self, log_entry: LogEntry) -> FieldValues:
         if log_entry.address != self.contract_address:
             raise ValueError("Log entry originates from a different contract")
         return self._event.decode_log_entry(log_entry)
