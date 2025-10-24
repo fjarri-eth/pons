@@ -23,10 +23,20 @@ Providers
 .. autoclass:: Provider
    :show-inheritance:
 
-.. autoclass:: HTTPProvider
+.. autoclass:: ProviderPath()
+
+
+HTTP
+^^^^
+
+Install the feature ``http-provider`` for the ``http_provider`` module to be available.
+
+.. autoclass:: pons.http_provider.HTTPProvider
    :show-inheritance:
 
-.. autoclass:: ProviderPath()
+.. autoclass:: pons.http_provider.HTTPError()
+   :show-inheritance:
+   :members:
 
 
 Fallback providers
@@ -70,8 +80,6 @@ Provider level
 .. autoclass:: ProtocolError
    :show-inheritance:
 
-.. autoclass:: HTTPError
-   :show-inheritance:
 
 Client level
 ^^^^^^^^^^^^

@@ -16,7 +16,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from ._provider import RPC_JSON, HTTPProvider, Provider
+from ._provider import RPC_JSON, Provider
+from .http_provider import HTTPProvider
 
 __all__ = ["HTTPProviderServer"]
 
@@ -88,7 +89,7 @@ def make_app(provider: Provider) -> ASGIFramework:
 
 class HTTPProviderServer:
     """
-    A server counterpart of :py:class:`pons.HTTPProvider`.
+    A server counterpart of :py:class:`pons.http_provider.HTTPProvider`.
     Intended for testing, not production-ready.
     """
 

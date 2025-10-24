@@ -55,8 +55,6 @@ from ._fallback_provider import (
 )
 from ._multicall import BoundMultiMethodCall, BoundMultiMethodValueCall, Multicall
 from ._provider import (
-    HTTPError,
-    HTTPProvider,
     InvalidResponse,
     ProtocolError,
     Provider,

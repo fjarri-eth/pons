@@ -9,6 +9,7 @@ Changed
 ^^^^^^^
 
 - ``ContractABI`` interface modified to allow for methods, errors, and events with arbitrary anonymous parameters and fields. Instead of returning ``dict[str, Any]`` as a parsed struct we now return a ``FieldValues`` object. Signatures of methods and fields of errors are exposed as ``Fields``, fields of events are exposed as ``EventFields`` objects. (PR_92_)
+- ``HTTPProvider`` and ``HTTPError`` are moved to ``http_provider`` submodule, which is optional and gated under the ``http-provider`` feature. (PR_94_)
 
 
 Added
@@ -29,6 +30,7 @@ Fixed
 .. _PR_91: https://github.com/fjarri-eth/pons/pull/91
 .. _PR_92: https://github.com/fjarri-eth/pons/pull/92
 .. _PR_93: https://github.com/fjarri-eth/pons/pull/93
+.. _PR_94: https://github.com/fjarri-eth/pons/pull/94
 
 
 0.10.0 (2025-10-19)

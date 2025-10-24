@@ -10,7 +10,6 @@ from ethereum_rpc import ErrorCode, RPCError
 from pons import (
     CycleFallback,
     FallbackProvider,
-    HTTPError,
     InvalidResponse,
     PriorityFallback,
     ProtocolError,
@@ -21,6 +20,7 @@ from pons import (
 )
 from pons._fallback_provider import PriorityFallbackStrategy
 from pons._provider import RPC_JSON, ProviderSession
+from pons.http_provider import HTTPError
 
 
 def random_request() -> str:
