@@ -1,6 +1,9 @@
 import re
+from copy import deepcopy
+from pathlib import Path
 
 import pytest
+import solcx
 from ethereum_rpc import Address, BlockHash, LogEntry, LogTopic, TxHash, keccak
 
 from pons import (
@@ -544,6 +547,63 @@ def test_contract_abi_json() -> None:
     assert isinstance(cabi.method.writeMethod, Method)
     assert isinstance(cabi.event.Deposit, Event)
     assert isinstance(cabi.error.CustomError, Error)
+
+
+def clean_entries(abi: list[ABI_JSON]) -> list[ABI_JSON]:
+    """
+    Makes JSON ABI entries comparable.
+
+    Currently just removes `internalType` items (we do not support keeping them at the moment).
+    """
+    abi = deepcopy(abi)
+    for entry in abi:
+        assert isinstance(entry, dict)
+        if "inputs" in entry:
+            for arg in entry["inputs"]:
+                if "internalType" in arg:
+                    del arg["internalType"]
+        if "outputs" in entry:
+            for arg in entry["outputs"]:
+                if "internalType" in arg:
+                    del arg["internalType"]
+
+    return abi
+
+
+def test_json_roundtrip() -> None:
+    # Since we need the raw JSON ABI, we cannot use the existing compiler function
+    # (which wraps the ABI in `ContractABI` straight away).
+
+    compiled = solcx.compile_files(
+        [Path(__file__).resolve().parent / "TestContractABI.sol"],
+        output_values=["abi"],
+    )
+
+    results = {}
+    for identifier, compiled_contract in compiled.items():
+        _path, contract_name = identifier.split(":")
+        results[contract_name] = compiled_contract["abi"]
+
+    json_abi = results["RoundTrip"]
+
+    cabi = ContractABI.from_json(json_abi)
+
+    assert isinstance(json_abi, list)
+    json_abi_ref = clean_entries(json_abi)
+
+    json_abi_test = cabi.to_json()
+    assert isinstance(json_abi_test, list)
+    json_abi_test = clean_entries(json_abi_test)
+
+    # The comparison is a little tricky:
+    # - ABI entries are a list, and the order may have changed after the roundtrip
+    # - There will be multiple entries with the same name for overloaded methods
+
+    assert len(json_abi_ref) == len(json_abi_test)
+
+    for ref_entry in json_abi_ref:
+        matches = [entry for entry in json_abi_test if entry == ref_entry]
+        assert len(matches) == 1, "expected one and only one match for each entry"
 
 
 def test_contract_abi_init() -> None:

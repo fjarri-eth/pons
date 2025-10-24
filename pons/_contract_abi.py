@@ -173,6 +173,18 @@ class Fields:
         """
         return FieldValues(list(zip(self.names, decode_args(self.types, value_bytes), strict=True)))
 
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        args = []
+        for name, tp in zip(self.names, self.types, strict=True):
+            args.append(
+                {
+                    "name": name if name is not None else "",
+                    "type": tp.canonical_form,
+                }
+            )
+        return args
+
     def __str__(self) -> str:
         fields = ", ".join(
             tp.canonical_form + ((" " + name) if name is not None else "")
@@ -297,6 +309,19 @@ class EventFields(Fields):
 
         return FieldValues(decoded_data)
 
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        args: list[ABI_JSON] = []
+        for name, tp, indexed in zip(self.names, self.types, self.indexed, strict=True):
+            args.append(
+                {
+                    "indexed": indexed,
+                    "name": name if name is not None else "",
+                    "type": tp.canonical_form,
+                }
+            )
+        return args
+
     def __str__(self) -> str:
         params = []
         for name, tp, indexed in zip(self.names, self.types, self.indexed, strict=True):
@@ -358,6 +383,14 @@ class Constructor:
         """Returns an encoded call with given arguments."""
         input_bytes = self.inputs.encode(self._inputs_signature.bind(*args, **kwargs).args)
         return ConstructorCall(input_bytes)
+
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        return {
+            "type": "constructor",
+            "stateMutability": "payable" if self.payable else "nonpayable",
+            "inputs": self.inputs.to_json(),
+        }
 
     def __str__(self) -> str:
         return f"constructor{self.inputs} " + ("payable" if self.payable else "nonpayable")
@@ -515,6 +548,16 @@ class Method:
         """Returns a multimethod resulting from joining this method with `method`."""
         return MultiMethod(self, method)
 
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        return {
+            "type": "function",
+            "name": self.name,
+            "stateMutability": self._mutability.value,
+            "inputs": self.inputs.to_json(),
+            "outputs": self.outputs.to_json(),
+        }
+
     def __str__(self) -> str:
         returns = "" if not self.outputs.names else f" returns {self.outputs}"
         return f"function {self.name}{self.inputs} {self._mutability.value}{returns}"
@@ -585,6 +628,10 @@ class MultiMethod:
             return method.call_bound(bound_args)
 
         raise TypeError("Could not find a suitable overloaded method for the given arguments")
+
+    def to_json(self) -> list[ABI_JSON]:
+        """Returns this object's JSON ABI."""
+        return [method.to_json() for method in self._methods.values()]
 
     def __str__(self) -> str:
         return "; ".join(str(method) for method in self._methods.values())
@@ -689,6 +736,15 @@ class Event:
 
         return self.fields.decode_log_entry([bytes(topic) for topic in topics], log_entry.data)
 
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        return {
+            "type": "event",
+            "name": self.name,
+            "inputs": self.fields.to_json(),
+            "anonymous": self.anonymous,
+        }
+
     def __str__(self) -> str:
         return f"event {self.name}{self.fields}" + (" anonymous" if self.anonymous else "")
 
@@ -743,6 +799,14 @@ class Error:
         """Decodes the error fields from the given packed data."""
         return self.fields.decode(data_bytes)
 
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        return {
+            "type": "error",
+            "name": self.name,
+            "inputs": self.fields.to_json(),
+        }
+
     def __str__(self) -> str:
         return f"error {self.name}{self.fields}"
 
@@ -773,6 +837,13 @@ class Fallback:
     def __init__(self, *, payable: bool = False):
         self.payable = payable
 
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        return {
+            "type": "fallback",
+            "stateMutability": "payable" if self.payable else "nonpayable",
+        }
+
     def __str__(self) -> str:
         return "fallback() " + ("payable" if self.payable else "nonpayable")
 
@@ -800,6 +871,13 @@ class Receive:
 
     def __init__(self, *, payable: bool = False):
         self.payable = payable
+
+    def to_json(self) -> ABI_JSON:
+        """Returns this object's JSON ABI."""
+        return {
+            "type": "receive",
+            "stateMutability": "payable" if self.payable else "nonpayable",
+        }
 
     def __str__(self) -> str:
         return "receive() " + ("payable" if self.payable else "nonpayable")
@@ -995,6 +1073,27 @@ class ContractABI:
             return error, decoded
 
         raise UnknownError(f"Could not find an error with selector {selector.hex()} in the ABI")
+
+    def to_json(self) -> ABI_JSON:
+        """Returns the serialized list of contract items (methods, errors, events)."""
+        all_items: Iterable[
+            Constructor | Fallback | Receive | Method | MultiMethod | Event | Error
+        ] = chain(
+            [self.constructor] if self.constructor else [],
+            [self.fallback] if self.fallback else [],
+            [self.receive] if self.receive else [],
+            self.method,
+            self.event,
+            self.error,
+        )
+        entries: list[ABI_JSON] = []
+        for item in all_items:
+            if isinstance(item, MultiMethod):
+                entries.extend(item.to_json())
+            else:
+                entries.append(item.to_json())
+
+        return entries
 
     def __str__(self) -> str:
         all_items: Iterable[
