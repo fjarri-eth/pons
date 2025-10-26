@@ -743,3 +743,10 @@ async def test_contract_panics(
         expected_message="execution reverted",
         expected_data=panic_selector + encode_args((abi.uint(256), 0x11)),
     )
+
+
+async def test_eth_uninstall_filter(session: ClientSession) -> None:
+    block_filter = await session.rpc.eth_new_block_filter()
+    assert await session.rpc.eth_uninstall_filter(block_filter)
+    # no such filter anymore
+    assert not await session.rpc.eth_uninstall_filter(block_filter)

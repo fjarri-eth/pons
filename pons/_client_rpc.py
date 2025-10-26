@@ -362,3 +362,18 @@ class ClientSessionRPC:
         Depending on what ``filter_`` was, returns a tuple of corresponding results.
         """
         return await self._query_filter("eth_getFilterChanges", filter_)
+
+    async def eth_uninstall_filter(
+        self, filter_: BlockFilter | PendingTransactionFilter | LogFilter
+    ) -> bool:
+        """
+        Calls the ``eth_uninstallFilter`` RPC method.
+        Returns ``true`` if there was an active filter with a given filter ID.
+
+        .. note::
+
+            Many providers will automatically uninstall filters after some time.
+        """
+        return await rpc_call_at_pin(
+            self._provider_session, filter_.provider_path, "eth_uninstallFilter", bool, filter_.id
+        )
