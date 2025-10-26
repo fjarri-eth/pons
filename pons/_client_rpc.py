@@ -377,3 +377,103 @@ class ClientSessionRPC:
         return await rpc_call_at_pin(
             self._provider_session, filter_.provider_path, "eth_uninstallFilter", bool, filter_.id
         )
+
+    async def web3_client_version(self) -> str:
+        """Calls the ``web3_clientVersion`` RPC method."""
+        return await rpc_call(self._provider_session, "web3_clientVersion", str)
+
+    async def web3_sha3(self, data: bytes) -> bytes:
+        """Calls the ``web3_sha3`` RPC method."""
+        return await rpc_call(self._provider_session, "web3_sha3", bytes, data)
+
+    async def net_listening(self) -> bool:
+        """Calls the ``net_listening`` RPC method."""
+        return await rpc_call(self._provider_session, "net_listening", bool)
+
+    async def net_peer_count(self) -> int:
+        """Calls the ``net_peerCount`` RPC method."""
+        return await rpc_call(self._provider_session, "net_peerCount", int)
+
+    async def eth_coinbase(self) -> Address:
+        """Calls the ``eth_coinbase`` RPC method."""
+        return await rpc_call(self._provider_session, "eth_coinbase", Address)
+
+    async def eth_accounts(self) -> list[Address]:
+        """Calls the ``eth_accounts`` RPC method."""
+        return await rpc_call(self._provider_session, "eth_accounts", list[Address])
+
+    async def eth_get_block_transaction_count_by_hash(self, block_hash: BlockHash) -> int:
+        """Calls the ``eth_getBlockTransactionCountByHash`` RPC method."""
+        return await rpc_call(
+            self._provider_session, "eth_getBlockTransactionCountByHash", int, block_hash
+        )
+
+    async def eth_get_block_transaction_count_by_number(self, block: Block) -> int:
+        """Calls the ``eth_getBlockTransactionCountByNumber`` RPC method."""
+        return await rpc_call(
+            self._provider_session, "eth_getBlockTransactionCountByNumber", int, block
+        )
+
+    async def eth_get_uncle_count_by_block_hash(self, block_hash: BlockHash) -> int:
+        """Returns the number of uncles in a block from a block matching the given block hash."""
+        return await rpc_call(
+            self._provider_session, "eth_getUncleCountByBlockHash", int, block_hash
+        )
+
+    async def eth_get_uncle_count_by_block_number(self, block: Block) -> int:
+        """Returns the number of uncles in a block from a block matching the given block number."""
+        return await rpc_call(self._provider_session, "eth_getUncleCountByBlockNumber", int, block)
+
+    async def eth_get_transaction_by_block_hash_and_index(
+        self, block_hash: BlockHash, index: int
+    ) -> TxInfo:
+        """Calls the ``eth_getTransactionByBlockHashAndIndex`` RPC method."""
+        return await rpc_call(
+            self._provider_session,
+            "eth_getTransactionByBlockHashAndIndex",
+            TxInfo,
+            block_hash,
+            index,
+        )
+
+    async def eth_get_transaction_by_block_number_and_index(
+        self, block: Block, index: int
+    ) -> TxInfo:
+        """Calls the ``eth_getTransactionByBlockNumberAndIndex`` RPC method."""
+        return await rpc_call(
+            self._provider_session, "eth_getTransactionByBlockNumberAndIndex", TxInfo, block, index
+        )
+
+    async def eth_get_uncle_by_block_hash_and_index(
+        self, block_hash: BlockHash, index: int
+    ) -> None | BlockInfo:
+        """Calls the ``eth_getUncleByBlockHashAndIndex`` RPC method."""
+        # Need an explicit cast, mypy doesn't work with union types correctly.
+        # See https://github.com/python/mypy/issues/16935
+        return cast(
+            "None | BlockInfo",
+            await rpc_call(
+                self._provider_session,
+                "eth_getUncleByBlockHashAndIndex",
+                None | BlockInfo,  # type: ignore[arg-type]
+                block_hash,
+                index,
+            ),
+        )
+
+    async def eth_get_uncle_by_block_number_and_index(
+        self, block: Block, index: int
+    ) -> None | BlockInfo:
+        """Calls the ``eth_getUncleByBlockNumberAndIndex`` RPC method."""
+        # Need an explicit cast, mypy doesn't work with union types correctly.
+        # See https://github.com/python/mypy/issues/16935
+        return cast(
+            "None | BlockInfo",
+            await rpc_call(
+                self._provider_session,
+                "eth_getUncleByBlockNumberAndIndex",
+                None | BlockInfo,  # type: ignore[arg-type]
+                block,
+                index,
+            ),
+        )
