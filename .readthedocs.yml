@@ -22,4 +22,4 @@ python:
     - method: pip
       path: .
       extra_requirements:
-        - docs
+        - docs,compiler,local-provider,http-provider,http-provider-server
