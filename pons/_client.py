@@ -277,10 +277,11 @@ class ClientSession:
     ) -> Any:
         """
         Sends a prepared contact method call to the provided address.
-        Returns the decoded output.
 
         If ``sender_address`` is provided, it will be included in the call
         and affect the return value if the method uses ``msg.sender`` internally.
+
+        The decoded output is returned according to :py:class:`Method.decode_output` rules.
         """
         with convert_errors(call.contract_abi):
             return await self._rpc.eth_call(call, block=block, sender_address=sender_address)

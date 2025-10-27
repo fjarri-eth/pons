@@ -638,14 +638,7 @@ class MultiMethod:
 
 
 class Event:
-    """
-    A contract event.
-
-    .. note::
-
-       If the name of a field given to the constructor matches a Python keyword,
-       ``_`` will be appended to it.
-    """
+    """A contract event."""
 
     name: str
     """The name of this event."""
