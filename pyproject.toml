@@ -26,7 +26,7 @@ compiler = [
     "py-solc-x>=2",
 ]
 local-provider = [
-    "alysis>=0.6.1",
+    "alysis>=0.6.3",
 ]
 http-provider = [
     "httpx>=0.22",
@@ -45,7 +45,7 @@ tests = [
     # from `compiler` feature
     "py-solc-x>=2",
     # from `local-provider` feature
-    "alysis>=0.3.0",
+    "alysis>=0.6.3",
     # from `http-provider` feature
     "httpx>=0.22",
     # from `http-provider-server` feature

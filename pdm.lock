@@ -5,7 +5,7 @@
 groups = ["default", "compiler", "docs", "http-provider", "http-provider-server", "lint", "local-provider", "tests"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:a13f7369eb15e760dfc6f725dc5d9dc15887fc8780be4ce00aa7284950963c7c"
+content_hash = "sha256:f254650c197ad4f9f2858cde2d4f63708116c5d99687625a3006b7518ade6e6a"
 
 [[metadata.targets]]
 requires_python = ">=3.10"
@@ -37,7 +37,7 @@ files = [
 
 [[package]]
 name = "alysis"
-version = "0.6.2"
+version = "0.6.3"
 requires_python = ">=3.10"
 summary = "Ethereum testerchain"
 groups = ["local-provider", "tests"]
@@ -52,8 +52,8 @@ dependencies = [
     "setuptools",
 ]
 files = [
-    {file = "alysis-0.6.2-py3-none-any.whl", hash = "sha256:8509a2fafe76900c6a0acbe1d8c9d828a0015af14863af03e1db47b0f6409bde"},
-    {file = "alysis-0.6.2.tar.gz", hash = "sha256:b34c457092b2831d9c0df2d3dc50acd0981feaa3eeab89dc074b87e6c31935a8"},
+    {file = "alysis-0.6.3-py3-none-any.whl", hash = "sha256:a3a5b2158ec92210ee87b845bff54cb925e1007a76cf8b63876c83a14c821494"},
+    {file = "alysis-0.6.3.tar.gz", hash = "sha256:5fdc824c80f04e0670aa31ad222297857fc3d28099df6cecb18246326e1827db"},
 ]
 
 [[package]]

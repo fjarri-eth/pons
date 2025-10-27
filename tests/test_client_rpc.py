@@ -743,3 +743,169 @@ async def test_contract_panics(
         expected_message="execution reverted",
         expected_data=panic_selector + encode_args((abi.uint(256), 0x11)),
     )
+
+
+async def test_eth_uninstall_filter(session: ClientSession) -> None:
+    block_filter = await session.rpc.eth_new_block_filter()
+    assert await session.rpc.eth_uninstall_filter(block_filter)
+    # no such filter anymore
+    assert not await session.rpc.eth_uninstall_filter(block_filter)
+
+
+async def test_web3_client_version(session: ClientSession) -> None:
+    assert await session.rpc.web3_client_version() == "Alysis testerchain"
+
+
+async def test_web3_sha3(session: ClientSession) -> None:
+    data = b"12345678"
+    assert await session.rpc.web3_sha3(data) == keccak(data)
+
+
+async def test_net_listening(session: ClientSession) -> None:
+    assert await session.rpc.net_listening()
+
+
+async def test_net_peer_coont(session: ClientSession) -> None:
+    assert await session.rpc.net_peer_count() == 42
+
+
+async def test_eth_coinbase(session: ClientSession) -> None:
+    # That's what the testerchain is expected to return
+    assert await session.rpc.eth_coinbase() == Address(b"\x00" * 20)
+
+
+async def test_eth_accounts(session: ClientSession) -> None:
+    # For now the testerchain does not support creating accounts
+    assert await session.rpc.eth_accounts() == []
+
+
+async def test_eth_get_block_transaction_count_by_hash(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(1))
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(2))
+    local_provider.enable_auto_mine_transactions()
+    block_info = await session.get_block(BlockLabel.LATEST)
+    assert block_info is not None
+    assert block_info.hash_ is not None
+
+    assert await session.rpc.eth_get_block_transaction_count_by_hash(block_info.hash_) == 2
+
+
+async def test_eth_get_block_transaction_count_by_number(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(1))
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(2))
+    local_provider.enable_auto_mine_transactions()
+
+    assert await session.rpc.eth_get_block_transaction_count_by_number(BlockLabel.LATEST) == 2
+
+
+async def test_eth_get_uncle_count_by_block_hash(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    block_info = await session.get_block(BlockLabel.LATEST)
+    assert block_info is not None
+    assert block_info.hash_ is not None
+
+    assert await session.rpc.eth_get_uncle_count_by_block_hash(block_info.hash_) == 0
+
+
+async def test_eth_get_uncle_count_by_block_number(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    assert await session.rpc.eth_get_uncle_count_by_block_number(BlockLabel.LATEST) == 0
+
+
+async def test_eth_get_transaction_by_block_hash_and_index(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(1))
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(2))
+    local_provider.enable_auto_mine_transactions()
+    block_info = await session.get_block(BlockLabel.LATEST, with_transactions=True)
+    assert block_info is not None
+    assert block_info.hash_ is not None
+
+    assert (
+        await session.rpc.eth_get_transaction_by_block_hash_and_index(block_info.hash_, 0)
+        == block_info.transactions[0]
+    )
+    assert (
+        await session.rpc.eth_get_transaction_by_block_hash_and_index(block_info.hash_, 1)
+        == block_info.transactions[1]
+    )
+
+    message = (
+        "Provider error: RPC error (RPCErrorCode.METHOD_NOT_FOUND): "
+        "2 transactions available, requested index 2"
+    )
+    with pytest.raises(ProviderError, match=re.escape(message)):
+        assert await session.rpc.eth_get_transaction_by_block_hash_and_index(block_info.hash_, 2)
+
+
+async def test_eth_get_transaction_by_block_number_and_index(
+    local_provider: LocalProvider,
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    local_provider.disable_auto_mine_transactions()
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(1))
+    await session.broadcast_transfer(root_signer, another_signer.address, Amount.ether(2))
+    local_provider.enable_auto_mine_transactions()
+    block_info = await session.get_block(BlockLabel.LATEST, with_transactions=True)
+    assert block_info is not None
+
+    assert (
+        await session.rpc.eth_get_transaction_by_block_number_and_index(BlockLabel.LATEST, 0)
+        == block_info.transactions[0]
+    )
+    assert (
+        await session.rpc.eth_get_transaction_by_block_number_and_index(BlockLabel.LATEST, 1)
+        == block_info.transactions[1]
+    )
+
+
+async def test_eth_get_uncle_by_block_hash_and_index(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+    block_info = await session.get_block(BlockLabel.LATEST, with_transactions=True)
+    assert block_info is not None
+    assert block_info.hash_ is not None
+
+    # How do we make the testerchain create uncles?
+    assert await session.rpc.eth_get_uncle_by_block_hash_and_index(block_info.hash_, 0) is None
+
+
+async def test_eth_get_uncle_by_block_number_and_index(
+    session: ClientSession,
+    root_signer: AccountSigner,
+    another_signer: AccountSigner,
+) -> None:
+    await session.transfer(root_signer, another_signer.address, Amount.ether(1))
+
+    # How do we make the testerchain create uncles?
+    assert await session.rpc.eth_get_uncle_by_block_number_and_index(BlockLabel.LATEST, 0) is None
