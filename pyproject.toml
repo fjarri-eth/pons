@@ -187,3 +187,4 @@ exclude = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["pons"]
+split-on-trailing-comma = false

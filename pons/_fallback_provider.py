@@ -4,13 +4,7 @@ from collections.abc import AsyncIterator, Iterable, Mapping
 from collections.abc import Set as AbstractSet
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from ._provider import (
-    RPC_JSON,
-    Provider,
-    ProviderError,
-    ProviderPath,
-    ProviderSession,
-)
+from ._provider import RPC_JSON, Provider, ProviderError, ProviderPath, ProviderSession
 
 
 class FallbackStrategy(ABC):
